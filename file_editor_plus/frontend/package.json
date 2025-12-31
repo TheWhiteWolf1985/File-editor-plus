@@ -1,0 +1,19 @@
+{
+  "name": "file-editor-plus-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "lit": "^3.2.1"
+  },
+"devDependencies": {
+  "typescript": "^5.7.2",
+  "vite": "^6.0.7",
+  "@vitejs/plugin-react": "^4.3.4",
+  "@babel/core": "^7.26.0",
+  "@babel/plugin-proposal-decorators": "^7.26.0",
+  "@babel/plugin-proposal-class-properties": "^7.18.6"
+}
+}
