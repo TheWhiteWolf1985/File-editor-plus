@@ -14,7 +14,14 @@
           "panel": "new"
         },
         "problemMatcher": []
+      },
+      {
+      "label": "supervisor_run",
+      "type": "shell",
+      "command": "supervisor_run",
+      "runOptions": { "runOn": "folderOpen" },
+      "problemMatcher": []
       }
     ]
   }
-  
+
