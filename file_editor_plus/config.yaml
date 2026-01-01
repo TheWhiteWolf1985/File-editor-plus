@@ -1,7 +1,7 @@
 name: "File Editor Plus (MVP)"
-version: "0.1.5"
+version: "0.1.6"
 slug: "file_editor_plus"
-description: "MVP: Ingress Hello UI"
+description: "Pro File Editor for Home Assistant"
 arch:
   - amd64
 startup: application

@@ -4,33 +4,6 @@ import { customElement, state } from "lit/decorators.js";
 type TreeItem = { name: string; path: string; type: "dir" | "file"; children?: TreeItem[] };
 type Tab = { path: string; name: string; dirty: boolean };
 
-const MOCK_TREE: TreeItem[] = [
-  {
-    name: "config",
-    path: "",
-    type: "dir",
-    children: [
-      { name: "configuration.yaml", path: "configuration.yaml", type: "file" },
-      { name: "automations.yaml", path: "automations.yaml", type: "file" },
-      {
-        name: "packages",
-        path: "packages",
-        type: "dir",
-        children: [
-          { name: "lighting.yaml", path: "packages/lighting.yaml", type: "file" },
-          { name: "climate.yaml", path: "packages/climate.yaml", type: "file" },
-        ],
-      },
-      {
-        name: "scripts",
-        path: "scripts",
-        type: "dir",
-        children: [{ name: "night_mode.yaml", path: "scripts/night_mode.yaml", type: "file" }],
-      },
-    ],
-  },
-];
-
 @customElement("app-root")
 export class AppRoot extends LitElement {
   static styles = css`
@@ -280,16 +253,55 @@ export class AppRoot extends LitElement {
     }
   `;
 
+  private apiBase = (() => {
+    const base = new URL("./", window.location.href).pathname;
+    return base.endsWith("/") ? base : `${base}/`;
+  })();
+
   @state() expanded = new Set<string>([""]); // root expanded
   @state() activePath: string | null = null;
   @state() tabs: Tab[] = [];
   @state() content = "";
   @state() status = "Ready";
+  @state() rootItems: TreeItem[] = [];
+  @state() treeData: Record<string, TreeItem[]> = {};
 
-  private toggleDir(path: string) {
+  connectedCallback() {
+    super.connectedCallback();
+    this.loadTree("");
+  }
+
+  private async loadTree(path: string) {
+    try {
+      this.status = "Loading tree...";
+      const url = `${this.apiBase}api/tree${path ? `?path=${encodeURIComponent(path)}` : ""}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`tree ${res.status}`);
+      }
+      const data = await res.json();
+      const key = (data && typeof data.path === "string" ? data.path : path) || "";
+      const items = Array.isArray(data?.items) ? (data.items as TreeItem[]) : [];
+      if (key === "") {
+        this.rootItems = items;
+      }
+      this.treeData = { ...this.treeData, [key]: items };
+      this.status = items.length === 0 ? "Nessun file" : "Ready";
+      await this.requestUpdate();
+    } catch (e) {
+      this.status = "Errore caricamento tree";
+    }
+  }
+
+  private async toggleDir(path: string) {
     const s = new Set(this.expanded);
-    s.has(path) ? s.delete(path) : s.add(path);
+    const willExpand = !s.has(path);
+    willExpand ? s.add(path) : s.delete(path);
     this.expanded = s;
+
+    if (willExpand && !this.treeData[path]) {
+      await this.loadTree(path);
+    }
   }
 
   private openFile(path: string) {
@@ -299,10 +311,26 @@ export class AppRoot extends LitElement {
       this.tabs = [...this.tabs, { path, name, dirty: false }];
     }
     this.activePath = path;
+    this.content = "";
+    this.loadFile(path);
+  }
 
-    // Mock content
-    this.content = `# ${name}\n\n# TODO: collegare FastAPI\n# path: /config/${path}\n`;
-    this.status = "Ready";
+  private async loadFile(path: string) {
+    try {
+      this.status = "Loading file...";
+      const url = `${this.apiBase}api/file?path=${encodeURIComponent(path)}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`file ${res.status}`);
+      }
+      const data = await res.json();
+      this.content = data.content ?? "";
+      this.tabs = this.tabs.map((t) => (t.path === path ? { ...t, dirty: false } : t));
+      this.status = "Ready";
+      await this.requestUpdate();
+    } catch (e) {
+      this.status = "Errore caricamento file";
+    }
   }
 
   private closeTab(path: string) {
@@ -326,20 +354,36 @@ export class AppRoot extends LitElement {
     );
   }
 
-  private save() {
+  private async save() {
     if (!this.activePath) return;
-    this.status = "Saving (mock)…";
-    // Mock save delay
-    setTimeout(() => {
+    this.status = "Saving...";
+    try {
+      const url = `${this.apiBase}api/file?path=${encodeURIComponent(this.activePath)}`;
+      const res = await fetch(url, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: this.content }),
+      });
+      if (!res.ok) {
+        throw new Error(`save ${res.status}`);
+      }
       this.tabs = this.tabs.map((t) =>
         t.path === this.activePath ? { ...t, dirty: false } : t
       );
-      this.status = "Saved (mock)";
+      this.status = "Saved";
       setTimeout(() => (this.status = "Ready"), 800);
-    }, 350);
+    } catch (e) {
+      this.status = "Errore salvataggio";
+    }
   }
 
-  private renderTree(items: TreeItem[], depth = 0) {
+  private renderTree(path: string, depth = 0) {
+    const items =
+      path === ""
+        ? this.rootItems.length > 0
+          ? this.rootItems
+          : this.treeData[""] ?? []
+        : this.treeData[path] ?? [];
     return items.map((it) => {
       const isDir = it.type === "dir";
       const isExpanded = isDir && this.expanded.has(it.path);
@@ -359,8 +403,8 @@ export class AppRoot extends LitElement {
           <span class=${isDir ? "" : "muted"}>${it.name}</span>
         </div>
 
-        ${isDir && isExpanded && it.children
-          ? html`<div>${this.renderTree(it.children, depth + 1)}</div>`
+        ${isDir && isExpanded
+          ? html`<div>${this.renderTree(it.path, depth + 1)}</div>`
           : nothing}
       `;
     });
@@ -391,7 +435,7 @@ export class AppRoot extends LitElement {
               <div class="explorerTitle">Explorer</div>
             </div>
             <div class="tree">
-              ${this.renderTree(MOCK_TREE)}
+              ${this.renderTree("")}
             </div>
           </div>
 
@@ -426,7 +470,7 @@ export class AppRoot extends LitElement {
               ></textarea>
 
               <div style="font-size:12px; opacity:.75;">
-                Hint: per ora è tutto mock. Prossimo step: collegare /api/tree e /api/file.
+                Hint: Explorer e editor usano /api/tree e /api/file (PUT) sull'ingress corrente.
               </div>
             </div>
           </div>
