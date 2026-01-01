@@ -265,13 +265,22 @@ export class AppRoot extends LitElement {
   @state() status = "Ready";
   @state() rootItems: TreeItem[] = [];
   @state() treeData: Record<string, TreeItem[]> = {};
+  private loadedPaths = new Set<string>();
+  private loadingPaths = new Set<string>();
 
   connectedCallback() {
     super.connectedCallback();
-    this.loadTree("");
+    if (!this.loadedPaths.has("")) {
+      this.loadTree("");
+    }
   }
 
   private async loadTree(path: string) {
+    if (this.loadedPaths.has(path) || this.loadingPaths.has(path)) {
+      return;
+    }
+    this.loadingPaths.add(path);
+
     try {
       this.status = "Loading tree...";
       const url = `${this.apiBase}api/tree${path ? `?path=${encodeURIComponent(path)}` : ""}`;
@@ -290,6 +299,9 @@ export class AppRoot extends LitElement {
       await this.requestUpdate();
     } catch (e) {
       this.status = "Errore caricamento tree";
+    } finally {
+      this.loadingPaths.delete(path);
+      this.loadedPaths.add(path);
     }
   }
 
