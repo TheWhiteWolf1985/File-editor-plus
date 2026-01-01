@@ -232,12 +232,37 @@ export class AppRoot extends LitElement {
       background: #1177bb;
     }
 
+    .editorWrap {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: stretch;
+      gap: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+    .gutter {
+      width: 52px;
+      padding: 10px 8px;
+      background: #1a1a1a;
+      color: #7c7c7c;
+      border: 1px solid #2a2a2a;
+      border-right: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      line-height: 1.4;
+      text-align: right;
+      white-space: pre;
+      box-sizing: border-box;
+      overflow: hidden;
+      border-radius: 12px 0 0 12px;
+    }
     textarea {
       width: 100%;
       height: 100%;
       resize: none;
-      border-radius: 12px;
+      border-radius: 0 12px 12px 0;
       border: 1px solid #2a2a2a;
+      border-left: none;
       background: #1e1e1e;
       color: #d4d4d4;
       padding: 12px;
@@ -245,6 +270,7 @@ export class AppRoot extends LitElement {
       font-size: 13px;
       line-height: 1.4;
       outline: none;
+      box-sizing: border-box;
     }
     textarea:focus {
       border-color: #3a3a3a;
@@ -282,6 +308,7 @@ export class AppRoot extends LitElement {
   @state() status = "Ready";
   @state() rootItems: TreeItem[] = [];
   @state() treeData: Record<string, TreeItem[]> = {};
+  @state() lineCount = 1;
   private loadedPaths = new Set<string>();
   private loadingPaths = new Set<string>();
 
@@ -354,6 +381,7 @@ export class AppRoot extends LitElement {
       }
       const data = await res.json();
       this.content = data.content ?? "";
+      this.lineCount = Math.max(1, this.content.split("\n").length);
       this.tabs = this.tabs.map((t) => (t.path === path ? { ...t, dirty: false } : t));
       this.status = "Ready";
       await this.requestUpdate();
@@ -382,6 +410,7 @@ export class AppRoot extends LitElement {
 
   private markDirty(val: string) {
     this.content = val;
+    this.lineCount = Math.max(1, this.content.split("\n").length);
     if (!this.activePath) return;
     this.tabs = this.tabs.map((t) =>
       t.path === this.activePath ? { ...t, dirty: true } : t
@@ -393,6 +422,11 @@ export class AppRoot extends LitElement {
     e.preventDefault();
     console.debug("[app-root] close tab click", path, { active: this.activePath, tabs: this.tabs.length });
     this.closeTab(path);
+  }
+
+  private renderLineNumbers() {
+    const count = Math.max(1, this.lineCount);
+    return Array.from({ length: count }, (_, i) => String(i + 1)).join("\n");
   }
 
   private async save() {
@@ -511,11 +545,14 @@ export class AppRoot extends LitElement {
                 </div>
               </div>
 
-              <textarea
-                .value=${this.content}
-                placeholder="Seleziona un file a sinistra…"
-                @input=${(e: Event) => this.markDirty((e.target as HTMLTextAreaElement).value)}
-              ></textarea>
+              <div class="editorWrap">
+                <div class="gutter">${this.renderLineNumbers()}</div>
+                <textarea
+                  .value=${this.content}
+                  placeholder="Seleziona un file a sinistra…"
+                  @input=${(e: Event) => this.markDirty((e.target as HTMLTextAreaElement).value)}
+                ></textarea>
+              </div>
 
               <div style="font-size:12px; opacity:.75;">
                 Hint: Explorer e editor usano /api/tree e /api/file (PUT) sull'ingress corrente.
