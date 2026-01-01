@@ -170,6 +170,19 @@ export class AppRoot extends LitElement {
       outline: 1px solid #2a2a2a;
       outline-offset: -1px;
     }
+    .tabClose {
+      background: transparent;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      padding: 0;
+      margin: 0;
+      opacity: 0.65;
+      font-size: 12px;
+      display: grid;
+      place-items: center;
+      line-height: 1;
+    }
     .dot {
       width: 8px;
       height: 8px;
@@ -347,7 +360,10 @@ export class AppRoot extends LitElement {
 
   private closeTab(path: string) {
     const idx = this.tabs.findIndex((t) => t.path === path);
-    if (idx < 0) return;
+    if (idx < 0) {
+      console.debug("[app-root] closeTab: tab not found", path);
+      return;
+    }
     const nextTabs = this.tabs.slice(0, idx).concat(this.tabs.slice(idx + 1));
     this.tabs = nextTabs;
 
@@ -356,6 +372,8 @@ export class AppRoot extends LitElement {
       this.activePath = next?.path ?? null;
       this.content = next ? this.content : "";
     }
+    console.debug("[app-root] closeTab: closed", path, { remaining: this.tabs.map((t) => t.path), active: this.activePath });
+    this.requestUpdate();
   }
 
   private markDirty(val: string) {
@@ -364,6 +382,13 @@ export class AppRoot extends LitElement {
     this.tabs = this.tabs.map((t) =>
       t.path === this.activePath ? { ...t, dirty: true } : t
     );
+  }
+
+  private handleCloseTab(e: Event, path: string) {
+    e.stopPropagation();
+    e.preventDefault();
+    console.debug("[app-root] close tab click", path, { active: this.activePath, tabs: this.tabs.length });
+    this.closeTab(path);
   }
 
   private async save() {
@@ -460,7 +485,14 @@ export class AppRoot extends LitElement {
                       <div class="tab ${t.path === this.activePath ? "active" : ""}" @click=${() => (this.activePath = t.path)}>
                         <span>${t.name}</span>
                         ${t.dirty ? html`<span class="dot" title="Unsaved"></span>` : nothing}
-                        <span style="opacity:.65; cursor:pointer;" @click=${(e: Event) => (e.stopPropagation(), this.closeTab(t.path))}>✕</span>
+                        <button
+                          class="tabClose"
+                          type="button"
+                          title="Close"
+                          @click=${(e: Event) => this.handleCloseTab(e, t.path)}
+                        >
+                          ✕
+                        </button>
                       </div>
                     `
                   )}
