@@ -9,10 +9,14 @@ export class AppRoot extends LitElement {
   static styles = css`
     :host {
       display: block;
-      height: 100vh;
+      height: 100%;
+      min-height: 100%;
+      width: 100%;
+      overflow: hidden;
       color: #d4d4d4;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
       background: #1e1e1e;
+      box-sizing: border-box;
     }
 
     /* Layout */
