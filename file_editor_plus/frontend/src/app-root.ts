@@ -1,5 +1,6 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { ref } from "lit/directives/ref.js";
 
 type TreeItem = { name: string; path: string; type: "dir" | "file"; children?: TreeItem[] };
 type Tab = { path: string; name: string; dirty: boolean };
@@ -239,38 +240,85 @@ export class AppRoot extends LitElement {
       gap: 0;
       height: 100%;
       overflow: hidden;
+      position: relative;
     }
     .gutter {
       width: 52px;
-      padding: 10px 8px;
+      padding: 12px 8px;
       background: #1a1a1a;
       color: #7c7c7c;
       border: 1px solid #2a2a2a;
       border-right: none;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 12px;
+      font-size: 13px;
       line-height: 1.4;
       text-align: right;
       white-space: pre;
       box-sizing: border-box;
       overflow: hidden;
+      height: fit-content;
       border-radius: 12px 0 0 12px;
+    }
+    .codeWrap {
+      position: relative;
+      height: 100%;
+      overflow: auto;
+      border: 1px solid #2a2a2a;
+      border-left: none;
+      border-radius: 0 12px 12px 0;
+      background: #1e1e1e;
+    }
+    .code {
+      position: absolute;
+      inset: 0;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      line-height: 1.4;
+      white-space: pre;
+      word-wrap: normal;
+      color: #d4d4d4;
+      pointer-events: none;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .codeLine {
+      white-space: pre;
+      min-height: 1.4em;
+      line-height: 1.4;
+    }
+    .token-key {
+      color: #9cdcfe;
+    }
+    .token-string {
+      color: #ce9178;
+    }
+    .token-number {
+      color: #b5cea8;
+    }
+    .token-boolean {
+      color: #4ec9b0;
+    }
+    .token-comment {
+      color: #6a9955;
     }
     textarea {
       width: 100%;
       height: 100%;
       resize: none;
       border-radius: 0 12px 12px 0;
-      border: 1px solid #2a2a2a;
+      border: none;
       border-left: none;
-      background: #1e1e1e;
-      color: #d4d4d4;
+      background: transparent;
+      color: transparent;
+      caret-color: #d4d4d4;
       padding: 12px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 13px;
       line-height: 1.4;
       outline: none;
       box-sizing: border-box;
+      overflow: auto;
     }
     textarea:focus {
       border-color: #3a3a3a;
@@ -311,6 +359,9 @@ export class AppRoot extends LitElement {
   @state() lineCount = 1;
   private loadedPaths = new Set<string>();
   private loadingPaths = new Set<string>();
+  private fileCache: Record<string, string> = {};
+  private codeRef: HTMLDivElement | null = null;
+  private gutterRef: HTMLDivElement | null = null;
 
   connectedCallback() {
     super.connectedCallback();
@@ -382,6 +433,7 @@ export class AppRoot extends LitElement {
       const data = await res.json();
       this.content = data.content ?? "";
       this.lineCount = Math.max(1, this.content.split("\n").length);
+      this.fileCache[path] = this.content;
       this.tabs = this.tabs.map((t) => (t.path === path ? { ...t, dirty: false } : t));
       this.status = "Ready";
       await this.requestUpdate();
@@ -412,9 +464,11 @@ export class AppRoot extends LitElement {
     this.content = val;
     this.lineCount = Math.max(1, this.content.split("\n").length);
     if (!this.activePath) return;
+    this.fileCache[this.activePath] = val;
     this.tabs = this.tabs.map((t) =>
       t.path === this.activePath ? { ...t, dirty: true } : t
     );
+    this.requestUpdate();
   }
 
   private handleCloseTab(e: Event, path: string) {
@@ -422,6 +476,83 @@ export class AppRoot extends LitElement {
     e.preventDefault();
     console.debug("[app-root] close tab click", path, { active: this.activePath, tabs: this.tabs.length });
     this.closeTab(path);
+  }
+
+  private switchTab(path: string) {
+    this.activePath = path;
+    const cached = this.fileCache[path];
+    if (cached !== undefined) {
+      this.content = cached;
+      this.lineCount = Math.max(1, cached.split("\n").length);
+      this.requestUpdate();
+    } else {
+      this.content = "";
+      this.lineCount = 1;
+      this.loadFile(path);
+    }
+  }
+
+  private highlightLine(line: string) {
+    type Seg = { text: string; cls?: string };
+    const segments: Seg[] = [];
+    const pushWithStyles = (text: string) => {
+      const regex = /(".*?"|'.*?'|\btrue\b|\bfalse\b|\bnull\b|\b\d+(?:\.\d+)?\b)/g;
+      let last = 0;
+      let m: RegExpExecArray | null;
+      while ((m = regex.exec(text)) !== null) {
+        if (m.index > last) {
+          segments.push({ text: text.slice(last, m.index) });
+        }
+        const token = m[1];
+        if (token === "true" || token === "false" || token === "null") {
+          segments.push({ text: token, cls: "token-boolean" });
+        } else if (/^\d/.test(token)) {
+          segments.push({ text: token, cls: "token-number" });
+        } else {
+          segments.push({ text: token, cls: "token-string" });
+        }
+        last = m.index + token.length;
+      }
+      if (last < text.length) {
+        segments.push({ text: text.slice(last) });
+      }
+    };
+
+    const commentIdx = line.indexOf("#");
+    const contentPart = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
+    const commentPart = commentIdx >= 0 ? line.slice(commentIdx) : null;
+
+    const keyMatch = contentPart.match(/^(\s*-?\s*[^:\s#]+:)/);
+    if (keyMatch) {
+      const key = keyMatch[1];
+      segments.push({ text: key, cls: "token-key" });
+      const rest = contentPart.slice(key.length);
+      if (rest) pushWithStyles(rest);
+    } else {
+      pushWithStyles(contentPart);
+    }
+
+    if (commentPart) {
+      segments.push({ text: commentPart, cls: "token-comment" });
+    }
+    if (segments.length === 0) {
+      segments.push({ text: " " });
+    }
+    return segments;
+  }
+
+  private renderHighlighted() {
+    const lines = this.content.split("\n");
+    return lines.map(
+      (line) =>
+        html`<div class="codeLine">${this.highlightLine(line).map((seg) => html`<span class=${seg.cls ?? ""}>${seg.text || " "}</span>`)}</div>`
+    );
+  }
+
+  private syncScroll(e: Event) {
+    const top = (e.target as HTMLElement).scrollTop;
+    if (this.codeRef) this.codeRef.style.transform = `translateY(-${top}px)`;
+    if (this.gutterRef) this.gutterRef.style.transform = `translateY(-${top}px)`;
   }
 
   private renderLineNumbers() {
@@ -442,6 +573,7 @@ export class AppRoot extends LitElement {
       if (!res.ok) {
         throw new Error(`save ${res.status}`);
       }
+      this.fileCache[this.activePath] = this.content;
       this.tabs = this.tabs.map((t) =>
         t.path === this.activePath ? { ...t, dirty: false } : t
       );
@@ -520,7 +652,7 @@ export class AppRoot extends LitElement {
                 ? html`<div class="tab active">Welcome</div>`
                 : this.tabs.map(
                     (t) => html`
-                      <div class="tab ${t.path === this.activePath ? "active" : ""}" @click=${() => (this.activePath = t.path)}>
+                      <div class="tab ${t.path === this.activePath ? "active" : ""}" @click=${() => this.switchTab(t.path)}>
                         <span>${t.name}</span>
                         ${t.dirty ? html`<span class="dot" title="Unsaved"></span>` : nothing}
                         <button
@@ -546,12 +678,16 @@ export class AppRoot extends LitElement {
               </div>
 
               <div class="editorWrap">
-                <div class="gutter">${this.renderLineNumbers()}</div>
-                <textarea
-                  .value=${this.content}
-                  placeholder="Seleziona un file a sinistra…"
-                  @input=${(e: Event) => this.markDirty((e.target as HTMLTextAreaElement).value)}
-                ></textarea>
+                <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${this.renderLineNumbers()}</div>
+                <div class="codeWrap">
+                  <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted()}</div>
+                  <textarea
+                    .value=${this.content}
+                    placeholder="Seleziona un file a sinistra…"
+                    @scroll=${this.syncScroll}
+                    @input=${(e: Event) => this.markDirty((e.target as HTMLTextAreaElement).value)}
+                  ></textarea>
+                </div>
               </div>
 
               <div style="font-size:12px; opacity:.75;">
