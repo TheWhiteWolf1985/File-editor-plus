@@ -357,17 +357,36 @@ export class AppRoot extends LitElement {
   @state() rootItems: TreeItem[] = [];
   @state() treeData: Record<string, TreeItem[]> = {};
   @state() lineCount = 1;
+  @state() cursorLine = 1;
+  @state() cursorCol = 1;
   private loadedPaths = new Set<string>();
   private loadingPaths = new Set<string>();
   private fileCache: Record<string, string> = {};
   private codeRef: HTMLDivElement | null = null;
   private gutterRef: HTMLDivElement | null = null;
+  private editorRef: HTMLTextAreaElement | null = null;
+  private cursorRaf: number | null = null;
+  private lastCursorLine = 1;
+  private lastCursorCol = 1;
+  private selectionListener = () => {
+    if (!this.editorRef) return;
+    const active = this.shadowRoot?.activeElement || document.activeElement;
+    if (active !== this.editorRef) return;
+    this.updateCursorFromPos(this.editorRef.selectionStart ?? 0, this.editorRef.value);
+  };
 
   connectedCallback() {
     super.connectedCallback();
     if (!this.loadedPaths.has("")) {
       this.loadTree("");
     }
+    document.addEventListener("selectionchange", this.selectionListener);
+  }
+
+  disconnectedCallback(): void {
+    document.removeEventListener("selectionchange", this.selectionListener);
+    if (this.cursorRaf !== null) cancelAnimationFrame(this.cursorRaf);
+    super.disconnectedCallback();
   }
 
   private async loadTree(path: string) {
@@ -434,6 +453,8 @@ export class AppRoot extends LitElement {
       this.content = data.content ?? "";
       this.lineCount = Math.max(1, this.content.split("\n").length);
       this.fileCache[path] = this.content;
+      this.cursorLine = 1;
+      this.cursorCol = 1;
       this.tabs = this.tabs.map((t) => (t.path === path ? { ...t, dirty: false } : t));
       this.status = "Ready";
       await this.requestUpdate();
@@ -455,6 +476,11 @@ export class AppRoot extends LitElement {
       const next = nextTabs[idx - 1] ?? nextTabs[idx] ?? null;
       this.activePath = next?.path ?? null;
       this.content = next ? this.content : "";
+      if (!next) {
+        this.cursorLine = 1;
+        this.cursorCol = 1;
+        this.lineCount = 1;
+      }
     }
     console.debug("[app-root] closeTab: closed", path, { remaining: this.tabs.map((t) => t.path), active: this.activePath });
     this.requestUpdate();
@@ -471,6 +497,56 @@ export class AppRoot extends LitElement {
     this.requestUpdate();
   }
 
+  private updateCursorFromPos(pos: number, value?: string) {
+    const source = value ?? this.content;
+    const upToPos = source.slice(0, pos);
+    const lines = upToPos.split("\n");
+    const nextLine = Math.max(1, lines.length);
+    const nextCol = Math.max(1, lines[lines.length - 1].length + 1);
+    if (nextLine !== this.cursorLine || nextCol !== this.cursorCol) {
+      this.cursorLine = nextLine;
+      this.cursorCol = nextCol;
+      this.lastCursorLine = nextLine;
+      this.lastCursorCol = nextCol;
+      console.debug("[app-root] cursor", { pos, line: nextLine, col: nextCol });
+      this.requestUpdate();
+    }
+  }
+
+  private updateCursorFromTextarea() {
+    if (!this.editorRef) return;
+    const ta = this.editorRef;
+    const pos = ta.selectionStart ?? 0;
+    this.updateCursorFromPos(pos, ta.value);
+  }
+
+  private handleInput(e: Event) {
+    const ta = e.target as HTMLTextAreaElement;
+    this.markDirty(ta.value);
+    requestAnimationFrame(() => this.updateCursorFromTextarea());
+  }
+
+  private handleCursorMove(e: Event) {
+    requestAnimationFrame(() => this.updateCursorFromTextarea());
+  }
+
+  private startCursorTracking() {
+    const tick = () => {
+      this.updateCursorFromTextarea();
+      this.cursorRaf = requestAnimationFrame(tick);
+    };
+    if (this.cursorRaf === null) {
+      this.cursorRaf = requestAnimationFrame(tick);
+    }
+  }
+
+  private stopCursorTracking() {
+    if (this.cursorRaf !== null) {
+      cancelAnimationFrame(this.cursorRaf);
+      this.cursorRaf = null;
+    }
+  }
+
   private handleCloseTab(e: Event, path: string) {
     e.stopPropagation();
     e.preventDefault();
@@ -484,10 +560,14 @@ export class AppRoot extends LitElement {
     if (cached !== undefined) {
       this.content = cached;
       this.lineCount = Math.max(1, cached.split("\n").length);
+      this.cursorLine = 1;
+      this.cursorCol = 1;
       this.requestUpdate();
     } else {
       this.content = "";
       this.lineCount = 1;
+      this.cursorLine = 1;
+      this.cursorCol = 1;
       this.loadFile(path);
     }
   }
@@ -544,8 +624,8 @@ export class AppRoot extends LitElement {
   private renderHighlighted() {
     const lines = this.content.split("\n");
     return lines.map(
-      (line) =>
-        html`<div class="codeLine">${this.highlightLine(line).map((seg) => html`<span class=${seg.cls ?? ""}>${seg.text || " "}</span>`)}</div>`
+      (line, idx) =>
+        html`<div class="codeLine" data-gutter-line=${idx + 1}>${this.highlightLine(line).map((seg) => html`<span class=${seg.cls ?? ""}>${seg.text || " "}</span>`)}</div>`
     );
   }
 
@@ -682,10 +762,18 @@ export class AppRoot extends LitElement {
                 <div class="codeWrap">
                   <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted()}</div>
                   <textarea
+                    ${ref((el) => (this.editorRef = el))}
                     .value=${this.content}
                     placeholder="Seleziona un file a sinistra…"
                     @scroll=${this.syncScroll}
-                    @input=${(e: Event) => this.markDirty((e.target as HTMLTextAreaElement).value)}
+                    @input=${this.handleInput}
+                    @keyup=${this.handleCursorMove}
+                    @keydown=${this.handleCursorMove}
+                    @click=${this.handleCursorMove}
+                    @mouseup=${this.handleCursorMove}
+                    @select=${this.handleCursorMove}
+                    @focus=${() => this.startCursorTracking()}
+                    @blur=${() => this.stopCursorTracking()}
                   ></textarea>
                 </div>
               </div>
@@ -700,6 +788,8 @@ export class AppRoot extends LitElement {
         <div class="statusbar">
           <div>${this.status}</div>
           <div class="right">
+            <span>Ln ${this.cursorLine}</span>
+            <span>Col ${this.cursorCol}</span>
             <span>UTF-8</span>
             <span>LF</span>
             <span>Lit</span>
