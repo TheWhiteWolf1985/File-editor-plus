@@ -37,14 +37,65 @@ export class AppRoot extends LitElement {
       background: #2d2d2d;
       user-select: none;
       font-size: 12px;
+      position: relative;
+      overflow: visible;
+      z-index: 30;
     }
     .menus {
       display: flex;
       gap: 12px;
       opacity: 0.9;
+      position: relative;
     }
     .menus span {
       cursor: default;
+    }
+    .menuItem {
+      position: relative;
+      cursor: pointer;
+      padding: 6px 8px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .menuItem:hover,
+    .menuItem.open {
+      background: #3a3a3a;
+    }
+    .menuPopup {
+      position: absolute;
+      top: 30px;
+      left: 0;
+      background: #2d2d2d;
+      border: 1px solid #3a3a3a;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      border-radius: 8px;
+      min-width: 180px;
+      padding: 6px 0;
+      z-index: 20;
+      overflow: visible;
+    }
+    .menuItemRow {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .menuItemRow:hover {
+      background: #3a3a3a;
+    }
+    .menuIcon {
+      width: 18px;
+      text-align: center;
+      opacity: 0.85;
+    }
+    .menuDivider {
+      height: 1px;
+      margin: 6px 0;
+      background: #3a3a3a;
     }
     .title {
       margin-left: auto;
@@ -354,6 +405,7 @@ export class AppRoot extends LitElement {
   @state() tabs: Tab[] = [];
   @state() content = "";
   @state() status = "Ready";
+  @state() showFileMenu = false;
   @state() rootItems: TreeItem[] = [];
   @state() treeData: Record<string, TreeItem[]> = {};
   @state() lineCount = 1;
@@ -366,6 +418,7 @@ export class AppRoot extends LitElement {
   private gutterRef: HTMLDivElement | null = null;
   private editorRef: HTMLTextAreaElement | null = null;
   private cursorRaf: number | null = null;
+  private fileMenuRef: HTMLDivElement | null = null;
   private lastCursorLine = 1;
   private lastCursorCol = 1;
   private selectionListener = () => {
@@ -381,10 +434,12 @@ export class AppRoot extends LitElement {
       this.loadTree("");
     }
     document.addEventListener("selectionchange", this.selectionListener);
+    document.addEventListener("click", this.handleGlobalClick, true);
   }
 
   disconnectedCallback(): void {
     document.removeEventListener("selectionchange", this.selectionListener);
+    document.removeEventListener("click", this.handleGlobalClick, true);
     if (this.cursorRaf !== null) cancelAnimationFrame(this.cursorRaf);
     super.disconnectedCallback();
   }
@@ -547,6 +602,21 @@ export class AppRoot extends LitElement {
     }
   }
 
+  private handleGlobalClick = (e: MouseEvent) => {
+    if (!this.showFileMenu) return;
+    const path = e.composedPath();
+    if (this.fileMenuRef && path.includes(this.fileMenuRef)) return;
+    this.showFileMenu = false;
+  };
+
+  private toggleFileMenu(e: Event) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.showFileMenu = !this.showFileMenu;
+    console.debug("[app-root] file menu toggle", { open: this.showFileMenu });
+    this.requestUpdate();
+  }
+
   private handleCloseTab(e: Event, path: string) {
     e.stopPropagation();
     e.preventDefault();
@@ -704,7 +774,39 @@ export class AppRoot extends LitElement {
       <div class="shell">
         <div class="titlebar">
           <div class="menus">
-            <span>File</span><span>Edit</span><span>View</span><span>Go</span><span>Run</span><span>Help</span>
+            <div
+              class="menuItem ${this.showFileMenu ? "open" : ""}"
+              ${ref((el) => (this.fileMenuRef = el))}
+              @click=${(e: Event) => this.toggleFileMenu(e)}
+            >
+              <span>File</span>
+              ${this.showFileMenu
+                ? html`<div class="menuPopup">
+                    <div class="menuItemRow" title="New">
+                      <span class="menuIcon">📄</span>
+                      <span>New</span>
+                    </div>
+                    <div class="menuItemRow" title="Save">
+                      <span class="menuIcon">💾</span>
+                      <span>Save</span>
+                    </div>
+                    <div class="menuItemRow" title="Save as…">
+                      <span class="menuIcon">📝</span>
+                      <span>Save as…</span>
+                    </div>
+                    <div class="menuDivider"></div>
+                    <div class="menuItemRow" title="Import…">
+                      <span class="menuIcon">⬆️</span>
+                      <span>Import…</span>
+                    </div>
+                    <div class="menuItemRow" title="Export…">
+                      <span class="menuIcon">⬇️</span>
+                      <span>Export…</span>
+                    </div>
+                  </div>`
+                : nothing}
+            </div>
+            <span>Edit</span><span>View</span><span>Go</span><span>Run</span><span>Help</span>
           </div>
           <div class="title">File Editor Plus</div>
         </div>
