@@ -15,10 +15,35 @@ export class AppRoot extends LitElement {
       min-height: 100%;
       width: 100%;
       overflow: hidden;
-      color: #d4d4d4;
+      color: var(--text-color);
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      background: #1e1e1e;
+      background: var(--bg-color);
       box-sizing: border-box;
+      --bg-color: #1e1e1e;
+      --panel-color: #252526;
+      --panel-strong: #2d2d2d;
+      --border-color: #2a2a2a;
+      --hover-color: #3a3a3a;
+      --text-color: #d4d4d4;
+      --muted-color: #c8c8c8;
+      --activity-color: #333333;
+      --accent-color: #0e639c;
+      --accent-hover: #1177bb;
+      --card-color: #1f1f1f;
+      --input-bg: #1e1e1e;
+      --toast-bg: #2d2d2d;
+      --toast-border: #3a3a3a;
+      --error-bg: #3a1f1f;
+      --error-border: #c74c4c;
+      --status-bg: #007acc;
+      --gutter-bg: #1a1a1a;
+      --code-bg: #1e1e1e;
+      --menu-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      --toast-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+      --modal-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      --tree-hover: #2a2d2e;
+      --tree-active: #37373d;
+      --entity-error-text: #f6dada;
     }
 
     /* Layout */
@@ -34,8 +59,8 @@ export class AppRoot extends LitElement {
       align-items: center;
       gap: 12px;
       padding: 0 10px;
-      border-bottom: 1px solid #2a2a2a;
-      background: #2d2d2d;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--panel-strong);
       user-select: none;
       font-size: 12px;
       position: relative;
@@ -62,15 +87,15 @@ export class AppRoot extends LitElement {
     }
     .menuItem:hover,
     .menuItem.open {
-      background: #3a3a3a;
+      background: var(--hover-color);
     }
     .menuPopup {
       position: absolute;
       top: 30px;
       left: 0;
-      background: #2d2d2d;
-      border: 1px solid #3a3a3a;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      background: var(--panel-strong);
+      border: 1px solid var(--border-color);
+      box-shadow: var(--menu-shadow);
       border-radius: 8px;
       min-width: 180px;
       padding: 6px 0;
@@ -86,7 +111,7 @@ export class AppRoot extends LitElement {
       font-size: 12px;
     }
     .menuItemRow:hover {
-      background: #3a3a3a;
+      background: var(--hover-color);
     }
     .menuIcon {
       width: 18px;
@@ -113,8 +138,8 @@ export class AppRoot extends LitElement {
 
     /* Activity bar */
     .activity {
-      background: #333333;
-      border-right: 1px solid #2a2a2a;
+      background: var(--activity-color);
+      border-right: 1px solid var(--border-color);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -131,8 +156,8 @@ export class AppRoot extends LitElement {
       opacity: 0.85;
     }
     .act.active {
-      background: #252526;
-      outline: 1px solid #3a3a3a;
+      background: var(--panel-color);
+      outline: 1px solid var(--border-color);
       opacity: 1;
     }
     .sidebarContent {
@@ -153,9 +178,9 @@ export class AppRoot extends LitElement {
       margin-bottom: 2px;
       padding: 8px;
       border-radius: 8px;
-      border: 1px solid #3a3a3a;
-      background: #1e1e1e;
-      color: #d4d4d4;
+      border: 1px solid var(--border-color);
+      background: var(--input-bg);
+      color: var(--text-color);
       box-sizing: border-box;
     }
     .entityList {
@@ -166,9 +191,9 @@ export class AppRoot extends LitElement {
     }
     .entityCard {
       padding: 8px;
-      border: 1px solid #2a2a2a;
+      border: 1px solid var(--border-color);
       border-radius: 8px;
-      background: #1f1f1f;
+      background: var(--card-color);
       box-sizing: border-box;
       position: relative;
       padding-bottom: 22px;
@@ -191,9 +216,9 @@ export class AppRoot extends LitElement {
       position: absolute;
       right: 6px;
       bottom: 6px;
-      border: 1px solid #3a3a3a;
-      background: #2a2a2a;
-      color: #d4d4d4;
+      border: 1px solid var(--border-color);
+      background: var(--panel-color);
+      color: var(--text-color);
       border-radius: 8px;
       padding: 4px 6px;
       cursor: pointer;
@@ -204,11 +229,11 @@ export class AppRoot extends LitElement {
       opacity: 0.9;
     }
     .entityInsert:hover {
-      background: #343434;
+      background: var(--hover-color);
     }
     .entityError {
-      color: #f6dada;
-      background: #3a1f1f;
+      color: var(--entity-error-text);
+      background: var(--error-bg);
       padding: 8px;
       border-radius: 8px;
       font-size: 12px;
@@ -257,8 +282,8 @@ export class AppRoot extends LitElement {
 
     /* Sidebar */
     .sidebar {
-      background: #252526;
-      border-right: 1px solid #2a2a2a;
+      background: var(--panel-color);
+      border-right: 1px solid var(--border-color);
       overflow-y: auto;
       overflow-x: hidden;
     }
@@ -267,10 +292,10 @@ export class AppRoot extends LitElement {
       display: flex;
       align-items: center;
       padding: 0 10px;
-      border-bottom: 1px solid #2a2a2a;
+      border-bottom: 1px solid var(--border-color);
       font-size: 12px;
       letter-spacing: 0.04em;
-      color: #c8c8c8;
+      color: var(--muted-color);
     }
     .explorerTitle {
       font-weight: 600;
@@ -289,13 +314,13 @@ export class AppRoot extends LitElement {
       padding: 6px 8px;
       border-radius: 8px;
       cursor: pointer;
-      color: #d4d4d4;
+      color: var(--text-color);
     }
     .treeRow:hover {
-      background: #2a2d2e;
+      background: var(--tree-hover);
     }
     .treeRow.active {
-      background: #37373d;
+      background: var(--tree-active);
     }
     .indent {
       width: 14px;
@@ -315,7 +340,7 @@ export class AppRoot extends LitElement {
       display: grid;
       grid-template-rows: 34px 1fr; /* tabs, content */
       overflow: hidden;
-      background: #1e1e1e;
+      background: var(--bg-color);
     }
 
     .tabs {
@@ -323,8 +348,8 @@ export class AppRoot extends LitElement {
       align-items: end;
       gap: 1px;
       padding: 0 8px;
-      background: #252526;
-      border-bottom: 1px solid #2a2a2a;
+      background: var(--panel-color);
+      border-bottom: 1px solid var(--border-color);
       overflow: auto;
       white-space: nowrap;
     }
@@ -336,15 +361,15 @@ export class AppRoot extends LitElement {
       padding: 0 10px;
       margin-top: 4px;
       border-radius: 10px 10px 0 0;
-      background: #2d2d2d;
-      color: #c8c8c8;
+      background: var(--panel-strong);
+      color: var(--muted-color);
       cursor: pointer;
       font-size: 12px;
     }
     .tab.active {
-      background: #1e1e1e;
-      color: #ffffff;
-      outline: 1px solid #2a2a2a;
+      background: var(--bg-color);
+      color: var(--text-color);
+      outline: 1px solid var(--border-color);
       outline-offset: -1px;
     }
     .tabClose {
@@ -385,24 +410,24 @@ export class AppRoot extends LitElement {
       gap: 10px;
     }
     .btn {
-      background: #2d2d2d;
-      color: #d4d4d4;
-      border: 1px solid #3a3a3a;
+      background: var(--btn-bg, var(--panel-strong));
+      color: var(--text-color);
+      border: 1px solid var(--btn-border, var(--border-color));
       border-radius: 10px;
       padding: 8px 12px;
       cursor: pointer;
       font-size: 12px;
     }
     .btn:hover {
-      background: #333333;
+      background: var(--btn-hover, var(--hover-color));
     }
     .btn.primary {
-      background: #0e639c;
-      border-color: #0e639c;
+      background: var(--accent-color);
+      border-color: var(--accent-color);
       color: white;
     }
     .btn.primary:hover {
-      background: #1177bb;
+      background: var(--accent-hover);
     }
 
     .editorWrap {
@@ -417,9 +442,9 @@ export class AppRoot extends LitElement {
     .gutter {
       width: 52px;
       padding: 12px 8px;
-      background: #1a1a1a;
+      background: var(--gutter-bg);
       color: #7c7c7c;
-      border: 1px solid #2a2a2a;
+      border: 1px solid var(--border-color);
       border-right: none;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 13px;
@@ -435,10 +460,10 @@ export class AppRoot extends LitElement {
       position: relative;
       height: 100%;
       overflow: auto;
-      border: 1px solid #2a2a2a;
+      border: 1px solid var(--border-color);
       border-left: none;
       border-radius: 0 12px 12px 0;
-      background: #1e1e1e;
+      background: var(--code-bg);
     }
     .code {
       position: absolute;
@@ -449,7 +474,7 @@ export class AppRoot extends LitElement {
       line-height: 1.4;
       white-space: pre;
       word-wrap: normal;
-      color: #d4d4d4;
+      color: var(--text-color);
       pointer-events: none;
       overflow: hidden;
       box-sizing: border-box;
@@ -503,7 +528,7 @@ export class AppRoot extends LitElement {
       gap: 10px;
       padding: 0 10px;
       font-size: 12px;
-      background: #007acc;
+      background: var(--status-bg);
       color: white;
       user-select: none;
     }
@@ -528,14 +553,14 @@ export class AppRoot extends LitElement {
     }
     .contextMenu {
       position: fixed;
-      background: #2d2d2d;
-      border: 1px solid #3a3a3a;
+      background: var(--panel-strong);
+      border: 1px solid var(--border-color);
       border-radius: 8px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      box-shadow: var(--menu-shadow);
       padding: 6px 0;
       z-index: 400;
       min-width: 160px;
-      color: #d4d4d4;
+      color: var(--text-color);
     }
     .contextMenuItem {
       display: flex;
@@ -564,12 +589,12 @@ export class AppRoot extends LitElement {
       z-index: 200;
     }
     .modal {
-      background: #2d2d2d;
-      border: 1px solid #3a3a3a;
+      background: var(--panel-strong);
+      border: 1px solid var(--border-color);
       border-radius: 12px;
       padding: 16px;
       width: 360px;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      box-shadow: var(--modal-shadow);
       display: grid;
       gap: 12px;
     }
@@ -584,9 +609,9 @@ export class AppRoot extends LitElement {
       gap: 6px;
     }
     .modal input {
-      background: #1e1e1e;
-      border: 1px solid #3a3a3a;
-      color: #d4d4d4;
+      background: var(--input-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
       padding: 8px;
       border-radius: 8px;
       font-size: 13px;
@@ -608,21 +633,21 @@ export class AppRoot extends LitElement {
     }
     .toast {
       min-width: 275px;
-      background: #2d2d2d;
-      color: #e5e5e5;
-      border: 1px solid #3a3a3a;
+      background: var(--toast-bg);
+      color: var(--text-color);
+      border: 1px solid var(--toast-border);
       border-radius: 10px;
       padding: 12px 16px;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+      box-shadow: var(--toast-shadow);
       font-size: 14px;
       transform: translateX(120%);
       animation: slide-in 180ms ease-out forwards, slide-out 180ms ease-in forwards;
       animation-delay: 0s, 4.8s;
     }
     .toast.error {
-      border-color: #c74c4c;
-      background: #3a1f1f;
-      color: #f6dada;
+      border-color: var(--error-border);
+      background: var(--error-bg);
+      color: var(--entity-error-text);
     }
     @keyframes slide-in {
       from {
@@ -672,6 +697,7 @@ export class AppRoot extends LitElement {
     contextMenuOpen: { state: true },
     contextMenuX: { state: true },
     contextMenuY: { state: true },
+    themeMode: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
     lineCount: { state: true },
@@ -699,6 +725,7 @@ export class AppRoot extends LitElement {
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
   declare contextMenuY: number;
+  declare themeMode: "auto" | "dark" | "light";
   declare rootItems: TreeItem[];
   declare treeData: Record<string, TreeItem[]>;
   declare lineCount: number;
@@ -715,8 +742,9 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.26";
+  private readonly appVersion = "0.1.27";
   private lastDomains = new Set<string>();
+  private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
     if (!this.editorRef) return;
     const active = this.shadowRoot?.activeElement || document.activeElement;
@@ -746,6 +774,7 @@ export class AppRoot extends LitElement {
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
+    this.themeMode = "auto";
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -758,6 +787,9 @@ export class AppRoot extends LitElement {
     if (!this.loadedPaths.has("")) {
       this.loadTree("");
     }
+    this.themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
+    this.themeMedia.addEventListener("change", this.handleThemeChange);
+    this.applyTheme();
     document.addEventListener("selectionchange", this.selectionListener);
     document.addEventListener("click", this.handleGlobalClick, true);
     this.initEntities();
@@ -766,6 +798,10 @@ export class AppRoot extends LitElement {
   disconnectedCallback(): void {
     document.removeEventListener("selectionchange", this.selectionListener);
     document.removeEventListener("click", this.handleGlobalClick, true);
+    if (this.themeMedia) {
+      this.themeMedia.removeEventListener("change", this.handleThemeChange);
+      this.themeMedia = null;
+    }
     if (this.cursorRaf !== null) cancelAnimationFrame(this.cursorRaf);
     if (this.haClient) {
       this.haClient.disconnect();
@@ -1411,6 +1447,83 @@ export class AppRoot extends LitElement {
     this.collapsedDomains = next;
   }
 
+  private handleThemeChange = () => {
+    if (this.themeMode === "auto") {
+      this.applyTheme();
+    }
+  };
+
+  private cycleTheme() {
+    const next = this.themeMode === "auto" ? "light" : this.themeMode === "light" ? "dark" : "auto";
+    this.themeMode = next;
+    this.applyTheme();
+  }
+
+  private getEffectiveTheme(): "dark" | "light" {
+    if (this.themeMode === "auto") {
+      const prefersDark = this.themeMedia ? this.themeMedia.matches : true;
+      return prefersDark ? "dark" : "light";
+    }
+    return this.themeMode;
+  }
+
+  private applyTheme() {
+    const theme = this.getEffectiveTheme();
+    const palette =
+      theme === "dark"
+        ? {
+            "--bg-color": "#1e1e1e",
+            "--panel-color": "#252526",
+            "--panel-strong": "#2d2d2d",
+            "--border-color": "#2a2a2a",
+            "--hover-color": "#3a3a3a",
+            "--text-color": "#d4d4d4",
+            "--muted-color": "#c8c8c8",
+            "--activity-color": "#333333",
+            "--accent-color": "#0e639c",
+            "--accent-hover": "#1177bb",
+            "--card-color": "#1f1f1f",
+            "--input-bg": "#1e1e1e",
+            "--toast-bg": "#2d2d2d",
+            "--toast-border": "#3a3a3a",
+            "--error-bg": "#3a1f1f",
+            "--error-border": "#c74c4c",
+            "--status-bg": "#007acc",
+            "--gutter-bg": "#1a1a1a",
+            "--code-bg": "#1e1e1e",
+            "--tree-hover": "#2a2d2e",
+            "--tree-active": "#37373d",
+            "--entity-error-text": "#f6dada",
+          }
+        : {
+            "--bg-color": "#f5f6f8",
+            "--panel-color": "#ffffff",
+            "--panel-strong": "#f1f1f3",
+            "--border-color": "#d1d5db",
+            "--hover-color": "#e5e7eb",
+            "--text-color": "#1f2937",
+            "--muted-color": "#4b5563",
+            "--activity-color": "#f3f4f6",
+            "--accent-color": "#0d6efd",
+            "--accent-hover": "#0b5ed7",
+            "--card-color": "#ffffff",
+            "--input-bg": "#ffffff",
+            "--toast-bg": "#ffffff",
+            "--toast-border": "#d1d5db",
+            "--error-bg": "#ffecec",
+            "--error-border": "#d9534f",
+            "--status-bg": "#0d6efd",
+            "--gutter-bg": "#f3f4f6",
+            "--code-bg": "#ffffff",
+            "--tree-hover": "#e8eef8",
+            "--tree-active": "#d9e6fb",
+            "--entity-error-text": "#8b1f1f",
+          };
+    Object.entries(palette).forEach(([key, value]) => {
+      this.style.setProperty(key, value);
+    });
+  }
+
   private insertEntityId(entityId: string) {
     if (!this.activePath || !this.editorRef) {
       this.showToast("Apri un file prima di inserire", "error");
@@ -1780,6 +1893,9 @@ export class AppRoot extends LitElement {
           <div class="right">
             <button class="statusToggle" @click=${() => (this.autoIndentEnabled = !this.autoIndentEnabled)}>
               Auto-indent: ${this.autoIndentEnabled ? "On" : "Off"}
+            </button>
+            <button class="statusToggle" @click=${() => this.cycleTheme()}>
+              Theme: ${this.themeMode.charAt(0).toUpperCase()}${this.themeMode.slice(1)}
             </button>
             <span>Ln ${this.cursorLine}</span>
             <span>Col ${this.cursorCol}</span>
