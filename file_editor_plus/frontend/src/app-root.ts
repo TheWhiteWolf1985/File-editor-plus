@@ -170,6 +170,8 @@ export class AppRoot extends LitElement {
       border-radius: 8px;
       background: #1f1f1f;
       box-sizing: border-box;
+      position: relative;
+      padding-bottom: 22px;
     }
     .entityName {
       font-weight: 600;
@@ -184,6 +186,25 @@ export class AppRoot extends LitElement {
       font-size: 12px;
       margin-top: 4px;
       overflow-wrap: anywhere;
+    }
+    .entityInsert {
+      position: absolute;
+      right: 6px;
+      bottom: 6px;
+      border: 1px solid #3a3a3a;
+      background: #2a2a2a;
+      color: #d4d4d4;
+      border-radius: 8px;
+      padding: 4px 6px;
+      cursor: pointer;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      opacity: 0.9;
+    }
+    .entityInsert:hover {
+      background: #343434;
     }
     .entityError {
       color: #f6dada;
@@ -652,7 +673,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.20";
+  private readonly appVersion = "0.1.21";
   private lastDomains = new Set<string>();
   private selectionListener = () => {
     if (!this.editorRef) return;
@@ -1157,6 +1178,26 @@ export class AppRoot extends LitElement {
     this.collapsedDomains = next;
   }
 
+  private insertEntityId(entityId: string) {
+    if (!this.activePath || !this.editorRef) {
+      this.showToast("Apri un file prima di inserire", "error");
+      return;
+    }
+    const ta = this.editorRef;
+    const start = ta.selectionStart ?? this.content.length;
+    const end = ta.selectionEnd ?? this.content.length;
+    const next = `${this.content.slice(0, start)}${entityId}${this.content.slice(end)}`;
+    this.markDirty(next);
+    const cursorPos = start + entityId.length;
+    requestAnimationFrame(() => {
+      if (!this.editorRef) return;
+      this.editorRef.selectionStart = cursorPos;
+      this.editorRef.selectionEnd = cursorPos;
+      this.editorRef.focus();
+      this.updateCursorFromPos(cursorPos, this.content);
+    });
+  }
+
   private syncCollapsedDomains(domains: string[]) {
     const domainSet = new Set(domains);
     if (domainSet.size === 0) {
@@ -1244,6 +1285,9 @@ export class AppRoot extends LitElement {
                               <div class="entityName">${name}</div>
                               <div class="entityId">${e.entity_id}</div>
                               <div class="entityMeta">${domain} • State: ${e.state}</div>
+                              <button class="entityInsert" title="Insert.." @click=${(ev: Event) => { ev.stopPropagation(); this.insertEntityId(e.entity_id); }}>
+                                ➕ <span>Insert</span>
+                              </button>
                             </div>`;
                           })}
                         </div>`
