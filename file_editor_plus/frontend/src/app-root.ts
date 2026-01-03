@@ -393,6 +393,49 @@ export class AppRoot extends LitElement {
       gap: 12px;
       align-items: center;
     }
+
+    /* Modal */
+    .modalBackdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: grid;
+      place-items: center;
+      z-index: 200;
+    }
+    .modal {
+      background: #2d2d2d;
+      border: 1px solid #3a3a3a;
+      border-radius: 12px;
+      padding: 16px;
+      width: 360px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      display: grid;
+      gap: 12px;
+    }
+    .modal h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+    .modal label {
+      font-size: 12px;
+      color: #c8c8c8;
+      display: grid;
+      gap: 6px;
+    }
+    .modal input {
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      color: #d4d4d4;
+      padding: 8px;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .modal .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
   `;
 
   private apiBase = (() => {
@@ -407,6 +450,9 @@ export class AppRoot extends LitElement {
     content: { state: true },
     status: { state: true },
     openMenu: { state: true },
+    newItemKind: { state: true },
+    newItemName: { state: true },
+    newItemExt: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
     lineCount: { state: true },
@@ -420,6 +466,9 @@ export class AppRoot extends LitElement {
   declare content: string;
   declare status: string;
   declare openMenu: string | null;
+  declare newItemKind: "file" | "folder" | null;
+  declare newItemName: string;
+  declare newItemExt: string;
   declare rootItems: TreeItem[];
   declare treeData: Record<string, TreeItem[]>;
   declare lineCount: number;
@@ -449,6 +498,9 @@ export class AppRoot extends LitElement {
     this.content = "";
     this.status = "Ready";
     this.openMenu = null;
+    this.newItemKind = null;
+    this.newItemName = "";
+    this.newItemExt = "";
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -472,8 +524,8 @@ export class AppRoot extends LitElement {
     super.disconnectedCallback();
   }
 
-  private async loadTree(path: string) {
-    if (this.loadedPaths.has(path) || this.loadingPaths.has(path)) {
+  private async loadTree(path: string, force = false) {
+    if ((!force && this.loadedPaths.has(path)) || this.loadingPaths.has(path)) {
       return;
     }
     this.loadingPaths.add(path);
@@ -640,6 +692,81 @@ export class AppRoot extends LitElement {
     console.debug("[app-root] menu toggle", { name, open: this.openMenu });
   }
 
+  private handleMenuAction(menu: string, action: string) {
+    this.openMenu = null;
+    if (menu === "file") {
+      if (action === "New file") {
+        this.newItemKind = "file";
+        this.newItemName = "";
+        this.newItemExt = "";
+      } else if (action === "New folder") {
+        this.newItemKind = "folder";
+        this.newItemName = "";
+      } else if (action === "Save" && this.activePath) {
+        this.save();
+      } else if (action === "Save as…") {
+        this.status = "Save as non implementato";
+      }
+    } else if (menu === "run" && action === "Save all") {
+      this.save();
+    }
+  }
+
+  private async createNewItem() {
+    if (!this.newItemKind) return;
+    const dir = this.activePath && this.activePath.includes("/") ? this.activePath.split("/").slice(0, -1).join("/") : "";
+    if (this.newItemKind === "file") {
+      const base = this.newItemName.trim();
+      const ext = this.newItemExt.trim();
+      if (!base) {
+        this.status = "Nome file richiesto";
+        return;
+      }
+      const filename = ext ? `${base}.${ext.replace(/^\./, "")}` : base;
+      const target = dir ? `${dir}/${filename}` : filename;
+      try {
+        const url = `${this.apiBase}api/file?path=${encodeURIComponent(target)}`;
+        const res = await fetch(url, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: "" }),
+        });
+        if (!res.ok) throw new Error(`new file ${res.status}`);
+        this.newItemKind = null;
+        this.loadedPaths.delete(dir);
+        await this.loadTree(dir, true);
+        this.expanded = new Set(this.expanded).add(dir);
+        this.openFile(target);
+      } catch (e) {
+        this.status = "Errore creazione file";
+      }
+    } else if (this.newItemKind === "folder") {
+      const base = this.newItemName.trim();
+      if (!base) {
+        this.status = "Nome cartella richiesto";
+        return;
+      }
+      const target = dir ? `${dir}/${base}` : base;
+      try {
+        const url = `${this.apiBase}api/folder?path=${encodeURIComponent(target)}`;
+        const res = await fetch(url, { method: "POST" });
+        if (!res.ok) throw new Error(`new folder ${res.status}`);
+        this.newItemKind = null;
+        this.loadedPaths.delete(dir);
+        await this.loadTree(dir, true);
+        this.expanded = new Set(this.expanded).add(target);
+      } catch (e) {
+        this.status = "Errore creazione cartella";
+      }
+    }
+  }
+
+  private cancelNewItem() {
+    this.newItemKind = null;
+    this.newItemName = "";
+    this.newItemExt = "";
+  }
+
   private handleCloseTab(e: Event, path: string) {
     e.stopPropagation();
     e.preventDefault();
@@ -726,9 +853,9 @@ export class AppRoot extends LitElement {
     return html`
       <div class="menuItem ${open ? "open" : ""}" @click=${(e: Event) => this.toggleMenu(e, name)}>
         <span>${label}</span>
-        <div class="menuPopup" ?hidden=${!open}>
+        <div class="menuPopup" ?hidden=${!open} @click=${(e: Event) => e.stopPropagation()}>
           ${items.map(
-            (it) => html`<div class="menuItemRow">
+            (it) => html`<div class="menuItemRow" @click=${() => this.handleMenuAction(name, it.label)}>
               <span class="menuIcon">${it.icon}</span>
               <span>${it.label}</span>
             </div>`
@@ -814,7 +941,8 @@ export class AppRoot extends LitElement {
         <div class="titlebar">
           <div class="menus">
             ${this.renderMenu("File", "file", [
-              { icon: "📄", label: "New" },
+              { icon: "📄", label: "New file" },
+              { icon: "📁", label: "New folder" },
               { icon: "💾", label: "Save" },
               { icon: "📝", label: "Save as…" },
               { icon: "⬆️", label: "Import…" },
@@ -927,6 +1055,40 @@ export class AppRoot extends LitElement {
             </div>
           </div>
         </div>
+
+        ${this.newItemKind
+          ? html`
+              <div class="modalBackdrop" @click=${() => this.cancelNewItem()}>
+                <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+                  <h3>${this.newItemKind === "file" ? "New file" : "New folder"}</h3>
+                  <label>
+                    Name
+                    <input
+                      type="text"
+                      .value=${this.newItemName}
+                      @input=${(e: Event) => (this.newItemName = (e.target as HTMLInputElement).value)}
+                      placeholder=${this.newItemKind === "file" ? "config" : "my_folder"}
+                    />
+                  </label>
+                  ${this.newItemKind === "file"
+                    ? html`<label>
+                        Extension
+                        <input
+                          type="text"
+                          .value=${this.newItemExt}
+                          @input=${(e: Event) => (this.newItemExt = (e.target as HTMLInputElement).value)}
+                          placeholder="yaml"
+                        />
+                      </label>`
+                    : nothing}
+                  <div class="actions">
+                    <button class="btn" @click=${() => this.cancelNewItem()}>Cancel</button>
+                    <button class="btn primary" @click=${() => this.createNewItem()}>Create</button>
+                  </div>
+                </div>
+              </div>
+            `
+          : nothing}
 
         <div class="statusbar">
           <div>${this.status}</div>

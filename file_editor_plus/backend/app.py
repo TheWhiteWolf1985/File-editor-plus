@@ -102,6 +102,14 @@ def atomic_write(target: Path, data: str) -> None:
 def health():
     return {"ok": True}
 
+@app.post("/api/folder")
+def create_folder(path: str):
+    target = safe_path(path)
+    if target.exists():
+        raise HTTPException(400, "Path already exists")
+    target.mkdir(parents=True, exist_ok=True)
+    return {"ok": True, "path": target.resolve().relative_to(BASE_DIR).as_posix()}
+
 
 @app.get("/api/tree")
 def tree(path: str = ""):
