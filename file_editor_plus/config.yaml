@@ -1,5 +1,5 @@
 name: "File Editor Plus (MVP)"
-version: "0.1.25"
+version: "0.1.26"
 slug: "file_editor_plus"
 description: "Pro File Editor for Home Assistant"
 arch:

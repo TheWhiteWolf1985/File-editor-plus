@@ -526,6 +526,28 @@ export class AppRoot extends LitElement {
     .statusToggle:hover {
       background: rgba(255, 255, 255, 0.12);
     }
+    .contextMenu {
+      position: fixed;
+      background: #2d2d2d;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      padding: 6px 0;
+      z-index: 400;
+      min-width: 160px;
+      color: #d4d4d4;
+    }
+    .contextMenuItem {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .contextMenuItem:hover {
+      background: #3a3a3a;
+    }
     .statusbar .version {
       margin-left: 10px;
       opacity: 0.85;
@@ -647,6 +669,9 @@ export class AppRoot extends LitElement {
     entityError: { state: true },
     collapsedDomains: { state: true },
     autoIndentEnabled: { state: true },
+    contextMenuOpen: { state: true },
+    contextMenuX: { state: true },
+    contextMenuY: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
     lineCount: { state: true },
@@ -671,6 +696,9 @@ export class AppRoot extends LitElement {
   declare entityError: string | null;
   declare collapsedDomains: Set<string>;
   declare autoIndentEnabled: boolean;
+  declare contextMenuOpen: boolean;
+  declare contextMenuX: number;
+  declare contextMenuY: number;
   declare rootItems: TreeItem[];
   declare treeData: Record<string, TreeItem[]>;
   declare lineCount: number;
@@ -687,7 +715,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.25";
+  private readonly appVersion = "0.1.26";
   private lastDomains = new Set<string>();
   private selectionListener = () => {
     if (!this.editorRef) return;
@@ -715,6 +743,9 @@ export class AppRoot extends LitElement {
     this.entityError = null;
     this.collapsedDomains = new Set<string>();
     this.autoIndentEnabled = true;
+    this.contextMenuOpen = false;
+    this.contextMenuX = 0;
+    this.contextMenuY = 0;
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -948,6 +979,118 @@ export class AppRoot extends LitElement {
     return true;
   }
 
+  private handleContextMenu(e: MouseEvent) {
+    e.preventDefault();
+    this.contextMenuOpen = true;
+    this.contextMenuX = e.clientX;
+    this.contextMenuY = e.clientY;
+  }
+
+  private closeContextMenu() {
+    if (this.contextMenuOpen) {
+      this.contextMenuOpen = false;
+    }
+  }
+
+  private async handleCopyCut(action: "copy" | "cut") {
+    if (!this.editorRef) return;
+    const ta = this.editorRef;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? start;
+    const selection = this.content.slice(start, end);
+    if (selection.length === 0 && action === "copy") {
+      this.showToast("Niente da copiare", "error");
+      return;
+    }
+    try {
+      if (selection.length > 0 && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(selection);
+      } else {
+        document.execCommand(action);
+      }
+      if (action === "cut") {
+        const next = `${this.content.slice(0, start)}${this.content.slice(end)}`;
+        this.markDirty(next);
+        const pos = start;
+        requestAnimationFrame(() => {
+          if (!this.editorRef) return;
+          this.editorRef.selectionStart = pos;
+          this.editorRef.selectionEnd = pos;
+          this.editorRef.focus();
+          this.updateCursorFromPos(pos, this.content);
+        });
+      }
+      this.showToast(action === "copy" ? "Copiato" : "Tagliato");
+    } catch (err) {
+      this.showToast("Clipboard non disponibile", "error");
+    } finally {
+      this.closeContextMenu();
+    }
+  }
+
+  private async handlePaste() {
+    if (!this.editorRef) return;
+    const ta = this.editorRef;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? start;
+    try {
+      const text = navigator.clipboard ? await navigator.clipboard.readText() : "";
+      if (!text) {
+        this.showToast("Niente da incollare", "error");
+        this.closeContextMenu();
+        return;
+      }
+      const next = `${this.content.slice(0, start)}${text}${this.content.slice(end)}`;
+      this.markDirty(next);
+      const pos = start + text.length;
+      requestAnimationFrame(() => {
+        if (!this.editorRef) return;
+        this.editorRef.selectionStart = pos;
+        this.editorRef.selectionEnd = pos;
+        this.editorRef.focus();
+        this.updateCursorFromPos(pos, this.content);
+      });
+      this.showToast("Incollato");
+    } catch (err) {
+      this.showToast("Clipboard non disponibile", "error");
+    } finally {
+      this.closeContextMenu();
+    }
+  }
+
+  private reindentAll() {
+    const lines = this.content.split("\n");
+    let level = 0;
+    const out: string[] = [];
+    for (const line of lines) {
+      const trimmed = line.trimEnd();
+      if (trimmed.trim() === "") {
+        out.push("");
+        continue;
+      }
+      const clean = trimmed.trim();
+      const origIndentSpaces = (line.match(/^ */)?.[0].length ?? 0);
+      const origLevel = Math.floor(origIndentSpaces / 2);
+      if (origLevel < level) level = origLevel;
+
+      const currentIndent = Math.max(0, level);
+      out.push(`${" ".repeat(currentIndent * 2)}${clean}`);
+
+      const endsWithBlock = /:\s*$/.test(clean);
+      const startsList = /^-\s*/.test(clean);
+      if (endsWithBlock || startsList) {
+        level = currentIndent + 1;
+      } else {
+        level = currentIndent;
+      }
+    }
+    const next = out.join("\n");
+    this.markDirty(next);
+    requestAnimationFrame(() => this.updateCursorFromTextarea());
+    this.closeContextMenu();
+    this.showToast("Auto-indent completato");
+  }
+
   private startCursorTracking() {
     const tick = () => {
       this.updateCursorFromTextarea();
@@ -966,11 +1109,17 @@ export class AppRoot extends LitElement {
   }
 
   private handleGlobalClick = (e: MouseEvent) => {
-    if (!this.openMenu) return;
     const path = e.composedPath();
-    if (path.includes(this)) return;
-    if (this.shadowRoot && path.includes(this.shadowRoot.host)) return;
-    this.openMenu = null;
+    if (this.openMenu) {
+      if (path.includes(this)) return;
+      if (this.shadowRoot && path.includes(this.shadowRoot.host)) return;
+      this.openMenu = null;
+    }
+    if (this.contextMenuOpen) {
+      const target = e.target as HTMLElement | null;
+      const inside = target?.closest?.(".contextMenu");
+      if (!inside) this.closeContextMenu();
+    }
   };
 
   private toggleMenu(e: Event, name: string) {
@@ -1558,6 +1707,7 @@ export class AppRoot extends LitElement {
                     @click=${this.handleCursorMove}
                     @mouseup=${this.handleCursorMove}
                     @select=${this.handleCursorMove}
+                    @contextmenu=${this.handleContextMenu}
                     @focus=${() => this.startCursorTracking()}
                     @blur=${() => this.stopCursorTracking()}
                   ></textarea>
@@ -1570,6 +1720,19 @@ export class AppRoot extends LitElement {
             </div>
           </div>
         </div>
+
+        ${this.contextMenuOpen
+          ? html`<div
+              class="contextMenu"
+              style="top:${this.contextMenuY}px; left:${this.contextMenuX}px;"
+              @click=${(e: Event) => e.stopPropagation()}
+            >
+              <div class="contextMenuItem" @click=${() => this.handleCopyCut("cut")}>✂️ Cut</div>
+              <div class="contextMenuItem" @click=${() => this.handleCopyCut("copy")}>📋 Copy</div>
+              <div class="contextMenuItem" @click=${() => this.handlePaste()}>📥 Paste</div>
+              <div class="contextMenuItem" @click=${() => this.reindentAll()}>🔧 Auto-indent</div>
+            </div>`
+          : nothing}
 
         ${this.toastMessage
           ? html`<div class="toastContainer">
