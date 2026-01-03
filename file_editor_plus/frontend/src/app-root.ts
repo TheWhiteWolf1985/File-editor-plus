@@ -514,6 +514,18 @@ export class AppRoot extends LitElement {
       gap: 12px;
       align-items: center;
     }
+    .statusToggle {
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      background: transparent;
+      color: inherit;
+      border-radius: 8px;
+      padding: 2px 8px;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .statusToggle:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
     .statusbar .version {
       margin-left: 10px;
       opacity: 0.85;
@@ -634,6 +646,7 @@ export class AppRoot extends LitElement {
     entities: { state: true },
     entityError: { state: true },
     collapsedDomains: { state: true },
+    autoIndentEnabled: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
     lineCount: { state: true },
@@ -657,6 +670,7 @@ export class AppRoot extends LitElement {
   declare entities: Record<string, HassState>;
   declare entityError: string | null;
   declare collapsedDomains: Set<string>;
+  declare autoIndentEnabled: boolean;
   declare rootItems: TreeItem[];
   declare treeData: Record<string, TreeItem[]>;
   declare lineCount: number;
@@ -673,7 +687,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.21";
+  private readonly appVersion = "0.1.25";
   private lastDomains = new Set<string>();
   private selectionListener = () => {
     if (!this.editorRef) return;
@@ -700,6 +714,7 @@ export class AppRoot extends LitElement {
     this.entities = {};
     this.entityError = null;
     this.collapsedDomains = new Set<string>();
+    this.autoIndentEnabled = true;
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -862,6 +877,75 @@ export class AppRoot extends LitElement {
 
   private handleCursorMove(e: Event) {
     requestAnimationFrame(() => this.updateCursorFromTextarea());
+  }
+
+  private handleEditorKeyDown(e: KeyboardEvent) {
+    if (!this.autoIndentEnabled) {
+      this.handleCursorMove(e);
+      return;
+    }
+    if (e.key === "Enter") {
+      const handled = this.applyAutoIndent(e);
+      if (handled) return;
+    } else if (e.key === "Tab") {
+      const handled = this.insertTabSpaces(e);
+      if (handled) return;
+    }
+    this.handleCursorMove(e);
+  }
+
+  private insertTabSpaces(e: KeyboardEvent) {
+    if (!this.editorRef) return false;
+    e.preventDefault();
+    const ta = this.editorRef;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? start;
+    const tab = "  ";
+    const next = `${this.content.slice(0, start)}${tab}${this.content.slice(end)}`;
+    this.markDirty(next);
+    const pos = start + tab.length;
+    requestAnimationFrame(() => {
+      if (!this.editorRef) return;
+      this.editorRef.selectionStart = pos;
+      this.editorRef.selectionEnd = pos;
+      this.editorRef.focus();
+      this.updateCursorFromPos(pos, this.content);
+    });
+    return true;
+  }
+
+  private applyAutoIndent(e: KeyboardEvent) {
+    if (!this.editorRef) return false;
+    if (e.shiftKey) return false; // Shift+Enter: newline default, niente indent automatico
+    e.preventDefault();
+    const ta = this.editorRef;
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? start;
+    const before = this.content.slice(0, start);
+    const after = this.content.slice(end);
+    const lineStart = before.lastIndexOf("\n") + 1;
+    const currentLine = before.slice(lineStart);
+    const baseIndent = currentLine.match(/^[\t ]*/) ? currentLine.match(/^[\t ]*/)![0] : "";
+    const trimmed = currentLine.trim();
+    let extra = "";
+    if (trimmed.endsWith(":")) {
+      extra = "  ";
+    } else if (trimmed.startsWith("-")) {
+      extra = "  ";
+    }
+    const indent = `${baseIndent}${extra}`;
+    const insert = `\n${indent}`;
+    const next = `${before}${insert}${after}`;
+    this.markDirty(next);
+    const pos = start + insert.length;
+    requestAnimationFrame(() => {
+      if (!this.editorRef) return;
+      this.editorRef.selectionStart = pos;
+      this.editorRef.selectionEnd = pos;
+      this.editorRef.focus();
+      this.updateCursorFromPos(pos, this.content);
+    });
+    return true;
   }
 
   private startCursorTracking() {
@@ -1470,7 +1554,7 @@ export class AppRoot extends LitElement {
                     @scroll=${this.syncScroll}
                     @input=${this.handleInput}
                     @keyup=${this.handleCursorMove}
-                    @keydown=${this.handleCursorMove}
+                    @keydown=${this.handleEditorKeyDown}
                     @click=${this.handleCursorMove}
                     @mouseup=${this.handleCursorMove}
                     @select=${this.handleCursorMove}
@@ -1531,6 +1615,9 @@ export class AppRoot extends LitElement {
           <div>${this.status}</div>
           <div class="version">v${this.appVersion}</div>
           <div class="right">
+            <button class="statusToggle" @click=${() => (this.autoIndentEnabled = !this.autoIndentEnabled)}>
+              Auto-indent: ${this.autoIndentEnabled ? "On" : "Off"}
+            </button>
             <span>Ln ${this.cursorLine}</span>
             <span>Col ${this.cursorCol}</span>
             <span>UTF-8</span>
