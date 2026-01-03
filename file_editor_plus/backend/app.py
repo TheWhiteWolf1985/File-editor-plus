@@ -161,7 +161,7 @@ def read_file(path: str):
 
 
 @app.put("/api/file")
-async def write_file(request: Request, path: str):
+async def write_file(request: Request, path: str, create_only: bool = False):
     f = safe_path(path)
 
     # accetta JSON {"content": "..."} oppure text/plain
@@ -181,7 +181,10 @@ async def write_file(request: Request, path: str):
     if text is None:
         text = ""
 
-    # backup prima di scrivere
+    if create_only and f.exists():
+        raise HTTPException(400, "File already exists")
+
+    # backup prima di scrivere (solo se esiste)
     bak = make_backup(f)
     try:
         atomic_write(f, text)

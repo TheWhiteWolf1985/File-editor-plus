@@ -393,6 +393,11 @@ export class AppRoot extends LitElement {
       gap: 12px;
       align-items: center;
     }
+    .statusbar .version {
+      margin-left: 10px;
+      opacity: 0.85;
+      font-weight: 600;
+    }
 
     /* Modal */
     .modalBackdrop {
@@ -436,6 +441,54 @@ export class AppRoot extends LitElement {
       justify-content: flex-end;
       gap: 10px;
     }
+
+    /* Toast */
+    .toastContainer {
+      position: fixed;
+      top: 112px;
+      right: 12px;
+      display: grid;
+      gap: 8px;
+      z-index: 300;
+    }
+    .toast {
+      min-width: 275px;
+      background: #2d2d2d;
+      color: #e5e5e5;
+      border: 1px solid #3a3a3a;
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+      font-size: 14px;
+      transform: translateX(120%);
+      animation: slide-in 180ms ease-out forwards, slide-out 180ms ease-in forwards;
+      animation-delay: 0s, 4.8s;
+    }
+    .toast.error {
+      border-color: #c74c4c;
+      background: #3a1f1f;
+      color: #f6dada;
+    }
+    @keyframes slide-in {
+      from {
+        transform: translateX(120%);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0%);
+        opacity: 1;
+      }
+    }
+    @keyframes slide-out {
+      from {
+        transform: translateX(0%);
+        opacity: 1;
+      }
+      to {
+        transform: translateX(120%);
+        opacity: 0;
+      }
+    }
   `;
 
   private apiBase = (() => {
@@ -453,6 +506,8 @@ export class AppRoot extends LitElement {
     newItemKind: { state: true },
     newItemName: { state: true },
     newItemExt: { state: true },
+    toastMessage: { state: true },
+    toastType: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
     lineCount: { state: true },
@@ -469,6 +524,8 @@ export class AppRoot extends LitElement {
   declare newItemKind: "file" | "folder" | null;
   declare newItemName: string;
   declare newItemExt: string;
+  declare toastMessage: string | null;
+  declare toastType: "info" | "error";
   declare rootItems: TreeItem[];
   declare treeData: Record<string, TreeItem[]>;
   declare lineCount: number;
@@ -483,6 +540,8 @@ export class AppRoot extends LitElement {
   private cursorRaf: number | null = null;
   private lastCursorLine = 1;
   private lastCursorCol = 1;
+  private toastTimer: number | null = null;
+  private readonly appVersion = "0.1.8";
   private selectionListener = () => {
     if (!this.editorRef) return;
     const active = this.shadowRoot?.activeElement || document.activeElement;
@@ -501,6 +560,8 @@ export class AppRoot extends LitElement {
     this.newItemKind = null;
     this.newItemName = "";
     this.newItemExt = "";
+    this.toastMessage = null;
+    this.toastType = "info";
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -692,6 +753,19 @@ export class AppRoot extends LitElement {
     console.debug("[app-root] menu toggle", { name, open: this.openMenu });
   }
 
+  private showToast(message: string, type: "info" | "error" = "info") {
+    if (this.toastTimer !== null) {
+      clearTimeout(this.toastTimer);
+    }
+    this.toastMessage = message;
+    this.toastType = type;
+    this.toastTimer = window.setTimeout(() => {
+      this.toastMessage = null;
+      this.toastType = "info";
+      this.toastTimer = null;
+    }, 5000);
+  }
+
   private handleMenuAction(menu: string, action: string) {
     this.openMenu = null;
     if (menu === "file") {
@@ -706,6 +780,7 @@ export class AppRoot extends LitElement {
         this.save();
       } else if (action === "Save as…") {
         this.status = "Save as non implementato";
+        this.showToast("Save as non implementato", "info");
       }
     } else if (menu === "run" && action === "Save all") {
       this.save();
@@ -720,18 +795,40 @@ export class AppRoot extends LitElement {
       const ext = this.newItemExt.trim();
       if (!base) {
         this.status = "Nome file richiesto";
+        this.showToast("Nome file richiesto", "error");
         return;
       }
       const filename = ext ? `${base}.${ext.replace(/^\./, "")}` : base;
       const target = dir ? `${dir}/${filename}` : filename;
       try {
-        const url = `${this.apiBase}api/file?path=${encodeURIComponent(target)}`;
+        const parentItems =
+          dir && dir !== ""
+            ? this.treeData[dir] ?? []
+            : this.rootItems.length > 0
+              ? this.rootItems
+              : this.treeData[""] ?? [];
+        if (parentItems.some((it) => it.name === filename && it.type === "file")) {
+          this.showToast("File already exist", "error");
+          this.status = "File already exist";
+          return;
+        }
+        const url = `${this.apiBase}api/file?path=${encodeURIComponent(target)}&create_only=1`;
         const res = await fetch(url, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content: "" }),
         });
-        if (!res.ok) throw new Error(`new file ${res.status}`);
+        if (!res.ok) {
+          const detailJson = await res.json().catch(() => null);
+          const detailText = !detailJson ? await res.text().catch(() => "") : "";
+          const msg =
+            (detailJson && (detailJson.detail || detailJson.message)) ||
+            detailText ||
+            (res.status === 400 ? "File already exist" : "Errore creazione file");
+          this.showToast(msg, "error");
+          this.status = msg;
+          return;
+        }
         this.newItemKind = null;
         this.loadedPaths.delete(dir);
         await this.loadTree(dir, true);
@@ -739,24 +836,49 @@ export class AppRoot extends LitElement {
         this.openFile(target);
       } catch (e) {
         this.status = "Errore creazione file";
+        this.showToast("Errore creazione file", "error");
       }
     } else if (this.newItemKind === "folder") {
       const base = this.newItemName.trim();
       if (!base) {
         this.status = "Nome cartella richiesto";
+        this.showToast("Nome cartella richiesta", "error");
+        return;
+      }
+      const parentItems =
+        dir && dir !== ""
+          ? this.treeData[dir] ?? []
+          : this.rootItems.length > 0
+            ? this.rootItems
+            : this.treeData[""] ?? [];
+      if (parentItems.some((it) => it.name === base && it.type === "dir")) {
+        const msg = "Folder already exist";
+        this.showToast(msg, "error");
+        this.status = msg;
         return;
       }
       const target = dir ? `${dir}/${base}` : base;
       try {
         const url = `${this.apiBase}api/folder?path=${encodeURIComponent(target)}`;
         const res = await fetch(url, { method: "POST" });
-        if (!res.ok) throw new Error(`new folder ${res.status}`);
+        if (!res.ok) {
+          const detailJson = await res.json().catch(() => null);
+          const detailText = !detailJson ? await res.text().catch(() => "") : "";
+          const msg =
+            (detailJson && (detailJson.detail || detailJson.message)) ||
+            detailText ||
+            (res.status === 400 ? "Folder already exist" : "Cartella esiste già o errore");
+          this.showToast(msg, "error");
+          this.status = msg;
+          return;
+        }
         this.newItemKind = null;
         this.loadedPaths.delete(dir);
         await this.loadTree(dir, true);
         this.expanded = new Set(this.expanded).add(target);
       } catch (e) {
         this.status = "Errore creazione cartella";
+        this.showToast("Errore creazione cartella", "error");
       }
     }
   }
@@ -938,7 +1060,7 @@ export class AppRoot extends LitElement {
 
     return html`
       <div class="shell">
-        <div class="titlebar">
+      <div class="titlebar">
           <div class="menus">
             ${this.renderMenu("File", "file", [
               { icon: "📄", label: "New file" },
@@ -978,6 +1100,7 @@ export class AppRoot extends LitElement {
             ])}
           </div>
           <div class="title">File Editor Plus</div>
+          <button class="btn" style="margin-left:12px;" @click=${() => this.showToast("Toast di test", "info")}>Toast test</button>
         </div>
 
         <div class="main">
@@ -1056,6 +1179,12 @@ export class AppRoot extends LitElement {
           </div>
         </div>
 
+        ${this.toastMessage
+          ? html`<div class="toastContainer">
+              <div class="toast ${this.toastType === "error" ? "error" : ""}">${this.toastMessage}</div>
+            </div>`
+          : nothing}
+
         ${this.newItemKind
           ? html`
               <div class="modalBackdrop" @click=${() => this.cancelNewItem()}>
@@ -1092,6 +1221,7 @@ export class AppRoot extends LitElement {
 
         <div class="statusbar">
           <div>${this.status}</div>
+          <div class="version">v${this.appVersion}</div>
           <div class="right">
             <span>Ln ${this.cursorLine}</span>
             <span>Col ${this.cursorCol}</span>
