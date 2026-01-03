@@ -159,12 +159,10 @@ export class AppRoot extends LitElement {
       box-sizing: border-box;
     }
     .entityList {
-      max-height: calc(100vh - 220px);
-      overflow-y: auto;
-      overflow-x: hidden;
+      overflow: visible;
       display: grid;
       gap: 6px;
-      padding-right: 4px;
+      padding-right: 0;
     }
     .entityCard {
       padding: 8px;
@@ -194,6 +192,46 @@ export class AppRoot extends LitElement {
       border-radius: 8px;
       font-size: 12px;
       box-sizing: border-box;
+    }
+    .entityGroup {
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #222;
+    }
+    .entityGroup + .entityGroup {
+      margin-top: 6px;
+    }
+    .entityGroupHeader {
+      width: 100%;
+      border: none;
+      background: #252526;
+      color: #d4d4d4;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      cursor: pointer;
+      text-align: left;
+      box-sizing: border-box;
+      font-size: 13px;
+    }
+    .entityGroupHeader:hover {
+      background: #2d2d2d;
+    }
+    .entityGroupTitle {
+      font-weight: 600;
+      text-transform: lowercase;
+    }
+    .entityGroupBody {
+      padding: 6px;
+      display: grid;
+      gap: 6px;
+    }
+    .entityEmpty {
+      padding: 8px;
+      font-size: 12px;
+      opacity: 0.75;
     }
 
     /* Sidebar */
@@ -574,6 +612,7 @@ export class AppRoot extends LitElement {
     entityFilter: { state: true },
     entities: { state: true },
     entityError: { state: true },
+    collapsedDomains: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
     lineCount: { state: true },
@@ -596,6 +635,7 @@ export class AppRoot extends LitElement {
   declare entityFilter: string;
   declare entities: Record<string, HassState>;
   declare entityError: string | null;
+  declare collapsedDomains: Set<string>;
   declare rootItems: TreeItem[];
   declare treeData: Record<string, TreeItem[]>;
   declare lineCount: number;
@@ -612,7 +652,8 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.16";
+  private readonly appVersion = "0.1.20";
+  private lastDomains = new Set<string>();
   private selectionListener = () => {
     if (!this.editorRef) return;
     const active = this.shadowRoot?.activeElement || document.activeElement;
@@ -637,6 +678,7 @@ export class AppRoot extends LitElement {
     this.entityFilter = "";
     this.entities = {};
     this.entityError = null;
+    this.collapsedDomains = new Set<string>();
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -857,6 +899,7 @@ export class AppRoot extends LitElement {
         } else {
           delete next[id];
         }
+        this.syncCollapsedDomains(Object.keys(next).map((k) => k.split(".")[0]));
         this.entities = next;
       });
       const states = await this.haClient.getStates();
@@ -864,6 +907,7 @@ export class AppRoot extends LitElement {
       states.forEach((s) => {
         next[s.entity_id] = s;
       });
+      this.syncCollapsedDomains(states.map((s) => s.entity_id.split(".")[0]));
       this.entities = next;
       this.entityError = null;
     } catch (e) {
@@ -1103,6 +1147,44 @@ export class AppRoot extends LitElement {
     this.activeActivity = name;
   }
 
+  private toggleDomain(domain: string) {
+    const next = new Set(this.collapsedDomains);
+    if (next.has(domain)) {
+      next.delete(domain);
+    } else {
+      next.add(domain);
+    }
+    this.collapsedDomains = next;
+  }
+
+  private syncCollapsedDomains(domains: string[]) {
+    const domainSet = new Set(domains);
+    if (domainSet.size === 0) {
+      this.lastDomains = domainSet;
+      return;
+    }
+    if (this.collapsedDomains.size === 0 && this.lastDomains.size === 0) {
+      this.collapsedDomains = new Set(domainSet);
+      this.lastDomains = domainSet;
+      return;
+    }
+
+    const next = new Set<string>();
+    domainSet.forEach((d) => {
+      if (this.collapsedDomains.has(d)) {
+        next.add(d);
+      } else if (!this.lastDomains.has(d)) {
+        // nuovo dominio: chiuso di default
+        next.add(d);
+      }
+    });
+
+    if (next.size !== this.collapsedDomains.size || Array.from(next).some((d) => !this.collapsedDomains.has(d))) {
+      this.collapsedDomains = next;
+    }
+    this.lastDomains = domainSet;
+  }
+
   private renderSidebarContent() {
     if (this.activeActivity === "explorer") {
       return html`<div class="tree">${this.renderTree("")}</div>`;
@@ -1124,6 +1206,13 @@ export class AppRoot extends LitElement {
         if (da === db) return a.entity_id.localeCompare(b.entity_id);
         return da.localeCompare(db);
       });
+    const grouped: Record<string, HassState[]> = {};
+    filtered.forEach((e) => {
+      const domain = e.entity_id.split(".")[0];
+      if (!grouped[domain]) grouped[domain] = [];
+      grouped[domain].push(e);
+    });
+    const domains = Object.keys(grouped).sort();
     return html`<div class="sidebarContent entityPane">
       <div class="entityHeader">Entities</div>
       <input
@@ -1136,15 +1225,31 @@ export class AppRoot extends LitElement {
       ${this.entityError
         ? html`<div class="entityError">${this.entityError}</div>`
         : html`<div class="entityList">
-            ${filtered.map((e) => {
-              const domain = e.entity_id.split(".")[0];
-              const name = (e.attributes?.friendly_name as string) || e.entity_id;
-              return html`<div class="entityCard">
-                <div class="entityName">${name}</div>
-                <div class="entityId">${e.entity_id}</div>
-                <div class="entityMeta">${domain} • State: ${e.state}</div>
-              </div>`;
-            })}
+            ${domains.length === 0
+              ? html`<div class="entityEmpty">No entities</div>`
+              : domains.map((domain) => {
+                  const items = grouped[domain];
+                  const isOpen = !this.collapsedDomains.has(domain);
+                  return html`<div class="entityGroup">
+                    <button class="entityGroupHeader" type="button" @click=${() => this.toggleDomain(domain)}>
+                      <span class="chevron">${isOpen ? "▾" : "▸"}</span>
+                      <span class="entityGroupTitle">${domain}</span>
+                      <span style="margin-left:auto; opacity:0.75; font-size:12px;">${items.length}</span>
+                    </button>
+                    ${isOpen
+                      ? html`<div class="entityGroupBody">
+                          ${items.map((e) => {
+                            const name = (e.attributes?.friendly_name as string) || e.entity_id;
+                            return html`<div class="entityCard">
+                              <div class="entityName">${name}</div>
+                              <div class="entityId">${e.entity_id}</div>
+                              <div class="entityMeta">${domain} • State: ${e.state}</div>
+                            </div>`;
+                          })}
+                        </div>`
+                      : nothing}
+                  </div>`;
+                })}
           </div>`}
     </div>`;
   }
