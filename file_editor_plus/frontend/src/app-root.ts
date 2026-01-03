@@ -406,7 +406,7 @@ export class AppRoot extends LitElement {
     tabs: { state: true },
     content: { state: true },
     status: { state: true },
-    showFileMenu: { state: true },
+    openMenu: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
     lineCount: { state: true },
@@ -414,17 +414,17 @@ export class AppRoot extends LitElement {
     cursorCol: { state: true },
   };
 
-  expanded!: Set<string>; // root expanded
-  activePath!: string | null;
-  tabs!: Tab[];
-  content!: string;
-  status!: string;
-  showFileMenu!: boolean;
-  rootItems!: TreeItem[];
-  treeData!: Record<string, TreeItem[]>;
-  lineCount!: number;
-  cursorLine!: number;
-  cursorCol!: number;
+  declare expanded: Set<string>; // root expanded
+  declare activePath: string | null;
+  declare tabs: Tab[];
+  declare content: string;
+  declare status: string;
+  declare openMenu: string | null;
+  declare rootItems: TreeItem[];
+  declare treeData: Record<string, TreeItem[]>;
+  declare lineCount: number;
+  declare cursorLine: number;
+  declare cursorCol: number;
   private loadedPaths = new Set<string>();
   private loadingPaths = new Set<string>();
   private fileCache: Record<string, string> = {};
@@ -432,7 +432,6 @@ export class AppRoot extends LitElement {
   private gutterRef: HTMLDivElement | null = null;
   private editorRef: HTMLTextAreaElement | null = null;
   private cursorRaf: number | null = null;
-  private fileMenuRef: HTMLDivElement | null = null;
   private lastCursorLine = 1;
   private lastCursorCol = 1;
   private selectionListener = () => {
@@ -449,7 +448,7 @@ export class AppRoot extends LitElement {
     this.tabs = [];
     this.content = "";
     this.status = "Ready";
-    this.showFileMenu = false;
+    this.openMenu = null;
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -627,17 +626,18 @@ export class AppRoot extends LitElement {
   }
 
   private handleGlobalClick = (e: MouseEvent) => {
-    if (!this.showFileMenu) return;
+    if (!this.openMenu) return;
     const path = e.composedPath();
-    if (this.fileMenuRef && path.includes(this.fileMenuRef)) return;
-    this.showFileMenu = false;
+    if (path.includes(this)) return;
+    if (this.shadowRoot && path.includes(this.shadowRoot.host)) return;
+    this.openMenu = null;
   };
 
-  private toggleFileMenu(e: Event) {
+  private toggleMenu(e: Event, name: string) {
     e.preventDefault();
     e.stopPropagation();
-    this.showFileMenu = !this.showFileMenu;
-    console.debug("[app-root] file menu toggle", { open: this.showFileMenu });
+    this.openMenu = this.openMenu === name ? null : name;
+    console.debug("[app-root] menu toggle", { name, open: this.openMenu });
   }
 
   private handleCloseTab(e: Event, path: string) {
@@ -721,6 +721,23 @@ export class AppRoot extends LitElement {
     );
   }
 
+  private renderMenu(label: string, name: string, items: { icon: string; label: string }[]) {
+    const open = this.openMenu === name;
+    return html`
+      <div class="menuItem ${open ? "open" : ""}" @click=${(e: Event) => this.toggleMenu(e, name)}>
+        <span>${label}</span>
+        <div class="menuPopup" ?hidden=${!open}>
+          ${items.map(
+            (it) => html`<div class="menuItemRow">
+              <span class="menuIcon">${it.icon}</span>
+              <span>${it.label}</span>
+            </div>`
+          )}
+        </div>
+      </div>
+    `;
+  }
+
   private syncScroll(e: Event) {
     const top = (e.target as HTMLElement).scrollTop;
     if (this.codeRef) this.codeRef.style.transform = `translateY(-${top}px)`;
@@ -796,39 +813,41 @@ export class AppRoot extends LitElement {
       <div class="shell">
         <div class="titlebar">
           <div class="menus">
-            <div
-              class="menuItem ${this.showFileMenu ? "open" : ""}"
-              ${ref((el) => (this.fileMenuRef = el))}
-              @click=${(e: Event) => this.toggleFileMenu(e)}
-            >
-              <span>File</span>
-              ${this.showFileMenu
-                ? html`<div class="menuPopup">
-                    <div class="menuItemRow" title="New">
-                      <span class="menuIcon">📄</span>
-                      <span>New</span>
-                    </div>
-                    <div class="menuItemRow" title="Save">
-                      <span class="menuIcon">💾</span>
-                      <span>Save</span>
-                    </div>
-                    <div class="menuItemRow" title="Save as…">
-                      <span class="menuIcon">📝</span>
-                      <span>Save as…</span>
-                    </div>
-                    <div class="menuDivider"></div>
-                    <div class="menuItemRow" title="Import…">
-                      <span class="menuIcon">⬆️</span>
-                      <span>Import…</span>
-                    </div>
-                    <div class="menuItemRow" title="Export…">
-                      <span class="menuIcon">⬇️</span>
-                      <span>Export…</span>
-                    </div>
-                  </div>`
-                : nothing}
-            </div>
-            <span>Edit</span><span>View</span><span>Go</span><span>Run</span><span>Help</span>
+            ${this.renderMenu("File", "file", [
+              { icon: "📄", label: "New" },
+              { icon: "💾", label: "Save" },
+              { icon: "📝", label: "Save as…" },
+              { icon: "⬆️", label: "Import…" },
+              { icon: "⬇️", label: "Export…" },
+            ])}
+            ${this.renderMenu("Edit", "edit", [
+              { icon: "↩️", label: "Undo" },
+              { icon: "↪️", label: "Redo" },
+              { icon: "✂️", label: "Cut" },
+              { icon: "📋", label: "Copy" },
+              { icon: "📥", label: "Paste" },
+              { icon: "🔍", label: "Find…" },
+              { icon: "♻️", label: "Replace…" },
+            ])}
+            ${this.renderMenu("View", "view", [
+              { icon: "🔄", label: "Reload tree" },
+              { icon: "🔡", label: "Toggle line numbers" },
+              { icon: "↔️", label: "Toggle wrap" },
+            ])}
+            ${this.renderMenu("Go", "go", [
+              { icon: "📂", label: "Go to file…" },
+              { icon: "🔢", label: "Go to line…" },
+              { icon: "📜", label: "Open recent…" },
+            ])}
+            ${this.renderMenu("Run", "run", [
+              { icon: "💾", label: "Save all" },
+              { icon: "🗂️", label: "Reload config" },
+              { icon: "✅", label: "Check health" },
+            ])}
+            ${this.renderMenu("Help", "help", [
+              { icon: "📖", label: "Docs" },
+              { icon: "❓", label: "About" },
+            ])}
           </div>
           <div class="title">File Editor Plus</div>
         </div>

@@ -8,6 +8,7 @@ export default defineConfig({
       babel: {
         plugins: [
           ["@babel/plugin-proposal-decorators", { legacy: true }],
+          ["@babel/plugin-transform-typescript", { allowDeclareFields: true }],
           ["@babel/plugin-proposal-class-properties", { loose: true }]
         ]
       }
