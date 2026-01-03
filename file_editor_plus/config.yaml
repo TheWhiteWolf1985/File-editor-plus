@@ -1,5 +1,5 @@
 name: "File Editor Plus (MVP)"
-version: "0.1.8"
+version: "0.1.16"
 slug: "file_editor_plus"
 description: "Pro File Editor for Home Assistant"
 arch:
@@ -7,6 +7,8 @@ arch:
 startup: application
 boot: auto
 init: false
+homeassistant_api: true
+hassio_api: true
 
 ingress: true
 ingress_port: 8099

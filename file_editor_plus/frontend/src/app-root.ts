@@ -1,6 +1,7 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
+import { HAClient, type HassState } from "./ha-client";
 
 type TreeItem = { name: string; path: string; type: "dir" | "file"; children?: TreeItem[] };
 type Tab = { path: string; name: string; dirty: boolean };
@@ -134,12 +135,73 @@ export class AppRoot extends LitElement {
       outline: 1px solid #3a3a3a;
       opacity: 1;
     }
+    .sidebarContent {
+      padding: 8px 6px 12px;
+      font-size: 13px;
+      overflow-x: hidden;
+    }
+    .entityPane {
+      display: grid;
+      gap: 8px;
+    }
+    .entityHeader {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .entitySearch {
+      width: 100%;
+      margin-bottom: 2px;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #3a3a3a;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      box-sizing: border-box;
+    }
+    .entityList {
+      max-height: calc(100vh - 220px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: grid;
+      gap: 6px;
+      padding-right: 4px;
+    }
+    .entityCard {
+      padding: 8px;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      background: #1f1f1f;
+      box-sizing: border-box;
+    }
+    .entityName {
+      font-weight: 600;
+      overflow-wrap: anywhere;
+    }
+    .entityId {
+      font-size: 12px;
+      opacity: 0.8;
+      overflow-wrap: anywhere;
+    }
+    .entityMeta {
+      font-size: 12px;
+      margin-top: 4px;
+      overflow-wrap: anywhere;
+    }
+    .entityError {
+      color: #f6dada;
+      background: #3a1f1f;
+      padding: 8px;
+      border-radius: 8px;
+      font-size: 12px;
+      box-sizing: border-box;
+    }
 
     /* Sidebar */
     .sidebar {
       background: #252526;
       border-right: 1px solid #2a2a2a;
-      overflow: auto;
+      overflow-y: auto;
+      overflow-x: hidden;
     }
     .sidebarHeader {
       height: 34px;
@@ -506,8 +568,12 @@ export class AppRoot extends LitElement {
     newItemKind: { state: true },
     newItemName: { state: true },
     newItemExt: { state: true },
+    activeActivity: { state: true },
     toastMessage: { state: true },
     toastType: { state: true },
+    entityFilter: { state: true },
+    entities: { state: true },
+    entityError: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
     lineCount: { state: true },
@@ -524,8 +590,12 @@ export class AppRoot extends LitElement {
   declare newItemKind: "file" | "folder" | null;
   declare newItemName: string;
   declare newItemExt: string;
+  declare activeActivity: "explorer" | "search" | "entity";
   declare toastMessage: string | null;
   declare toastType: "info" | "error";
+  declare entityFilter: string;
+  declare entities: Record<string, HassState>;
+  declare entityError: string | null;
   declare rootItems: TreeItem[];
   declare treeData: Record<string, TreeItem[]>;
   declare lineCount: number;
@@ -541,7 +611,8 @@ export class AppRoot extends LitElement {
   private lastCursorLine = 1;
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
-  private readonly appVersion = "0.1.8";
+  private haClient: HAClient | null = null;
+  private readonly appVersion = "0.1.16";
   private selectionListener = () => {
     if (!this.editorRef) return;
     const active = this.shadowRoot?.activeElement || document.activeElement;
@@ -560,8 +631,12 @@ export class AppRoot extends LitElement {
     this.newItemKind = null;
     this.newItemName = "";
     this.newItemExt = "";
+    this.activeActivity = "explorer";
     this.toastMessage = null;
     this.toastType = "info";
+    this.entityFilter = "";
+    this.entities = {};
+    this.entityError = null;
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -576,12 +651,17 @@ export class AppRoot extends LitElement {
     }
     document.addEventListener("selectionchange", this.selectionListener);
     document.addEventListener("click", this.handleGlobalClick, true);
+    this.initEntities();
   }
 
   disconnectedCallback(): void {
     document.removeEventListener("selectionchange", this.selectionListener);
     document.removeEventListener("click", this.handleGlobalClick, true);
     if (this.cursorRaf !== null) cancelAnimationFrame(this.cursorRaf);
+    if (this.haClient) {
+      this.haClient.disconnect();
+      this.haClient = null;
+    }
     super.disconnectedCallback();
   }
 
@@ -764,6 +844,32 @@ export class AppRoot extends LitElement {
       this.toastType = "info";
       this.toastTimer = null;
     }, 5000);
+  }
+
+  private async initEntities() {
+    try {
+      this.haClient = new HAClient(this.apiBase);
+      this.haClient.connect((ev) => {
+        const id = ev.event.data.entity_id;
+        const next = { ...this.entities };
+        if (ev.event.data.new_state) {
+          next[id] = ev.event.data.new_state;
+        } else {
+          delete next[id];
+        }
+        this.entities = next;
+      });
+      const states = await this.haClient.getStates();
+      const next: Record<string, HassState> = {};
+      states.forEach((s) => {
+        next[s.entity_id] = s;
+      });
+      this.entities = next;
+      this.entityError = null;
+    } catch (e) {
+      this.entityError = "Errore caricamento entità";
+      this.showToast("Errore caricamento entità", "error");
+    }
   }
 
   private handleMenuAction(menu: string, action: string) {
@@ -993,6 +1099,56 @@ export class AppRoot extends LitElement {
     if (this.gutterRef) this.gutterRef.style.transform = `translateY(-${top}px)`;
   }
 
+  private setActivity(name: "explorer" | "search" | "entity") {
+    this.activeActivity = name;
+  }
+
+  private renderSidebarContent() {
+    if (this.activeActivity === "explorer") {
+      return html`<div class="tree">${this.renderTree("")}</div>`;
+    }
+    if (this.activeActivity === "search") {
+      return html`<div class="sidebarContent">Search coming soon…</div>`;
+    }
+    // entity mock
+    const entries = Object.values(this.entities);
+    const filtered = entries
+      .filter((e) => {
+        const q = this.entityFilter.toLowerCase();
+        if (!q) return true;
+        return e.entity_id.toLowerCase().includes(q) || (e.attributes?.friendly_name || "").toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        const da = a.entity_id.split(".")[0];
+        const db = b.entity_id.split(".")[0];
+        if (da === db) return a.entity_id.localeCompare(b.entity_id);
+        return da.localeCompare(db);
+      });
+    return html`<div class="sidebarContent entityPane">
+      <div class="entityHeader">Entities</div>
+      <input
+        class="entitySearch"
+        type="text"
+        .value=${this.entityFilter}
+        @input=${(e: Event) => (this.entityFilter = (e.target as HTMLInputElement).value)}
+        placeholder="Search entity id or name"
+      />
+      ${this.entityError
+        ? html`<div class="entityError">${this.entityError}</div>`
+        : html`<div class="entityList">
+            ${filtered.map((e) => {
+              const domain = e.entity_id.split(".")[0];
+              const name = (e.attributes?.friendly_name as string) || e.entity_id;
+              return html`<div class="entityCard">
+                <div class="entityName">${name}</div>
+                <div class="entityId">${e.entity_id}</div>
+                <div class="entityMeta">${domain} • State: ${e.state}</div>
+              </div>`;
+            })}
+          </div>`}
+    </div>`;
+  }
+
   private renderLineNumbers() {
     const count = Math.max(1, this.lineCount);
     return Array.from({ length: count }, (_, i) => String(i + 1)).join("\n");
@@ -1060,7 +1216,7 @@ export class AppRoot extends LitElement {
 
     return html`
       <div class="shell">
-      <div class="titlebar">
+          <div class="titlebar">
           <div class="menus">
             ${this.renderMenu("File", "file", [
               { icon: "📄", label: "New file" },
@@ -1105,19 +1261,22 @@ export class AppRoot extends LitElement {
 
         <div class="main">
           <div class="activity">
-            <div class="act active" title="Explorer">📁</div>
-            <div class="act" title="Search">🔎</div>
-            <div class="act" title="Source Control">🌿</div>
-            <div class="act" title="Extensions">🧩</div>
+            <div class="act ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>📁</div>
+            <div class="act ${this.activeActivity === "search" ? "active" : ""}" title="Search" @click=${() => this.setActivity("search")}>🔎</div>
+            <div class="act ${this.activeActivity === "entity" ? "active" : ""}" title="Entity" @click=${() => this.setActivity("entity")}>🗂️</div>
           </div>
 
           <div class="sidebar">
             <div class="sidebarHeader">
-              <div class="explorerTitle">Explorer</div>
+              <div class="explorerTitle">
+                ${this.activeActivity === "explorer"
+                  ? "Explorer"
+                  : this.activeActivity === "search"
+                    ? "Search"
+                    : "Entity"}
+              </div>
             </div>
-            <div class="tree">
-              ${this.renderTree("")}
-            </div>
+            ${this.renderSidebarContent()}
           </div>
 
           <div class="editor">

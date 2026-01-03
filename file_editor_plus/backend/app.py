@@ -3,17 +3,23 @@ from __future__ import annotations
 import os
 import shutil
 import time
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Request
+import json
+import httpx
+import websockets
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 BASE_DIR = Path("/config").resolve()
 BACKUP_DIR = (BASE_DIR / ".fep-backups").resolve()
 FRONTEND_DIR = Path("/app/frontend").resolve()
+SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
+logger = logging.getLogger("file_editor_plus")
 
 # roba che di solito non vuoi toccare/vedere nell’editor
 DEFAULT_IGNORE = {
@@ -102,6 +108,88 @@ def atomic_write(target: Path, data: str) -> None:
 def health():
     return {"ok": True}
 
+
+@app.get("/api/ha/states")
+async def ha_states():
+    if not SUPERVISOR_TOKEN:
+        logger.error("ha_states: missing SUPERVISOR_TOKEN env, cannot call HA API")
+        raise HTTPException(500, "Missing supervisor token")
+    try:
+        token_preview = SUPERVISOR_TOKEN[:8] + "..." if SUPERVISOR_TOKEN else ""
+        logger.info("ha_states: calling supervisor/core/api/states token_present=%s token_prefix=%s", bool(SUPERVISOR_TOKEN), token_preview)
+        async with httpx.AsyncClient(base_url="http://supervisor/core/api", timeout=15) as client:
+            res = await client.get("/states", headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"})
+            if res.status_code in (401, 403):
+                logger.warning("ha_states denied by HA: status=%s body=%s", res.status_code, res.text)
+                raise HTTPException(403, "Unauthorized to read HA states (check homeassistant_api permission)")
+            res.raise_for_status()
+            logger.info("ha_states: fetched %s states", len(res.json() or []))
+            return res.json()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("ha_states: error fetching states: %s", e)
+        raise HTTPException(500, f"Error fetching states: {e}")
+
+
+@app.websocket("/api/ha/ws")
+async def ha_ws(ws: WebSocket):
+    await ws.accept()
+    if not SUPERVISOR_TOKEN:
+        logger.error("ha_ws: missing SUPERVISOR_TOKEN, closing client")
+        await ws.close(code=1011)
+        return
+    try:
+        token_preview = SUPERVISOR_TOKEN[:8] + "..." if SUPERVISOR_TOKEN else ""
+        logger.info("ha_ws: connecting to supervisor/core/websocket token_prefix=%s", token_preview)
+        async with websockets.connect("ws://supervisor/core/websocket") as upstream:
+            first = await upstream.recv()
+            try:
+                first_payload = json.loads(first)
+            except Exception:
+                first_payload = {"type": "unknown", "raw": first}
+
+            if first_payload.get("type") != "auth_required":
+                logger.warning("ha_ws: unexpected first message from HA: %s", first)
+                await ws.send_json({"type": "error", "message": "Unexpected handshake from HA"})
+                await ws.close()
+                return
+
+            await upstream.send(json.dumps({"type": "auth", "access_token": SUPERVISOR_TOKEN}))
+            auth_resp = await upstream.recv()
+            try:
+                auth_payload = json.loads(auth_resp)
+            except Exception:
+                auth_payload = {"type": "unknown", "raw": auth_resp}
+
+            if auth_payload.get("type") != "auth_ok":
+                logger.warning("ha_ws: auth failed to HA, response=%s", auth_resp)
+                await ws.send_json({"type": "error", "message": "Auth to HA failed"})
+                await ws.close()
+                return
+            await upstream.send(json.dumps({"id": 1, "type": "subscribe_events", "event_type": "state_changed"}))
+            logger.info("ha_ws: subscribed to state_changed")
+
+            async def client_to_upstream():
+                try:
+                    async for msg in ws.iter_text():
+                        await upstream.send(msg)
+                except WebSocketDisconnect:
+                    return
+
+            async def upstream_to_client():
+                try:
+                    async for msg in upstream:
+                        await ws.send_text(msg)
+                except Exception:
+                    return
+
+            import asyncio
+
+            await asyncio.gather(client_to_upstream(), upstream_to_client())
+    except Exception as e:
+        logger.exception("ha_ws: error in proxy: %s", e)
+        await ws.close(code=1011)
 @app.post("/api/folder")
 def create_folder(path: str):
     target = safe_path(path)
