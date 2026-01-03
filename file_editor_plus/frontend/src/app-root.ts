@@ -1,5 +1,5 @@
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
 
 type TreeItem = { name: string; path: string; type: "dir" | "file"; children?: TreeItem[] };
@@ -400,17 +400,31 @@ export class AppRoot extends LitElement {
     return base.endsWith("/") ? base : `${base}/`;
   })();
 
-  @state() expanded = new Set<string>([""]); // root expanded
-  @state() activePath: string | null = null;
-  @state() tabs: Tab[] = [];
-  @state() content = "";
-  @state() status = "Ready";
-  @state() showFileMenu = false;
-  @state() rootItems: TreeItem[] = [];
-  @state() treeData: Record<string, TreeItem[]> = {};
-  @state() lineCount = 1;
-  @state() cursorLine = 1;
-  @state() cursorCol = 1;
+  static properties = {
+    expanded: { state: true },
+    activePath: { state: true },
+    tabs: { state: true },
+    content: { state: true },
+    status: { state: true },
+    showFileMenu: { state: true },
+    rootItems: { state: true },
+    treeData: { state: true },
+    lineCount: { state: true },
+    cursorLine: { state: true },
+    cursorCol: { state: true },
+  };
+
+  expanded!: Set<string>; // root expanded
+  activePath!: string | null;
+  tabs!: Tab[];
+  content!: string;
+  status!: string;
+  showFileMenu!: boolean;
+  rootItems!: TreeItem[];
+  treeData!: Record<string, TreeItem[]>;
+  lineCount!: number;
+  cursorLine!: number;
+  cursorCol!: number;
   private loadedPaths = new Set<string>();
   private loadingPaths = new Set<string>();
   private fileCache: Record<string, string> = {};
@@ -427,6 +441,21 @@ export class AppRoot extends LitElement {
     if (active !== this.editorRef) return;
     this.updateCursorFromPos(this.editorRef.selectionStart ?? 0, this.editorRef.value);
   };
+
+  constructor() {
+    super();
+    this.expanded = new Set<string>([""]);
+    this.activePath = null;
+    this.tabs = [];
+    this.content = "";
+    this.status = "Ready";
+    this.showFileMenu = false;
+    this.rootItems = [];
+    this.treeData = {};
+    this.lineCount = 1;
+    this.cursorLine = 1;
+    this.cursorCol = 1;
+  }
 
   connectedCallback() {
     super.connectedCallback();
@@ -465,7 +494,6 @@ export class AppRoot extends LitElement {
       }
       this.treeData = { ...this.treeData, [key]: items };
       this.status = items.length === 0 ? "Nessun file" : "Ready";
-      await this.requestUpdate();
     } catch (e) {
       this.status = "Errore caricamento tree";
     } finally {
@@ -512,7 +540,6 @@ export class AppRoot extends LitElement {
       this.cursorCol = 1;
       this.tabs = this.tabs.map((t) => (t.path === path ? { ...t, dirty: false } : t));
       this.status = "Ready";
-      await this.requestUpdate();
     } catch (e) {
       this.status = "Errore caricamento file";
     }
@@ -538,7 +565,6 @@ export class AppRoot extends LitElement {
       }
     }
     console.debug("[app-root] closeTab: closed", path, { remaining: this.tabs.map((t) => t.path), active: this.activePath });
-    this.requestUpdate();
   }
 
   private markDirty(val: string) {
@@ -549,7 +575,6 @@ export class AppRoot extends LitElement {
     this.tabs = this.tabs.map((t) =>
       t.path === this.activePath ? { ...t, dirty: true } : t
     );
-    this.requestUpdate();
   }
 
   private updateCursorFromPos(pos: number, value?: string) {
@@ -564,7 +589,6 @@ export class AppRoot extends LitElement {
       this.lastCursorLine = nextLine;
       this.lastCursorCol = nextCol;
       console.debug("[app-root] cursor", { pos, line: nextLine, col: nextCol });
-      this.requestUpdate();
     }
   }
 
@@ -614,7 +638,6 @@ export class AppRoot extends LitElement {
     e.stopPropagation();
     this.showFileMenu = !this.showFileMenu;
     console.debug("[app-root] file menu toggle", { open: this.showFileMenu });
-    this.requestUpdate();
   }
 
   private handleCloseTab(e: Event, path: string) {
@@ -632,7 +655,6 @@ export class AppRoot extends LitElement {
       this.lineCount = Math.max(1, cached.split("\n").length);
       this.cursorLine = 1;
       this.cursorCol = 1;
-      this.requestUpdate();
     } else {
       this.content = "";
       this.lineCount = 1;
