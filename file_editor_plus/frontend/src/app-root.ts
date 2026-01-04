@@ -15,6 +15,7 @@ export class AppRoot extends LitElement {
       min-height: 100%;
       width: 100%;
       overflow: hidden;
+      position: relative;
       color: var(--text-color);
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
       background: var(--bg-color);
@@ -584,6 +585,7 @@ export class AppRoot extends LitElement {
       overflow: auto;
       z-index: 350;
       color: var(--text-color);
+      transform: translateY(-4px) translateY(-100%);
     }
     .suggestItem {
       padding: 8px 12px;
@@ -777,7 +779,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.33";
+  private readonly appVersion = "0.1.35";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
@@ -1236,8 +1238,12 @@ export class AppRoot extends LitElement {
     const line = lines.length;
     const col = lines[lines.length - 1].length;
     const lineHeight = 18; // px approx (13px font * 1.4)
-    const top = (line - 1) * lineHeight + 12 - (this.editorRef.scrollTop || 0);
-    const left = 70 + col * 8; // gutter + approx char width
+    const taRect = this.editorRef.getBoundingClientRect();
+    const hostRect = this.getBoundingClientRect();
+    const padding = 12;
+    const charWidth = 8;
+    const left = taRect.left - hostRect.left + padding + col * charWidth;
+    const top = taRect.top - hostRect.top + padding + (line - 1) * lineHeight - (this.editorRef.scrollTop || 0) - 2;
     this.suggestOpen = true;
     this.suggestItems = items;
     this.suggestIndex = sameItems ? Math.min(this.suggestIndex, items.length - 1) : 0;
