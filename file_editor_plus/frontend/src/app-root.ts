@@ -571,7 +571,31 @@ export class AppRoot extends LitElement {
       font-size: 13px;
     }
     .contextMenuItem:hover {
-      background: #3a3a3a;
+      background: var(--hover-color);
+    }
+    .suggestBox {
+      position: absolute;
+      background: var(--panel-strong);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      box-shadow: var(--menu-shadow);
+      min-width: 220px;
+      max-height: 220px;
+      overflow: auto;
+      z-index: 350;
+      color: var(--text-color);
+    }
+    .suggestItem {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 12px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .suggestItem:hover,
+    .suggestItem.active {
+      background: var(--hover-color);
     }
     .statusbar .version {
       margin-left: 10px;
@@ -698,6 +722,11 @@ export class AppRoot extends LitElement {
     contextMenuX: { state: true },
     contextMenuY: { state: true },
     themeMode: { state: true },
+    suggestOpen: { state: true },
+    suggestItems: { state: true },
+    suggestIndex: { state: true },
+    suggestTop: { state: true },
+    suggestLeft: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
     lineCount: { state: true },
@@ -726,6 +755,12 @@ export class AppRoot extends LitElement {
   declare contextMenuX: number;
   declare contextMenuY: number;
   declare themeMode: "auto" | "dark" | "light";
+  declare suggestOpen: boolean;
+  declare suggestItems: string[];
+  declare suggestIndex: number;
+  declare suggestTop: number;
+  declare suggestLeft: number;
+  private suggestBlocked = false;
   declare rootItems: TreeItem[];
   declare treeData: Record<string, TreeItem[]>;
   declare lineCount: number;
@@ -742,7 +777,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.27";
+  private readonly appVersion = "0.1.33";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
@@ -775,6 +810,11 @@ export class AppRoot extends LitElement {
     this.contextMenuX = 0;
     this.contextMenuY = 0;
     this.themeMode = "auto";
+    this.suggestOpen = false;
+    this.suggestItems = [];
+    this.suggestIndex = 0;
+    this.suggestTop = 0;
+    this.suggestLeft = 0;
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -939,14 +979,39 @@ export class AppRoot extends LitElement {
   private handleInput(e: Event) {
     const ta = e.target as HTMLTextAreaElement;
     this.markDirty(ta.value);
+    this.updateSuggestions();
+    if (this.suggestBlocked && !ta.value.endsWith(".")) {
+      this.suggestBlocked = false;
+    }
     requestAnimationFrame(() => this.updateCursorFromTextarea());
   }
 
   private handleCursorMove(e: Event) {
+    this.updateSuggestions();
     requestAnimationFrame(() => this.updateCursorFromTextarea());
   }
 
   private handleEditorKeyDown(e: KeyboardEvent) {
+    if (this.suggestOpen) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const delta = e.key === "ArrowDown" ? 1 : -1;
+        const next = (this.suggestIndex + delta + this.suggestItems.length) % this.suggestItems.length;
+        this.suggestIndex = next;
+        requestAnimationFrame(() => this.scrollSuggestIntoView());
+        return;
+      }
+      if (e.key === "Enter" || e.key === "Tab") {
+        e.preventDefault();
+        this.applySuggestion();
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        this.closeSuggestions(true);
+        return;
+      }
+    }
     if (!this.autoIndentEnabled) {
       this.handleCursorMove(e);
       return;
@@ -1020,6 +1085,7 @@ export class AppRoot extends LitElement {
     this.contextMenuOpen = true;
     this.contextMenuX = e.clientX;
     this.contextMenuY = e.clientY;
+    this.closeSuggestions();
   }
 
   private closeContextMenu() {
@@ -1127,6 +1193,94 @@ export class AppRoot extends LitElement {
     this.showToast("Auto-indent completato");
   }
 
+  private closeSuggestions(block = false) {
+    if (this.suggestOpen) {
+      this.suggestOpen = false;
+      this.suggestItems = [];
+      this.suggestIndex = 0;
+    }
+    if (block) {
+      this.suggestBlocked = true;
+    }
+  }
+
+  private updateSuggestions() {
+    if (this.suggestBlocked) return;
+    if (!this.editorRef) {
+      this.closeSuggestions();
+      return;
+    }
+    const pos = this.editorRef.selectionStart ?? 0;
+    const before = this.content.slice(0, pos);
+    const match = before.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_\\-]*)$/);
+    if (!match) {
+      this.closeSuggestions();
+      return;
+    }
+    const domain = (match[1] || "").toLowerCase();
+    const query = match[2] || "";
+    const all = Object.keys(this.entities).sort();
+    const items =
+      domain === "state" || domain === "states"
+        ? all.filter((id) => id.includes(query))
+        : all.filter((id) => id.startsWith(`${domain}.`) && id.includes(query));
+    if (items.length === 0) {
+      this.closeSuggestions();
+      return;
+    }
+    const sameItems =
+      this.suggestOpen &&
+      this.suggestItems.length === items.length &&
+      this.suggestItems.every((v, i) => v === items[i]);
+    const lines = before.split("\n");
+    const line = lines.length;
+    const col = lines[lines.length - 1].length;
+    const lineHeight = 18; // px approx (13px font * 1.4)
+    const top = (line - 1) * lineHeight + 12 - (this.editorRef.scrollTop || 0);
+    const left = 70 + col * 8; // gutter + approx char width
+    this.suggestOpen = true;
+    this.suggestItems = items;
+    this.suggestIndex = sameItems ? Math.min(this.suggestIndex, items.length - 1) : 0;
+    this.suggestTop = top;
+    this.suggestLeft = left;
+    requestAnimationFrame(() => this.scrollSuggestIntoView());
+  }
+
+  private applySuggestion() {
+    if (!this.editorRef || !this.suggestOpen || this.suggestItems.length === 0) return;
+    const ta = this.editorRef;
+    const pos = ta.selectionStart ?? 0;
+    const before = this.content.slice(0, pos);
+    const match = before.match(/(?:states?|state)\.([a-zA-Z0-9_\\-]*)$/);
+    if (!match) {
+      this.closeSuggestions();
+      return;
+    }
+    const prefixLen = match[0].length;
+    const start = pos - prefixLen;
+    const end = ta.selectionEnd ?? pos;
+    const insert = this.suggestItems[this.suggestIndex];
+    const next = `${this.content.slice(0, start)}${insert}${this.content.slice(end)}`;
+    this.markDirty(next);
+    const newPos = start + insert.length;
+    requestAnimationFrame(() => {
+      if (!this.editorRef) return;
+      this.editorRef.selectionStart = newPos;
+      this.editorRef.selectionEnd = newPos;
+      this.editorRef.focus();
+      this.updateCursorFromPos(newPos, this.content);
+    });
+    this.closeSuggestions();
+  }
+
+  private scrollSuggestIntoView() {
+    if (!this.suggestOpen) return;
+    const items = this.shadowRoot?.querySelectorAll(".suggestItem");
+    if (!items || items.length === 0) return;
+    const el = items[this.suggestIndex] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: "nearest" });
+  }
+
   private startCursorTracking() {
     const tick = () => {
       this.updateCursorFromTextarea();
@@ -1155,6 +1309,11 @@ export class AppRoot extends LitElement {
       const target = e.target as HTMLElement | null;
       const inside = target?.closest?.(".contextMenu");
       if (!inside) this.closeContextMenu();
+    }
+    if (this.suggestOpen) {
+      const target = e.target as HTMLElement | null;
+      const inside = target?.closest?.(".suggestBox");
+      if (!inside) this.closeSuggestions(true);
     }
   };
 
@@ -1844,6 +2003,26 @@ export class AppRoot extends LitElement {
               <div class="contextMenuItem" @click=${() => this.handleCopyCut("copy")}>📋 Copy</div>
               <div class="contextMenuItem" @click=${() => this.handlePaste()}>📥 Paste</div>
               <div class="contextMenuItem" @click=${() => this.reindentAll()}>🔧 Auto-indent</div>
+            </div>`
+          : nothing}
+
+        ${this.suggestOpen
+          ? html`<div
+              class="suggestBox"
+              style="top:${this.suggestTop}px; left:${this.suggestLeft}px;"
+            >
+              ${this.suggestItems.map(
+                (s, idx) => html`<div
+                  class="suggestItem ${idx === this.suggestIndex ? "active" : ""}"
+                  @mousedown=${(ev: Event) => {
+                    ev.preventDefault();
+                    this.suggestIndex = idx;
+                    this.applySuggestion();
+                  }}
+                >
+                  🧭 <span>${s}</span>
+                </div>`
+              )}
             </div>`
           : nothing}
 
