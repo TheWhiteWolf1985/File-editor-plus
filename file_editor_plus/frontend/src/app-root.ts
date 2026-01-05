@@ -798,11 +798,11 @@ export class AppRoot extends LitElement {
   declare snippets: Snippet[];
   private suggestBlocked = false;
   private snippetMocks: Snippet[] = [
-    { id: "mock-1", name: "Light toggle", description: "Esempio di automazione per accendere/spegnere una luce tramite switch con condizione oraria.", content: "" },
-    { id: "mock-2", name: "Presence alert", description: "Notifica push quando un dispositivo torna online in rete domestica.", content: "" },
-    { id: "mock-3", name: "HVAC preset", description: "Snippet per impostare modalità comfort/eco sul clima con soglie configurabili.", content: "" },
-    { id: "mock-4", name: "Backup reminder", description: "Promemoria settimanale per eseguire il backup della configurazione di Home Assistant.", content: "" },
-    { id: "mock-5", name: "Scene starter", description: "Esempio di scena per luci soffuse e musica a volume basso in salotto.", content: "" },
+    { id: "mock-1", name: "Light toggle", description: "Esempio di automazione per accendere/spegnere una luce tramite switch con condizione oraria.", content: "alias: Toggle light\ntrigger:\n  - platform: state\n    entity_id: binary_sensor.motion\naction:\n  - service: light.toggle\n    target:\n      entity_id: light.living_room" },
+    { id: "mock-2", name: "Presence alert", description: "Notifica push quando un dispositivo torna online in rete domestica.", content: "alias: Presence alert\ntrigger:\n  - platform: state\n    entity_id: device_tracker.phone\n    to: 'home'\naction:\n  - service: notify.mobile_app_phone\n    data:\n      message: \"Bentornato a casa!\"" },
+    { id: "mock-3", name: "HVAC preset", description: "Snippet per impostare modalità comfort/eco sul clima con soglie configurabili.", content: "alias: HVAC preset\naction:\n  - service: climate.set_preset_mode\n    target:\n      entity_id: climate.living_room\n    data:\n      preset_mode: comfort" },
+    { id: "mock-4", name: "Backup reminder", description: "Promemoria settimanale per eseguire il backup della configurazione di Home Assistant.", content: "alias: Backup reminder\ntrigger:\n  - platform: time\n    at: '20:00:00'\naction:\n  - service: notify.persistent_notification\n    data:\n      message: \"Ricordati il backup della config!\"" },
+    { id: "mock-5", name: "Scene starter", description: "Esempio di scena per luci soffuse e musica a volume basso in salotto.", content: "alias: Scene starter\naction:\n  - service: scene.turn_on\n    target:\n      entity_id: scene.relax" },
   ];
   declare rootItems: TreeItem[];
   declare treeData: Record<string, TreeItem[]>;
@@ -820,7 +820,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.43";
+  private readonly appVersion = "0.1.45";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
@@ -1406,6 +1406,44 @@ export class AppRoot extends LitElement {
     el?.scrollIntoView({ block: "nearest" });
   }
 
+  private insertSnippet(snippet: Snippet) {
+    if (!this.editorRef || !this.activePath) {
+      this.showToast("Apri un file prima di inserire", "error");
+      return;
+    }
+    const ta = this.editorRef;
+    const start = ta.selectionStart ?? this.content.length;
+    const end = ta.selectionEnd ?? start;
+    const insert = snippet.content || "";
+    const next = `${this.content.slice(0, start)}${insert}${this.content.slice(end)}`;
+    this.markDirty(next);
+    const pos = start + insert.length;
+    requestAnimationFrame(() => {
+      if (!this.editorRef) return;
+      this.editorRef.selectionStart = pos;
+      this.editorRef.selectionEnd = pos;
+      this.editorRef.focus();
+      this.updateCursorFromPos(pos, this.content);
+    });
+    this.showToast(`Snippet inserito: ${snippet.name}`);
+  }
+
+  private async deleteSnippet(snippet: Snippet) {
+    const id = snippet.id;
+    if (!id) {
+      this.showToast("ID snippet mancante", "error");
+      return;
+    }
+    try {
+      const res = await fetch(`${this.apiBase}api/snippets/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`delete snippet ${res.status}`);
+      this.snippets = this.snippets.filter((s) => s.id !== id);
+      this.showToast("Snippet eliminato");
+    } catch (e) {
+      this.showToast("Errore eliminazione snippet", "error");
+    }
+  }
+
   private startCursorTracking() {
     const tick = () => {
       this.updateCursorFromTextarea();
@@ -1875,7 +1913,8 @@ export class AppRoot extends LitElement {
                 <div class="snippetTitle">${s.name}</div>
                 <div style="display:flex; gap:6px;">
                   <button class="statusToggle" title="Modify" style="padding:2px 6px; border-color:var(--border-color);">✏️</button>
-                  <button class="statusToggle" title="Cancel" style="padding:2px 6px; border-color:var(--border-color);">🗙</button>
+                  <button class="statusToggle" title="Cancel" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.deleteSnippet(s); }}>🗙</button>
+                  <button class="statusToggle" title="Insert" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.insertSnippet(s); }}>➕</button>
                 </div>
               </div>
               <div class="snippetDesc">${s.description.slice(0, 200)}</div>
