@@ -751,6 +751,7 @@ export class AppRoot extends LitElement {
     suggestIndex: { state: true },
     suggestTop: { state: true },
     suggestLeft: { state: true },
+    snippetEditingId: { state: true },
     showSnippetModal: { state: true },
     snippetName: { state: true },
     snippetDescription: { state: true },
@@ -790,6 +791,7 @@ export class AppRoot extends LitElement {
   declare suggestIndex: number;
   declare suggestTop: number;
   declare suggestLeft: number;
+  declare snippetEditingId: string | null;
   declare showSnippetModal: boolean;
   declare snippetName: string;
   declare snippetDescription: string;
@@ -820,7 +822,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.45";
+  private readonly appVersion = "0.1.46";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
@@ -858,6 +860,7 @@ export class AppRoot extends LitElement {
     this.suggestIndex = 0;
     this.suggestTop = 0;
     this.suggestLeft = 0;
+    this.snippetEditingId = null;
     this.showSnippetModal = false;
     this.snippetName = "";
     this.snippetDescription = "";
@@ -1345,16 +1348,25 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private openSnippetModal() {
+  private openSnippetModal(existing?: Snippet) {
     this.showSnippetModal = true;
-    this.snippetName = "";
-    this.snippetDescription = "";
-    this.snippetContent = "";
+    if (existing) {
+      this.snippetEditingId = existing.id;
+      this.snippetName = existing.name;
+      this.snippetDescription = existing.description;
+      this.snippetContent = existing.content;
+    } else {
+      this.snippetEditingId = null;
+      this.snippetName = "";
+      this.snippetDescription = "";
+      this.snippetContent = "";
+    }
   }
 
   private closeSnippetModal() {
     if (this.snippetSaving) return;
     this.showSnippetModal = false;
+    this.snippetEditingId = null;
   }
 
   private async saveSnippet() {
@@ -1376,21 +1388,38 @@ export class AppRoot extends LitElement {
     }
     this.snippetSaving = true;
     try {
-      const res = await fetch(`${this.apiBase}api/snippets`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, description, content }),
-      });
-      if (!res.ok) throw new Error(`save snippet ${res.status}`);
-      const data = await res.json();
-      const item = data?.item as Snippet | undefined;
-      if (item && item.id) {
-        this.snippets = [...this.snippets, item];
+      const payload = { name, description, content };
+      if (this.snippetEditingId) {
+        const res = await fetch(`${this.apiBase}api/snippets/${encodeURIComponent(this.snippetEditingId)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`update snippet ${res.status}`);
+        const data = await res.json();
+        const item = data?.item as Snippet | undefined;
+        if (item && item.id) {
+          this.snippets = this.snippets.map((s) => (s.id === item.id ? item : s));
+        }
+        this.showToast("Snippet aggiornato");
       } else {
-        this.snippets = [...this.snippets, { id: `tmp-${Date.now()}`, name, description, content }];
+        const res = await fetch(`${this.apiBase}api/snippets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error(`save snippet ${res.status}`);
+        const data = await res.json();
+        const item = data?.item as Snippet | undefined;
+        if (item && item.id) {
+          this.snippets = [...this.snippets, item];
+        } else {
+          this.snippets = [...this.snippets, { id: `tmp-${Date.now()}`, name, description, content }];
+        }
+        this.showToast("Snippet salvato");
       }
-      this.showToast("Snippet salvato");
       this.showSnippetModal = false;
+      this.snippetEditingId = null;
     } catch (e) {
       this.showToast("Errore salvataggio snippet", "error");
     } finally {
@@ -1912,7 +1941,7 @@ export class AppRoot extends LitElement {
               <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                 <div class="snippetTitle">${s.name}</div>
                 <div style="display:flex; gap:6px;">
-                  <button class="statusToggle" title="Modify" style="padding:2px 6px; border-color:var(--border-color);">✏️</button>
+                  <button class="statusToggle" title="Modify" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.openSnippetModal(s); }}>✏️</button>
                   <button class="statusToggle" title="Cancel" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.deleteSnippet(s); }}>🗙</button>
                   <button class="statusToggle" title="Insert" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.insertSnippet(s); }}>➕</button>
                 </div>
