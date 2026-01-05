@@ -4,6 +4,7 @@ import os
 import shutil
 import time
 import logging
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -18,6 +19,8 @@ from fastapi.staticfiles import StaticFiles
 BASE_DIR = Path("/config").resolve()
 BACKUP_DIR = (BASE_DIR / ".fep-backups").resolve()
 FRONTEND_DIR = Path("/app/frontend").resolve()
+SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
+SNIPPET_FILE = SNIPPET_DIR / "snippets.json"
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 logger = logging.getLogger("file_editor_plus")
 
@@ -102,6 +105,55 @@ def atomic_write(target: Path, data: str) -> None:
         os.fsync(f.fileno())
 
     os.replace(tmp, target)  # atomic sulla stessa FS
+
+
+def ensure_snippet_store() -> None:
+    SNIPPET_DIR.mkdir(parents=True, exist_ok=True)
+    if not SNIPPET_FILE.exists():
+        default_snippets = [
+          {
+            "id": str(uuid.uuid4()),
+            "name": "Light toggle",
+            "description": "Esempio di automazione per accendere/spegnere una luce al passaggio.",
+            "content": "alias: Toggle light\ntrigger:\n  - platform: state\n    entity_id: binary_sensor.motion\naction:\n  - service: light.toggle\n    target:\n      entity_id: light.living_room"
+          },
+          {
+            "id": str(uuid.uuid4()),
+            "name": "Presence alert",
+            "description": "Invia notifica quando un device torna online nella rete di casa.",
+            "content": "alias: Presence alert\ntrigger:\n  - platform: state\n    entity_id: device_tracker.phone\n    to: 'home'\naction:\n  - service: notify.mobile_app_phone\n    data:\n      message: \"Bentornato a casa!\""
+          },
+          {
+            "id": str(uuid.uuid4()),
+            "name": "Backup reminder",
+            "description": "Promemoria settimanale per eseguire il backup della configurazione.",
+            "content": "alias: Backup reminder\ntrigger:\n  - platform: time\n    at: '20:00:00'\n  - platform: time\n    at: '08:00:00'\naction:\n  - service: notify.persistent_notification\n    data:\n      message: \"Ricordati il backup della config!\""
+          },
+        ]
+        atomic_write(SNIPPET_FILE, json.dumps(default_snippets, ensure_ascii=False, indent=2))
+
+
+def load_snippets() -> List[dict]:
+    ensure_snippet_store()
+    try:
+        with open(SNIPPET_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError:
+        data = []
+    except Exception as e:
+        logger.exception("snippets: errore lettura %s: %s", SNIPPET_FILE, e)
+        raise HTTPException(500, f"Errore lettura snippets: {e}")
+    if not isinstance(data, list):
+        data = []
+    return data
+
+
+def save_snippets(items: List[dict]) -> None:
+    try:
+        atomic_write(SNIPPET_FILE, json.dumps(items, ensure_ascii=False, indent=2))
+    except Exception as e:
+        logger.exception("snippets: errore salvataggio %s: %s", SNIPPET_FILE, e)
+        raise HTTPException(500, f"Errore salvataggio snippets: {e}")
 
 
 @app.get("/api/health")
@@ -280,6 +332,72 @@ async def write_file(request: Request, path: str, create_only: bool = False):
         raise HTTPException(500, f"Write failed: {e}")
 
     return {"ok": True, "path": f.resolve().relative_to(BASE_DIR).as_posix(), "backup": str(bak.relative_to(BASE_DIR)) if bak else None}
+
+
+@app.get("/api/snippets")
+def get_snippets():
+    return {"items": load_snippets()}
+
+
+@app.post("/api/snippets")
+async def create_snippet(request: Request):
+    payload = await request.json()
+    name = (payload.get("name") or "").strip()
+    description = (payload.get("description") or "").strip()
+    content = payload.get("content") or ""
+    if not name:
+        raise HTTPException(400, "Name required")
+    if len(name) > 120:
+        raise HTTPException(400, "Name too long")
+    if len(description) > 400:
+        raise HTTPException(400, "Description too long")
+    items = load_snippets()
+    new = {"id": str(uuid.uuid4()), "name": name, "description": description, "content": content}
+    items.append(new)
+    save_snippets(items)
+    return {"item": new}
+
+
+@app.put("/api/snippets/{snippet_id}")
+async def update_snippet(snippet_id: str, request: Request):
+    payload = await request.json()
+    name = payload.get("name")
+    description = payload.get("description")
+    content = payload.get("content")
+
+    items = load_snippets()
+    found = False
+    for idx, s in enumerate(items):
+        if s.get("id") == snippet_id:
+            found = True
+            if name is not None:
+                if not str(name).strip():
+                    raise HTTPException(400, "Name required")
+                if len(str(name)) > 120:
+                    raise HTTPException(400, "Name too long")
+                s["name"] = str(name).strip()
+            if description is not None:
+                if len(str(description)) > 400:
+                    raise HTTPException(400, "Description too long")
+                s["description"] = str(description).strip()
+            if content is not None:
+                s["content"] = content
+            items[idx] = s
+            break
+    if not found:
+        raise HTTPException(404, "Snippet not found")
+    save_snippets(items)
+    return {"item": s}
+
+
+@app.delete("/api/snippets/{snippet_id}")
+def delete_snippet(snippet_id: str):
+    items = load_snippets()
+    next_items = [s for s in items if s.get("id") != snippet_id]
+    if len(next_items) == len(items):
+        raise HTTPException(404, "Snippet not found")
+    save_snippets(next_items)
+    return {"ok": True}
 
 
 # ---- Frontend (Ingress friendly): serve static + SPA fallback

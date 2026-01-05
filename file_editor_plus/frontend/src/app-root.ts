@@ -5,6 +5,7 @@ import { HAClient, type HassState } from "./ha-client";
 
 type TreeItem = { name: string; path: string; type: "dir" | "file"; children?: TreeItem[] };
 type Tab = { path: string; name: string; dirty: boolean };
+type Snippet = { id: string; name: string; description: string; content: string };
 
 @customElement("app-root")
 export class AppRoot extends LitElement {
@@ -552,6 +553,27 @@ export class AppRoot extends LitElement {
     .statusToggle:hover {
       background: rgba(255, 255, 255, 0.12);
     }
+    .snippetGrid {
+      display: grid;
+      gap: 10px;
+      padding: 8px 6px 12px;
+    }
+    .snippetCard {
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px;
+      background: var(--card-color);
+      display: grid;
+      gap: 6px;
+      box-shadow: var(--menu-shadow);
+    }
+    .snippetTitle {
+      font-weight: 700;
+    }
+    .snippetDesc {
+      font-size: 12px;
+      color: var(--muted-color);
+    }
     .contextMenu {
       position: fixed;
       background: var(--panel-strong);
@@ -729,6 +751,7 @@ export class AppRoot extends LitElement {
     suggestIndex: { state: true },
     suggestTop: { state: true },
     suggestLeft: { state: true },
+    snippets: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
     lineCount: { state: true },
@@ -745,7 +768,7 @@ export class AppRoot extends LitElement {
   declare newItemKind: "file" | "folder" | null;
   declare newItemName: string;
   declare newItemExt: string;
-  declare activeActivity: "explorer" | "search" | "entity";
+  declare activeActivity: "explorer" | "search" | "entity" | "snippet";
   declare toastMessage: string | null;
   declare toastType: "info" | "error";
   declare entityFilter: string;
@@ -762,7 +785,15 @@ export class AppRoot extends LitElement {
   declare suggestIndex: number;
   declare suggestTop: number;
   declare suggestLeft: number;
+  declare snippets: Snippet[];
   private suggestBlocked = false;
+  private snippetMocks: Snippet[] = [
+    { id: "mock-1", name: "Light toggle", description: "Esempio di automazione per accendere/spegnere una luce tramite switch con condizione oraria.", content: "" },
+    { id: "mock-2", name: "Presence alert", description: "Notifica push quando un dispositivo torna online in rete domestica.", content: "" },
+    { id: "mock-3", name: "HVAC preset", description: "Snippet per impostare modalità comfort/eco sul clima con soglie configurabili.", content: "" },
+    { id: "mock-4", name: "Backup reminder", description: "Promemoria settimanale per eseguire il backup della configurazione di Home Assistant.", content: "" },
+    { id: "mock-5", name: "Scene starter", description: "Esempio di scena per luci soffuse e musica a volume basso in salotto.", content: "" },
+  ];
   declare rootItems: TreeItem[];
   declare treeData: Record<string, TreeItem[]>;
   declare lineCount: number;
@@ -779,7 +810,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.35";
+  private readonly appVersion = "0.1.42";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
@@ -817,6 +848,7 @@ export class AppRoot extends LitElement {
     this.suggestIndex = 0;
     this.suggestTop = 0;
     this.suggestLeft = 0;
+    this.snippets = [];
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -834,6 +866,7 @@ export class AppRoot extends LitElement {
     this.applyTheme();
     document.addEventListener("selectionchange", this.selectionListener);
     document.addEventListener("click", this.handleGlobalClick, true);
+    this.loadSnippets();
     this.initEntities();
   }
 
@@ -994,6 +1027,11 @@ export class AppRoot extends LitElement {
   }
 
   private handleEditorKeyDown(e: KeyboardEvent) {
+    if ((e.key === "s" || e.key === "S") && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      this.save();
+      return;
+    }
     if (this.suggestOpen) {
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
@@ -1257,7 +1295,7 @@ export class AppRoot extends LitElement {
     const ta = this.editorRef;
     const pos = ta.selectionStart ?? 0;
     const before = this.content.slice(0, pos);
-    const match = before.match(/(?:states?|state)\.([a-zA-Z0-9_\\-]*)$/);
+    const match = before.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_\\-]*)$/);
     if (!match) {
       this.closeSuggestions();
       return;
@@ -1277,6 +1315,19 @@ export class AppRoot extends LitElement {
       this.updateCursorFromPos(newPos, this.content);
     });
     this.closeSuggestions();
+  }
+
+  private async loadSnippets() {
+    try {
+      const res = await fetch(`${this.apiBase}api/snippets`);
+      if (!res.ok) throw new Error(`snippets ${res.status}`);
+      const data = await res.json();
+      const items = Array.isArray(data?.items) ? (data.items as Snippet[]) : [];
+      this.snippets = items.length > 0 ? items : this.snippetMocks;
+    } catch (e) {
+      this.snippets = this.snippetMocks;
+      this.showToast("Snippet offline (mock)", "error");
+    }
   }
 
   private scrollSuggestIntoView() {
@@ -1598,7 +1649,7 @@ export class AppRoot extends LitElement {
     if (this.gutterRef) this.gutterRef.style.transform = `translateY(-${top}px)`;
   }
 
-  private setActivity(name: "explorer" | "search" | "entity") {
+  private setActivity(name: "explorer" | "search" | "entity" | "snippet") {
     this.activeActivity = name;
   }
 
@@ -1743,6 +1794,25 @@ export class AppRoot extends LitElement {
     }
     if (this.activeActivity === "search") {
       return html`<div class="sidebarContent">Search coming soon…</div>`;
+    }
+    if (this.activeActivity === "snippet") {
+      return html`<div class="sidebarContent" style="display:grid; gap:8px;">
+        <button class="btn primary" style="justify-self:flex-start; padding:6px 10px;">Add snippet…</button>
+        <div class="snippetGrid">
+          ${this.snippets.map(
+            (s) => html`<div class="snippetCard">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                <div class="snippetTitle">${s.name}</div>
+                <div style="display:flex; gap:6px;">
+                  <button class="statusToggle" title="Modify" style="padding:2px 6px; border-color:var(--border-color);">✏️</button>
+                  <button class="statusToggle" title="Cancel" style="padding:2px 6px; border-color:var(--border-color);">🗙</button>
+                </div>
+              </div>
+              <div class="snippetDesc">${s.description.slice(0, 200)}</div>
+            </div>`
+          )}
+        </div>
+      </div>`;
     }
     // entity mock
     const entries = Object.values(this.entities);
@@ -1924,6 +1994,7 @@ export class AppRoot extends LitElement {
             <div class="act ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>📁</div>
             <div class="act ${this.activeActivity === "search" ? "active" : ""}" title="Search" @click=${() => this.setActivity("search")}>🔎</div>
             <div class="act ${this.activeActivity === "entity" ? "active" : ""}" title="Entity" @click=${() => this.setActivity("entity")}>🗂️</div>
+            <div class="act ${this.activeActivity === "snippet" ? "active" : ""}" title="Snippet" @click=${() => this.setActivity("snippet")}>📜</div>
           </div>
 
           <div class="sidebar">
@@ -1933,7 +2004,9 @@ export class AppRoot extends LitElement {
                   ? "Explorer"
                   : this.activeActivity === "search"
                     ? "Search"
-                    : "Entity"}
+                    : this.activeActivity === "entity"
+                      ? "Entity"
+                      : "Snippet"}
               </div>
             </div>
             ${this.renderSidebarContent()}

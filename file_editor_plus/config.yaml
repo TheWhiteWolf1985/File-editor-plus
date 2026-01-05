@@ -1,5 +1,5 @@
-name: "File Editor Plus (MVP)"
-version: "0.1.35"
+name: "File Editor Plus"
+version: "0.1.42"
 slug: "file_editor_plus"
 description: "Pro File Editor for Home Assistant"
 arch:
@@ -12,6 +12,8 @@ hassio_api: true
 
 ingress: true
 ingress_port: 8099
+ingress_panel: true
+panel_title: File Editor Plus
 ports:
   8099/tcp: null
 panel_icon: "mdi:file-document-edit-outline"
