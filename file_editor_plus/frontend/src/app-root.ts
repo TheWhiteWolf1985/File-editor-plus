@@ -757,6 +757,8 @@ export class AppRoot extends LitElement {
     snippetDescription: { state: true },
     snippetContent: { state: true },
     snippetSaving: { state: true },
+    snippetSearchText: { state: true },
+    snippetSearchField: { state: true },
     snippets: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
@@ -797,6 +799,8 @@ export class AppRoot extends LitElement {
   declare snippetDescription: string;
   declare snippetContent: string;
   declare snippetSaving: boolean;
+  declare snippetSearchText: string;
+  declare snippetSearchField: "title" | "description";
   declare snippets: Snippet[];
   private suggestBlocked = false;
   private snippetMocks: Snippet[] = [
@@ -822,7 +826,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.46";
+  private readonly appVersion = "0.1.47";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
@@ -866,6 +870,8 @@ export class AppRoot extends LitElement {
     this.snippetDescription = "";
     this.snippetContent = "";
     this.snippetSaving = false;
+    this.snippetSearchText = "";
+    this.snippetSearchField = "title";
     this.snippets = [];
     this.rootItems = [];
     this.treeData = {};
@@ -1931,12 +1937,35 @@ export class AppRoot extends LitElement {
       return html`<div class="sidebarContent">Search coming soon…</div>`;
     }
     if (this.activeActivity === "snippet") {
+      const term = this.snippetSearchText.toLowerCase();
+      const field = this.snippetSearchField;
+      const filtered = this.snippets.filter((s) => {
+        const hay = field === "description" ? s.description : s.name;
+        return hay.toLowerCase().includes(term);
+      });
       return html`<div class="sidebarContent" style="display:grid; gap:8px;">
         <button class="btn primary" style="justify-self:flex-start; padding:6px 10px;" @click=${() => this.openSnippetModal()}>
           Add snippet…
         </button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <input
+            type="text"
+            placeholder="Search snippets..."
+            .value=${this.snippetSearchText}
+            @input=${(e: Event) => (this.snippetSearchText = (e.target as HTMLInputElement).value)}
+            style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border-color); background: var(--input-bg); color: var(--text-color);"
+          />
+          <select
+            .value=${this.snippetSearchField}
+            @change=${(e: Event) => (this.snippetSearchField = (e.target as HTMLSelectElement).value as "title" | "description")}
+            style="padding:8px; border-radius:8px; border:1px solid var(--border-color); background: var(--input-bg); color: var(--text-color);"
+          >
+            <option value="title">Title</option>
+            <option value="description">Description</option>
+          </select>
+        </div>
         <div class="snippetGrid">
-          ${this.snippets.map(
+          ${filtered.map(
             (s) => html`<div class="snippetCard">
               <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                 <div class="snippetTitle">${s.name}</div>
