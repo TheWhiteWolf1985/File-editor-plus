@@ -751,6 +751,11 @@ export class AppRoot extends LitElement {
     suggestIndex: { state: true },
     suggestTop: { state: true },
     suggestLeft: { state: true },
+    showSnippetModal: { state: true },
+    snippetName: { state: true },
+    snippetDescription: { state: true },
+    snippetContent: { state: true },
+    snippetSaving: { state: true },
     snippets: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
@@ -785,6 +790,11 @@ export class AppRoot extends LitElement {
   declare suggestIndex: number;
   declare suggestTop: number;
   declare suggestLeft: number;
+  declare showSnippetModal: boolean;
+  declare snippetName: string;
+  declare snippetDescription: string;
+  declare snippetContent: string;
+  declare snippetSaving: boolean;
   declare snippets: Snippet[];
   private suggestBlocked = false;
   private snippetMocks: Snippet[] = [
@@ -810,7 +820,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.42";
+  private readonly appVersion = "0.1.43";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
@@ -848,6 +858,11 @@ export class AppRoot extends LitElement {
     this.suggestIndex = 0;
     this.suggestTop = 0;
     this.suggestLeft = 0;
+    this.showSnippetModal = false;
+    this.snippetName = "";
+    this.snippetDescription = "";
+    this.snippetContent = "";
+    this.snippetSaving = false;
     this.snippets = [];
     this.rootItems = [];
     this.treeData = {};
@@ -1330,6 +1345,59 @@ export class AppRoot extends LitElement {
     }
   }
 
+  private openSnippetModal() {
+    this.showSnippetModal = true;
+    this.snippetName = "";
+    this.snippetDescription = "";
+    this.snippetContent = "";
+  }
+
+  private closeSnippetModal() {
+    if (this.snippetSaving) return;
+    this.showSnippetModal = false;
+  }
+
+  private async saveSnippet() {
+    if (this.snippetSaving) return;
+    const name = this.snippetName.trim();
+    const description = this.snippetDescription.trim();
+    const content = this.snippetContent;
+    if (!name || !description || !content) {
+      this.showToast("Compila tutti i campi", "error");
+      return;
+    }
+    if (name.length > 100) {
+      this.showToast("Titolo troppo lungo (max 100)", "error");
+      return;
+    }
+    if (description.length > 250) {
+      this.showToast("Descrizione troppo lunga (max 250)", "error");
+      return;
+    }
+    this.snippetSaving = true;
+    try {
+      const res = await fetch(`${this.apiBase}api/snippets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, description, content }),
+      });
+      if (!res.ok) throw new Error(`save snippet ${res.status}`);
+      const data = await res.json();
+      const item = data?.item as Snippet | undefined;
+      if (item && item.id) {
+        this.snippets = [...this.snippets, item];
+      } else {
+        this.snippets = [...this.snippets, { id: `tmp-${Date.now()}`, name, description, content }];
+      }
+      this.showToast("Snippet salvato");
+      this.showSnippetModal = false;
+    } catch (e) {
+      this.showToast("Errore salvataggio snippet", "error");
+    } finally {
+      this.snippetSaving = false;
+    }
+  }
+
   private scrollSuggestIntoView() {
     if (!this.suggestOpen) return;
     const items = this.shadowRoot?.querySelectorAll(".suggestItem");
@@ -1797,7 +1865,9 @@ export class AppRoot extends LitElement {
     }
     if (this.activeActivity === "snippet") {
       return html`<div class="sidebarContent" style="display:grid; gap:8px;">
-        <button class="btn primary" style="justify-self:flex-start; padding:6px 10px;">Add snippet…</button>
+        <button class="btn primary" style="justify-self:flex-start; padding:6px 10px;" @click=${() => this.openSnippetModal()}>
+          Add snippet…
+        </button>
         <div class="snippetGrid">
           ${this.snippets.map(
             (s) => html`<div class="snippetCard">
@@ -2139,6 +2209,49 @@ export class AppRoot extends LitElement {
                   <div class="actions">
                     <button class="btn" @click=${() => this.cancelNewItem()}>Cancel</button>
                     <button class="btn primary" @click=${() => this.createNewItem()}>Create</button>
+                  </div>
+                </div>
+              </div>
+            `
+          : nothing}
+
+        ${this.showSnippetModal
+          ? html`
+              <div class="modalBackdrop" @click=${() => this.closeSnippetModal()}>
+                <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:480px;">
+                  <h3>New snippet</h3>
+                  <label>
+                    Title (max 100)
+                    <input
+                      type="text"
+                      .value=${this.snippetName}
+                      maxlength="100"
+                      @input=${(e: Event) => (this.snippetName = (e.target as HTMLInputElement).value)}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Description (max 250)
+                    <input
+                      type="text"
+                      .value=${this.snippetDescription}
+                      maxlength="250"
+                      @input=${(e: Event) => (this.snippetDescription = (e.target as HTMLInputElement).value)}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Content
+                    <textarea
+                      style="min-height:160px; background: var(--input-bg); color: var(--text-color); border:1px solid var(--border-color); border-radius:8px; padding:8px;"
+                      .value=${this.snippetContent}
+                      @input=${(e: Event) => (this.snippetContent = (e.target as HTMLTextAreaElement).value)}
+                      required
+                    ></textarea>
+                  </label>
+                  <div class="actions">
+                    <button class="btn" ?disabled=${this.snippetSaving} @click=${() => this.closeSnippetModal()}>Cancel</button>
+                    <button class="btn primary" ?disabled=${this.snippetSaving} @click=${() => this.saveSnippet()}>Save</button>
                   </div>
                 </div>
               </div>
