@@ -828,7 +828,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.48";
+  private readonly appVersion = "0.1.50";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
@@ -1494,17 +1494,35 @@ export class AppRoot extends LitElement {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: this.content }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.ok !== true) {
-        const detail = data?.detail || data?.error;
-        const line = detail?.line;
-        const col = detail?.column;
-        const msg = detail?.message || `YAML non valido${line ? ` (riga ${line}, col ${col ?? ""})` : ""}`;
+      let payload: any = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+      if (!res.ok || payload?.ok !== true) {
+        const err = payload?.error ?? payload?.detail;
+        const line = err?.line;
+        const col = err?.column;
+        const raw = String(err?.message ?? "");
+        const short = (raw.split("\n")[0] || raw).trim();
+        let msg = "YAML non valido";
+        if (line != null && col != null) msg += ` (riga ${line}, colonna ${col})`;
+        else if (line != null) msg += ` (riga ${line})`;
+        if (short) msg += `: ${short}`;
+        else msg += ".";
+        const hint1 = raw.includes("expected <block end>, but found '?'");
+        const hint2 = raw.includes("expected ',' or '}', but got '{'");
+        if (hint1) msg += " (controlla che dopo '-' ci sia uno spazio: '- key: value')";
+        if (hint2) msg += " (in una mappa {...} manca una virgola o una '}')";
+        if (!err) {
+          msg = `Impossibile formattare YAML (HTTP ${res.status}).`;
+        }
         this.showToast(msg, "error");
         this.status = "Errore formattazione";
         return;
       }
-      const formatted = data.formatted ?? "";
+      const formatted = payload.formatted ?? "";
       this.markDirty(formatted);
       this.status = "Formatted (non salvato)";
       this.showToast("YAML formattato");
