@@ -461,7 +461,7 @@ export class AppRoot extends LitElement {
     .codeWrap {
       position: relative;
       height: 100%;
-      overflow: auto;
+      overflow: hidden;
       border: 1px solid var(--border-color);
       border-left: none;
       border-radius: 0 12px 12px 0;
@@ -518,6 +518,8 @@ export class AppRoot extends LitElement {
       outline: none;
       box-sizing: border-box;
       overflow: auto;
+      white-space: pre;
+      word-wrap: normal;
     }
     textarea:focus {
       border-color: #3a3a3a;
@@ -828,7 +830,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.50";
+  private readonly appVersion = "0.1.52";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
@@ -1841,7 +1843,8 @@ export class AppRoot extends LitElement {
 
   private syncScroll(e: Event) {
     const top = (e.target as HTMLElement).scrollTop;
-    if (this.codeRef) this.codeRef.style.transform = `translateY(-${top}px)`;
+    const left = (e.target as HTMLElement).scrollLeft;
+    if (this.codeRef) this.codeRef.style.transform = `translate(${-left}px, -${top}px)`;
     if (this.gutterRef) this.gutterRef.style.transform = `translateY(-${top}px)`;
   }
 
@@ -2276,6 +2279,7 @@ export class AppRoot extends LitElement {
                     ${ref((el) => (this.editorRef = el))}
                     .value=${this.content}
                     placeholder="Seleziona un file a sinistra…"
+                    wrap="off"
                     @scroll=${this.syncScroll}
                     @input=${this.handleInput}
                     @keyup=${this.handleCursorMove}
