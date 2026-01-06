@@ -759,6 +759,7 @@ export class AppRoot extends LitElement {
     snippetSaving: { state: true },
     snippetSearchText: { state: true },
     snippetSearchField: { state: true },
+    indenting: { state: true },
     snippets: { state: true },
     rootItems: { state: true },
     treeData: { state: true },
@@ -801,6 +802,7 @@ export class AppRoot extends LitElement {
   declare snippetSaving: boolean;
   declare snippetSearchText: string;
   declare snippetSearchField: "title" | "description";
+  declare indenting: boolean;
   declare snippets: Snippet[];
   private suggestBlocked = false;
   private snippetMocks: Snippet[] = [
@@ -826,7 +828,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.47";
+  private readonly appVersion = "0.1.48";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private selectionListener = () => {
@@ -872,6 +874,7 @@ export class AppRoot extends LitElement {
     this.snippetSaving = false;
     this.snippetSearchText = "";
     this.snippetSearchField = "title";
+    this.indenting = false;
     this.snippets = [];
     this.rootItems = [];
     this.treeData = {};
@@ -1476,6 +1479,40 @@ export class AppRoot extends LitElement {
       this.showToast("Snippet eliminato");
     } catch (e) {
       this.showToast("Errore eliminazione snippet", "error");
+    }
+  }
+
+  private async indentFile() {
+    if (!this.activePath || this.indenting) {
+      return;
+    }
+    this.indenting = true;
+    this.status = "Formatting YAML...";
+    try {
+      const res = await fetch(`${this.apiBase}api/format/yaml`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: this.content }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok !== true) {
+        const detail = data?.detail || data?.error;
+        const line = detail?.line;
+        const col = detail?.column;
+        const msg = detail?.message || `YAML non valido${line ? ` (riga ${line}, col ${col ?? ""})` : ""}`;
+        this.showToast(msg, "error");
+        this.status = "Errore formattazione";
+        return;
+      }
+      const formatted = data.formatted ?? "";
+      this.markDirty(formatted);
+      this.status = "Formatted (non salvato)";
+      this.showToast("YAML formattato");
+    } catch (e) {
+      this.showToast("Errore formattazione", "error");
+      this.status = "Errore formattazione";
+    } finally {
+      this.indenting = false;
     }
   }
 
@@ -2207,6 +2244,9 @@ export class AppRoot extends LitElement {
                 <div style="display:flex; gap:8px;">
                   <button class="btn" ?disabled=${!this.activePath} @click=${this.save}>Save</button>
                   <button class="btn primary" ?disabled=${!this.activePath} @click=${this.save}>Save All</button>
+                  <button class="btn" ?disabled=${!this.activePath || this.indenting} @click=${() => this.indentFile()}>
+                    ${this.indenting ? "Formatting..." : "Indent file…"}
+                  </button>
                 </div>
               </div>
 

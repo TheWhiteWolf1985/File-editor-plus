@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import shutil
 import time
@@ -23,6 +24,7 @@ SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
 SNIPPET_FILE = SNIPPET_DIR / "snippets.json"
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 logger = logging.getLogger("file_editor_plus")
+MAX_FORMAT_SIZE = 2 * 1024 * 1024  # 2MB
 
 # roba che di solito non vuoi toccare/vedere nell’editor
 DEFAULT_IGNORE = {
@@ -154,6 +156,43 @@ def save_snippets(items: List[dict]) -> None:
     except Exception as e:
         logger.exception("snippets: errore salvataggio %s: %s", SNIPPET_FILE, e)
         raise HTTPException(500, f"Errore salvataggio snippets: {e}")
+
+
+def format_yaml_text(text: str) -> str:
+    if len(text.encode("utf-8")) > MAX_FORMAT_SIZE:
+        raise HTTPException(413, "YAML troppo grande per essere formattato (limite 2MB).")
+    try:
+        from ruamel.yaml import YAML  # lazy import
+    except ImportError:
+        raise HTTPException(500, "ruamel.yaml non disponibile")
+
+    yaml = YAML(typ="rt")
+    yaml.preserve_quotes = True
+    yaml.width = 4096
+    yaml.indent(mapping=2, sequence=4, offset=2)
+    buf = io.StringIO()
+
+    had_trailing_nl = text.endswith("\n")
+    try:
+        data = yaml.load(text)
+    except Exception as e:
+        line = getattr(getattr(e, "problem_mark", None), "line", None)
+        col = getattr(getattr(e, "problem_mark", None), "column", None)
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": str(e),
+                "line": (line + 1) if line is not None else None,
+                "column": (col + 1) if col is not None else None,
+            },
+        )
+    yaml.dump(data, buf)
+    formatted = buf.getvalue()
+    if had_trailing_nl and not formatted.endswith("\n"):
+        formatted += "\n"
+    if not had_trailing_nl:
+        formatted = formatted.rstrip("\n")
+    return formatted
 
 
 @app.get("/api/health")
@@ -398,6 +437,15 @@ def delete_snippet(snippet_id: str):
         raise HTTPException(404, "Snippet not found")
     save_snippets(next_items)
     return {"ok": True}
+
+
+@app.post("/api/format/yaml")
+async def format_yaml(body: dict):
+    text = body.get("text") if isinstance(body, dict) else None
+    if text is None:
+        raise HTTPException(400, "Field 'text' richiesto")
+    formatted = format_yaml_text(str(text))
+    return {"ok": True, "formatted": formatted}
 
 
 # ---- Frontend (Ingress friendly): serve static + SPA fallback
