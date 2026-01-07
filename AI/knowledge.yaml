@@ -339,6 +339,21 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-07"
     actor: "codex"
+    version: "0.1.71"
+    change: "Aggiunto workflow manuale di release (input versione) per pubblicare su main solo i file necessari via whitelist; bump versione."
+    reason: "Separare develop (sviluppo) e main (release) con rilascio controllato per beta tester."
+    touched_files:
+      - ".github/workflows/release.yml"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "GitHub Actions: workflow 'Release (manual)' disponibile"
+      - "Run manuale richiede input versione e verifica match"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
     version: "0.1.70"
     change: "Activity bar: aumentata la dimensione delle icone (+50%) con `font-size: 1.5em`; bump versione."
     reason: "Richiesta maggiore leggibilità delle icone nella barra Activity."
