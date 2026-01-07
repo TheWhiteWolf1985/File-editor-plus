@@ -1024,7 +1024,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.57";
+  private readonly appVersion = "0.1.59";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private pendingJump: { path: string; line: number; col: number } | null = null;
@@ -1144,6 +1144,19 @@ export class AppRoot extends LitElement {
       this.loadingPaths.delete(path);
       this.loadedPaths.add(path);
     }
+  }
+
+  private async reloadTree() {
+    const expandedPaths = Array.from(this.expanded).filter((p) => p !== "");
+    this.loadedPaths.clear();
+    this.loadingPaths.clear();
+    this.treeData = {};
+    this.rootItems = [];
+    await this.loadTree("", true);
+    for (const p of expandedPaths) {
+      await this.loadTree(p, true);
+    }
+    this.showToast("Tree ricaricato");
   }
 
   private async toggleDir(path: string) {
@@ -1460,6 +1473,23 @@ export class AppRoot extends LitElement {
       this.showToast("Clipboard non disponibile", "error");
     } finally {
       this.closeContextMenu();
+    }
+  }
+
+  private handleUndoRedo(action: "undo" | "redo") {
+    if (!this.editorRef || !this.activePath) {
+      this.showToast("Apri un file prima di modificare", "error");
+      return;
+    }
+    const ta = this.editorRef;
+    ta.focus();
+    const ok = document.execCommand(action);
+    const next = ta.value;
+    if (next !== this.content) {
+      this.markDirty(next);
+    }
+    if (!ok) {
+      this.showToast(action === "undo" ? "Undo non disponibile" : "Redo non disponibile", "error");
     }
   }
 
@@ -1983,8 +2013,24 @@ export class AppRoot extends LitElement {
         this.status = "Save as non implementato";
         this.showToast("Save as non implementato", "info");
       }
-    } else if (menu === "run" && action === "Save all") {
-      this.save();
+    } else if (menu === "edit") {
+      if (action === "Undo") {
+        this.handleUndoRedo("undo");
+      } else if (action === "Redo") {
+        this.handleUndoRedo("redo");
+      } else if (action === "Cut") {
+        this.handleCopyCut("cut");
+      } else if (action === "Copy") {
+        this.handleCopyCut("copy");
+      } else if (action === "Paste") {
+        this.handlePaste();
+      }
+    } else if (menu === "view") {
+      if (action === "Reload tree") {
+        this.reloadTree();
+      } else if (action === "Split") {
+        this.showToast("Split view non implementata", "info");
+      }
     }
   }
 
@@ -2610,23 +2656,10 @@ export class AppRoot extends LitElement {
               { icon: "✂️", label: "Cut" },
               { icon: "📋", label: "Copy" },
               { icon: "📥", label: "Paste" },
-              { icon: "🔍", label: "Find…" },
-              { icon: "♻️", label: "Replace…" },
             ])}
             ${this.renderMenu("View", "view", [
               { icon: "🔄", label: "Reload tree" },
-              { icon: "🔡", label: "Toggle line numbers" },
-              { icon: "↔️", label: "Toggle wrap" },
-            ])}
-            ${this.renderMenu("Go", "go", [
-              { icon: "📂", label: "Go to file…" },
-              { icon: "🔢", label: "Go to line…" },
-              { icon: "📜", label: "Open recent…" },
-            ])}
-            ${this.renderMenu("Run", "run", [
-              { icon: "💾", label: "Save all" },
-              { icon: "🗂️", label: "Reload config" },
-              { icon: "✅", label: "Check health" },
+              { icon: "🪟", label: "Split" },
             ])}
             ${this.renderMenu("Help", "help", [
               { icon: "📖", label: "Docs" },
