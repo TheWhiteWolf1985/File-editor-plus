@@ -1086,7 +1086,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.61";
+  private readonly appVersion = "0.1.64";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private diffRequestId = 0;
@@ -1672,6 +1672,11 @@ export class AppRoot extends LitElement {
     }
   }
 
+  private handleCompareFromContext() {
+    this.handleMenuAction("view", "Compare…");
+    this.closeContextMenu();
+  }
+
   private reindentAll() {
     const lines = this.content.split("\n");
     let level = 0;
@@ -2110,11 +2115,10 @@ export class AppRoot extends LitElement {
   }
 
   private handleGlobalClick = (e: MouseEvent) => {
-    const path = e.composedPath();
     if (this.openMenu) {
-      if (path.includes(this)) return;
-      if (this.shadowRoot && path.includes(this.shadowRoot.host)) return;
-      this.openMenu = null;
+      const target = e.target as HTMLElement | null;
+      const insideMenu = target?.closest?.(".menuItem");
+      if (!insideMenu) this.openMenu = null;
     }
     if (this.contextMenuOpen) {
       const target = e.target as HTMLElement | null;
@@ -3026,9 +3030,6 @@ export class AppRoot extends LitElement {
                     </div>
                   </div>`}
 
-              <div style="font-size:12px; opacity:.75;">
-                Hint: Explorer e editor usano /api/tree e /api/file (PUT) sull'ingress corrente.
-              </div>
             </div>
           </div>
         </div>
@@ -3043,6 +3044,7 @@ export class AppRoot extends LitElement {
               <div class="contextMenuItem" @click=${() => this.handleCopyCut("copy")}>📋 Copy</div>
               <div class="contextMenuItem" @click=${() => this.handlePaste()}>📥 Paste</div>
               <div class="contextMenuItem" @click=${() => this.reindentAll()}>🔧 Auto-indent</div>
+              <div class="contextMenuItem" @click=${() => this.handleCompareFromContext()}>🧩 Compare…</div>
             </div>`
           : nothing}
 
