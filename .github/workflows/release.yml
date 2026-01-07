@@ -78,7 +78,7 @@ jobs:
           git fetch origin main
           git checkout -B main origin/main
           git rm -r --quiet .
-          rsync -a --delete /tmp/release/ ./
+          rsync -a --delete --exclude "/.git" /tmp/release/ ./
           git add -A
           if git diff --cached --quiet; then
             echo "No changes to release."
