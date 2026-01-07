@@ -614,7 +614,7 @@ export class AppRoot extends LitElement {
       box-sizing: border-box;
     }
     .codeLine {
-      white-space: pre;
+      white-space: normal;
       min-height: 1.4em;
       line-height: 1.4;
     }
@@ -1086,7 +1086,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.60";
+  private readonly appVersion = "0.1.61";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private diffRequestId = 0;
