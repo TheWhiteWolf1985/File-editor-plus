@@ -25,6 +25,7 @@ BACKUP_DIR = (BASE_DIR / ".fep-backups").resolve()
 FRONTEND_DIR = Path("/app/frontend").resolve()
 SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
 SNIPPET_FILE = SNIPPET_DIR / "snippets.json"
+USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 logger = logging.getLogger("file_editor_plus")
 MAX_FORMAT_SIZE = 2 * 1024 * 1024  # 2MB
@@ -44,6 +45,7 @@ SEARCH_SKIP_DIRS = {
     "dist",
     "build",
 }
+DEFAULT_USER_CONFIG = {"font_base_rem": 0.875}
 
 # roba che di solito non vuoi toccare/vedere nell’editor
 DEFAULT_IGNORE = {
@@ -204,6 +206,40 @@ def _replace_text(text: str, query: str, replace: str, case_sensitive: bool):
     pattern = re.escape(query)
     repl, count = re.subn(pattern, replace, text, flags=flags)
     return repl, count
+
+
+def ensure_user_config() -> None:
+    if not USER_CONFIG_FILE.exists():
+        try:
+            atomic_write(USER_CONFIG_FILE, json.dumps(DEFAULT_USER_CONFIG, ensure_ascii=False, indent=2))
+        except Exception as e:
+            logger.exception("user_config: errore creazione %s: %s", USER_CONFIG_FILE, e)
+            raise HTTPException(500, f"Errore creazione user_config: {e}")
+
+
+def load_user_config() -> dict:
+    ensure_user_config()
+    try:
+        with open(USER_CONFIG_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError:
+        data = DEFAULT_USER_CONFIG.copy()
+    except Exception as e:
+        logger.exception("user_config: errore lettura %s: %s", USER_CONFIG_FILE, e)
+        raise HTTPException(500, f"Errore lettura user_config: {e}")
+    if not isinstance(data, dict):
+        data = DEFAULT_USER_CONFIG.copy()
+    return data
+
+
+def save_user_config(data: dict) -> None:
+    if not isinstance(data, dict):
+        raise HTTPException(400, "Config must be an object")
+    try:
+        atomic_write(USER_CONFIG_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+    except Exception as e:
+        logger.exception("user_config: errore salvataggio %s: %s", USER_CONFIG_FILE, e)
+        raise HTTPException(500, f"Errore salvataggio user_config: {e}")
 
 
 def ensure_snippet_store() -> None:
@@ -783,6 +819,23 @@ def delete_snippet(snippet_id: str):
         raise HTTPException(404, "Snippet not found")
     save_snippets(next_items)
     return {"ok": True}
+
+
+@app.get("/api/user-config")
+def get_user_config():
+    return {"ok": True, "config": load_user_config()}
+
+
+@app.put("/api/user-config")
+async def update_user_config(request: Request):
+    payload = await request.json()
+    config = payload.get("config") if isinstance(payload, dict) else None
+    if config is None and isinstance(payload, dict):
+        config = payload
+    if not isinstance(config, dict):
+        raise HTTPException(400, "Config must be an object")
+    save_user_config(config)
+    return {"ok": True, "config": load_user_config()}
 
 
 @app.post("/api/format/yaml")

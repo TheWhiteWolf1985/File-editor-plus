@@ -168,6 +168,7 @@ export class AppRoot extends LitElement {
       place-items: center;
       cursor: pointer;
       opacity: 0.85;
+      font-size: 1.5em;
     }
     .act.active {
       background: var(--panel-color);
@@ -898,6 +899,49 @@ export class AppRoot extends LitElement {
       justify-content: flex-end;
       gap: 10px;
     }
+    .settingsTabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+    .settingsTab {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-color);
+      padding: 6px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: var(--font-size-sm);
+    }
+    .settingsTab.active {
+      background: var(--hover-color);
+      border-color: var(--border-color);
+    }
+    .settingsBody {
+      display: grid;
+      gap: 10px;
+    }
+    .settingsRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .settingsLabel {
+      font-weight: 600;
+    }
+    .settingsHint {
+      font-size: var(--font-size-sm);
+      opacity: 0.75;
+    }
+    .settingsValue {
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+    }
+    .settingsRange {
+      width: 100%;
+    }
 
     /* Toast */
     .toastContainer {
@@ -982,6 +1026,9 @@ export class AppRoot extends LitElement {
     suggestLeft: { state: true },
     snippetEditingId: { state: true },
     showSnippetModal: { state: true },
+    showSettingsModal: { state: true },
+    settingsTab: { state: true },
+    settingsFontBaseRem: { state: true },
     snippetName: { state: true },
     snippetDescription: { state: true },
     snippetContent: { state: true },
@@ -1040,6 +1087,9 @@ export class AppRoot extends LitElement {
   declare suggestLeft: number;
   declare snippetEditingId: string | null;
   declare showSnippetModal: boolean;
+  declare showSettingsModal: boolean;
+  declare settingsTab: "appearance" | "localization";
+  declare settingsFontBaseRem: number;
   declare snippetName: string;
   declare snippetDescription: string;
   declare snippetContent: string;
@@ -1092,7 +1142,12 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.67";
+  private readonly fontDefaults = { xs: 0.6875, sm: 0.75, md: 0.8125, base: 0.875, lg: 1 };
+  private readonly fontBaseMin = 0.75;
+  private readonly fontBaseMax = 1.125;
+  private readonly fontBaseStep = 0.0625;
+  private fontBaseRem = this.fontDefaults.base;
+  private readonly appVersion = "0.1.70";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private diffRequestId = 0;
@@ -1135,6 +1190,9 @@ export class AppRoot extends LitElement {
     this.suggestLeft = 0;
     this.snippetEditingId = null;
     this.showSnippetModal = false;
+    this.showSettingsModal = false;
+    this.settingsTab = "appearance";
+    this.settingsFontBaseRem = this.fontBaseRem;
     this.snippetName = "";
     this.snippetDescription = "";
     this.snippetContent = "";
@@ -1173,6 +1231,7 @@ export class AppRoot extends LitElement {
     this.themeMedia = window.matchMedia("(prefers-color-scheme: dark)");
     this.themeMedia.addEventListener("change", this.handleThemeChange);
     this.applyTheme();
+    void this.loadFontSettings();
     document.addEventListener("selectionchange", this.selectionListener);
     document.addEventListener("click", this.handleGlobalClick, true);
     this.loadSnippets();
@@ -2205,6 +2264,8 @@ export class AppRoot extends LitElement {
       } else if (action === "Save as…") {
         this.status = "Save as non implementato";
         this.showToast("Save as non implementato", "info");
+      } else if (action === "Settings") {
+        this.openSettingsModal();
       }
     } else if (menu === "edit") {
       if (action === "Undo") {
@@ -2576,6 +2637,91 @@ export class AppRoot extends LitElement {
     });
   }
 
+  private clampFontBase(value: number) {
+    return Math.min(this.fontBaseMax, Math.max(this.fontBaseMin, value));
+  }
+
+  private applyFontScale(baseRem: number) {
+    const scale = baseRem / this.fontDefaults.base;
+    const toRem = (val: number) => `${(val * scale).toFixed(4)}rem`;
+    this.style.setProperty("--font-size-xs", toRem(this.fontDefaults.xs));
+    this.style.setProperty("--font-size-sm", toRem(this.fontDefaults.sm));
+    this.style.setProperty("--font-size-md", toRem(this.fontDefaults.md));
+    this.style.setProperty("--font-size-base", `${baseRem.toFixed(4)}rem`);
+    this.style.setProperty("--font-size-lg", toRem(this.fontDefaults.lg));
+  }
+
+  private async loadFontSettings() {
+    try {
+      const res = await fetch(`${this.apiBase}api/user-config`);
+      if (res.ok) {
+        let payload: any = null;
+        try {
+          payload = await res.json();
+        } catch {
+          payload = null;
+        }
+        const cfg = payload?.config ?? payload ?? {};
+        const raw = Number(cfg.font_base_rem);
+        if (!Number.isNaN(raw)) {
+          this.fontBaseRem = this.clampFontBase(raw);
+        }
+      }
+    } catch {
+      /* ignore load errors */
+    }
+    this.settingsFontBaseRem = this.fontBaseRem;
+    this.applyFontScale(this.fontBaseRem);
+  }
+
+  private openSettingsModal() {
+    this.settingsTab = "appearance";
+    this.settingsFontBaseRem = this.fontBaseRem;
+    this.showSettingsModal = true;
+  }
+
+  private cancelSettingsModal() {
+    this.applyFontScale(this.fontBaseRem);
+    this.settingsFontBaseRem = this.fontBaseRem;
+    this.showSettingsModal = false;
+  }
+
+  private async applySettingsModal() {
+    const next = this.settingsFontBaseRem;
+    try {
+      const res = await fetch(`${this.apiBase}api/user-config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: { font_base_rem: next } }),
+      });
+      let payload: any = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+      if (!res.ok || payload?.ok !== true) {
+        throw new Error("save-failed");
+      }
+    } catch {
+      this.applyFontScale(this.fontBaseRem);
+      this.settingsFontBaseRem = this.fontBaseRem;
+      this.showToast("Errore salvataggio impostazioni", "error");
+      return;
+    }
+    this.fontBaseRem = next;
+    this.applyFontScale(this.fontBaseRem);
+    this.showSettingsModal = false;
+    this.showToast("Impostazioni applicate");
+  }
+
+  private handleFontSizeInput(e: Event) {
+    const raw = Number((e.target as HTMLInputElement).value);
+    const next = this.clampFontBase(raw);
+    this.settingsFontBaseRem = next;
+    this.applyFontScale(next);
+  }
+
   private insertEntityId(entityId: string) {
     if (!this.activePath || !this.editorRef) {
       this.showToast("Apri un file prima di inserire", "error");
@@ -2893,6 +3039,7 @@ export class AppRoot extends LitElement {
               { icon: "📁", label: "New folder" },
               { icon: "💾", label: "Save" },
               { icon: "📝", label: "Save as…" },
+              { icon: "⚙️", label: "Settings" },
               { icon: "⬆️", label: "Import…" },
               { icon: "⬇️", label: "Export…" },
             ])}
@@ -3110,6 +3257,62 @@ export class AppRoot extends LitElement {
                   <div class="actions">
                     <button class="btn" @click=${() => this.cancelNewItem()}>Cancel</button>
                     <button class="btn primary" @click=${() => this.createNewItem()}>Create</button>
+                  </div>
+                </div>
+              </div>
+            `
+          : nothing}
+
+        ${this.showSettingsModal
+          ? html`
+              <div class="modalBackdrop" @click=${() => this.cancelSettingsModal()}>
+                <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:520px;">
+                  <h3>Settings</h3>
+                  <div class="settingsTabs">
+                    <button
+                      class="settingsTab ${this.settingsTab === "localization" ? "active" : ""}"
+                      type="button"
+                      @click=${() => (this.settingsTab = "localization")}
+                    >
+                      Localizzazione
+                    </button>
+                    <button
+                      class="settingsTab ${this.settingsTab === "appearance" ? "active" : ""}"
+                      type="button"
+                      @click=${() => (this.settingsTab = "appearance")}
+                    >
+                      Aspetto
+                    </button>
+                  </div>
+                  ${this.settingsTab === "appearance"
+                    ? html`
+                        <div class="settingsBody">
+                          <div class="settingsRow">
+                            <div>
+                              <div class="settingsLabel">Dimensione caratteri</div>
+                              <div class="settingsHint">Regola in tempo reale, salva con Apply.</div>
+                            </div>
+                            <div class="settingsValue">${Math.round(this.settingsFontBaseRem * 16)}px</div>
+                          </div>
+                          <input
+                            class="settingsRange"
+                            type="range"
+                            min=${this.fontBaseMin}
+                            max=${this.fontBaseMax}
+                            step=${this.fontBaseStep}
+                            .value=${String(this.settingsFontBaseRem)}
+                            @input=${this.handleFontSizeInput}
+                          />
+                        </div>
+                      `
+                    : html`
+                        <div class="settingsBody">
+                          <div class="settingsHint">Impostazioni di localizzazione in arrivo.</div>
+                        </div>
+                      `}
+                  <div class="actions">
+                    <button class="btn" @click=${() => this.cancelSettingsModal()}>Cancel</button>
+                    <button class="btn primary" @click=${() => this.applySettingsModal()}>Apply</button>
                   </div>
                 </div>
               </div>
