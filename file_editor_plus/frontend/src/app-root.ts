@@ -6,6 +6,9 @@ import { HAClient, type HassState } from "./ha-client";
 type TreeItem = { name: string; path: string; type: "dir" | "file"; children?: TreeItem[] };
 type Tab = { path: string; name: string; dirty: boolean };
 type Snippet = { id: string; name: string; description: string; content: string };
+type SearchMatch = { line: number; column: number; preview: string; match_len: number };
+type SearchResult = { path: string; mtime: number; size: number; matches: SearchMatch[]; matches_count: number };
+type SearchSummary = { files_scanned: number; files_with_matches: number; matches_total: number };
 
 @customElement("app-root")
 export class AppRoot extends LitElement {
@@ -136,6 +139,7 @@ export class AppRoot extends LitElement {
       grid-template-columns: 48px 280px 1fr; /* activity, sidebar, editor */
       height: 100%;
       overflow: hidden;
+      position: relative;
     }
 
     /* Activity bar */
@@ -166,6 +170,96 @@ export class AppRoot extends LitElement {
       padding: 8px 6px 12px;
       font-size: 13px;
       overflow-x: hidden;
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+      align-content: start;
+    }
+    .searchPane {
+      display: grid;
+      gap: 8px;
+    }
+    .searchRow {
+      display: flex;
+      gap: 8px;
+    }
+    .searchInput {
+      width: 100%;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: var(--input-bg);
+      color: var(--text-color);
+      box-sizing: border-box;
+    }
+    .searchControls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .searchSummary {
+      font-size: 12px;
+      opacity: 0.8;
+    }
+    .searchResults {
+      display: grid;
+      gap: 8px;
+      max-height: calc(100vh - 220px);
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .searchFile {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--card-color);
+      padding: 6px;
+    }
+    .searchFileHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-weight: 600;
+      margin-bottom: 4px;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .searchMatches {
+      display: grid;
+      gap: 4px;
+    }
+    .searchMatch {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+      padding: 6px;
+      border-radius: 6px;
+      background: var(--panel-color);
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .searchMatch:hover {
+      border-color: var(--border-color);
+      background: var(--hover-color);
+    }
+    .lineTag {
+      font-size: 11px;
+      opacity: 0.8;
+      color: var(--muted-color);
+    }
+    .searchMatch .preview {
+      word-break: break-word;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .searchStatus {
+      font-size: 12px;
+      opacity: 0.8;
+      padding: 6px;
+    }
+    .searchStatus.muted {
+      color: var(--muted-color);
     }
     .entityPane {
       display: grid;
@@ -286,8 +380,9 @@ export class AppRoot extends LitElement {
     .sidebar {
       background: var(--panel-color);
       border-right: 1px solid var(--border-color);
-      overflow-y: auto;
-      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
     .sidebarHeader {
       height: 34px;
@@ -303,6 +398,22 @@ export class AppRoot extends LitElement {
       font-weight: 600;
       text-transform: uppercase;
       opacity: 0.9;
+    }
+    .sidebarClose {
+      display: none;
+      margin-left: auto;
+      border: none;
+      background: transparent;
+      color: var(--muted-color);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0 6px;
+    }
+    .sidebarClose:hover {
+      color: var(--text-color);
+    }
+    .sidebarBackdrop {
+      display: none;
     }
 
     .tree {
@@ -460,6 +571,8 @@ export class AppRoot extends LitElement {
     }
     .codeWrap {
       position: relative;
+      --editor-pad: 12px;
+      --editor-pad-right: 28px;
       height: 100%;
       overflow: hidden;
       border: 1px solid var(--border-color);
@@ -469,8 +582,9 @@ export class AppRoot extends LitElement {
     }
     .code {
       position: absolute;
-      inset: 0;
-      padding: 12px;
+      top: 0;
+      left: 0;
+      padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 13px;
       line-height: 1.4;
@@ -479,6 +593,9 @@ export class AppRoot extends LitElement {
       color: var(--text-color);
       pointer-events: none;
       overflow: hidden;
+      min-width: 100%;
+      width: max-content;
+      min-height: 100%;
       box-sizing: border-box;
     }
     .codeLine {
@@ -511,7 +628,7 @@ export class AppRoot extends LitElement {
       background: transparent;
       color: transparent;
       caret-color: #d4d4d4;
-      padding: 12px;
+      padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 13px;
       line-height: 1.4;
@@ -520,6 +637,7 @@ export class AppRoot extends LitElement {
       overflow: auto;
       white-space: pre;
       word-wrap: normal;
+      scrollbar-gutter: stable;
     }
     textarea:focus {
       border-color: #3a3a3a;
@@ -559,6 +677,9 @@ export class AppRoot extends LitElement {
       display: grid;
       gap: 10px;
       padding: 8px 6px 12px;
+      width: 90%;
+      box-sizing: border-box;
+      overflow-x: hidden;
     }
     .snippetCard {
       border: 1px solid var(--border-color);
@@ -568,13 +689,70 @@ export class AppRoot extends LitElement {
       display: grid;
       gap: 6px;
       box-shadow: var(--menu-shadow);
+      width: 100%;
+      box-sizing: border-box;
+      min-width: 0;
+    }
+    .snippetHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .snippetActions {
+      display: flex;
+      gap: 6px;
+      flex: 0 0 auto;
+    }
+    @media (max-width: 900px) {
+      .main {
+        grid-template-columns: 48px 0 1fr;
+      }
+      .sidebar {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 48px;
+        width: min(80vw, 320px);
+        transform: translateX(-110%);
+        transition: transform 0.2s ease;
+        z-index: 40;
+        box-shadow: var(--menu-shadow);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+      }
+      .sidebarBackdrop {
+        display: block;
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 48px;
+        right: 0;
+        background: rgba(0, 0, 0, 0.3);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+        z-index: 30;
+      }
+      .sidebarBackdrop.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .sidebarClose {
+        display: inline-flex;
+      }
     }
     .snippetTitle {
       font-weight: 700;
+      min-width: 0;
+      flex: 1;
+      overflow-wrap: anywhere;
     }
     .snippetDesc {
       font-size: 12px;
       color: var(--muted-color);
+      overflow-wrap: anywhere;
     }
     .contextMenu {
       position: fixed;
@@ -768,6 +946,14 @@ export class AppRoot extends LitElement {
     lineCount: { state: true },
     cursorLine: { state: true },
     cursorCol: { state: true },
+    searchQuery: { state: true },
+    searchReplace: { state: true },
+    searchCaseSensitive: { state: true },
+    searchResults: { state: true },
+    searchSummary: { state: true },
+    searchTruncated: { state: true },
+    searchLoading: { state: true },
+    sidebarOpen: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -806,6 +992,14 @@ export class AppRoot extends LitElement {
   declare snippetSearchField: "title" | "description";
   declare indenting: boolean;
   declare snippets: Snippet[];
+  declare searchQuery: string;
+  declare searchReplace: string;
+  declare searchCaseSensitive: boolean;
+  declare searchResults: SearchResult[];
+  declare searchSummary: SearchSummary | null;
+  declare searchTruncated: boolean;
+  declare searchLoading: boolean;
+  declare sidebarOpen: boolean;
   private suggestBlocked = false;
   private snippetMocks: Snippet[] = [
     { id: "mock-1", name: "Light toggle", description: "Esempio di automazione per accendere/spegnere una luce tramite switch con condizione oraria.", content: "alias: Toggle light\ntrigger:\n  - platform: state\n    entity_id: binary_sensor.motion\naction:\n  - service: light.toggle\n    target:\n      entity_id: light.living_room" },
@@ -830,9 +1024,10 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.52";
+  private readonly appVersion = "0.1.57";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
+  private pendingJump: { path: string; line: number; col: number } | null = null;
   private selectionListener = () => {
     if (!this.editorRef) return;
     const active = this.shadowRoot?.activeElement || document.activeElement;
@@ -878,6 +1073,14 @@ export class AppRoot extends LitElement {
     this.snippetSearchField = "title";
     this.indenting = false;
     this.snippets = [];
+    this.searchQuery = "";
+    this.searchReplace = "";
+    this.searchCaseSensitive = false;
+    this.searchResults = [];
+    this.searchSummary = null;
+    this.searchTruncated = false;
+    this.searchLoading = false;
+    this.sidebarOpen = false;
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -980,6 +1183,12 @@ export class AppRoot extends LitElement {
       this.cursorLine = 1;
       this.cursorCol = 1;
       this.tabs = this.tabs.map((t) => (t.path === path ? { ...t, dirty: false } : t));
+      const jump = this.pendingJump && this.pendingJump.path === path ? this.pendingJump : null;
+      this.pendingJump = null;
+      requestAnimationFrame(() => {
+        this.syncEditorOverlay();
+        if (jump) this.jumpToPosition(jump.line, jump.col);
+      });
       this.status = "Ready";
     } catch (e) {
       this.status = "Errore caricamento file";
@@ -1037,6 +1246,31 @@ export class AppRoot extends LitElement {
     if (!this.editorRef) return;
     const ta = this.editorRef;
     const pos = ta.selectionStart ?? 0;
+    this.updateCursorFromPos(pos, ta.value);
+  }
+
+  private syncEditorOverlay() {
+    if (!this.editorRef) return;
+    this.syncScroll({ target: this.editorRef } as unknown as Event);
+  }
+
+  private jumpToPosition(line: number, col: number) {
+    if (!this.editorRef) return;
+    const ta = this.editorRef;
+    const safeLine = Math.max(1, Math.min(line, this.content.split("\n").length));
+    const lines = this.content.split("\n");
+    let pos = 0;
+    for (let i = 0; i < safeLine - 1 && i < lines.length; i++) {
+      pos += lines[i].length + 1;
+    }
+    const lineText = lines[safeLine - 1] ?? "";
+    pos += Math.min(Math.max(col, 1) - 1, lineText.length);
+    ta.selectionStart = pos;
+    ta.selectionEnd = pos;
+    const approxLineHeight = 18; // 13px font * 1.4 line-height ~ 18px
+    ta.scrollTop = Math.max(0, (safeLine - 1) * approxLineHeight - approxLineHeight);
+    this.syncScroll({ target: ta } as unknown as Event);
+    ta.focus();
     this.updateCursorFromPos(pos, ta.value);
   }
 
@@ -1446,6 +1680,119 @@ export class AppRoot extends LitElement {
     el?.scrollIntoView({ block: "nearest" });
   }
 
+  private async performSearch() {
+    const query = this.searchQuery.trim();
+    if (!query) {
+      this.showToast("Inserisci un termine di ricerca", "error");
+      return;
+    }
+    this.searchTruncated = false;
+    this.searchLoading = true;
+    try {
+      const payload = {
+        query,
+        case_sensitive: this.searchCaseSensitive,
+        max_files: 200,
+        max_matches_total: 5000,
+        max_matches_per_file: 200,
+      };
+      const res = await fetch(`${this.apiBase}api/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || data?.ok !== true) {
+        throw new Error(data?.detail || `search ${res.status}`);
+      }
+      this.searchResults = Array.isArray(data.results) ? (data.results as SearchResult[]) : [];
+      this.searchSummary = (data.summary as SearchSummary) || null;
+      this.searchTruncated = !!data.truncated;
+    } catch (e) {
+      this.showToast("Errore ricerca", "error");
+    } finally {
+      this.searchLoading = false;
+    }
+  }
+
+  private async replaceAll() {
+    const query = this.searchQuery.trim();
+    if (!query) {
+      this.showToast("Esegui prima una ricerca", "error");
+      return;
+    }
+    if (this.searchResults.length === 0) {
+      this.showToast("Nessun risultato da sostituire", "error");
+      return;
+    }
+    this.searchLoading = true;
+    try {
+      const files = this.searchResults.map((r) => ({ path: r.path, mtime: r.mtime }));
+      const payload = {
+        query,
+        replace: this.searchReplace,
+        case_sensitive: this.searchCaseSensitive,
+        scope: "files",
+        files,
+      };
+      const previewRes = await fetch(`${this.apiBase}api/search/replace/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      let preview: any = null;
+      try {
+        preview = await previewRes.json();
+      } catch {
+        preview = null;
+      }
+      if (!previewRes.ok || preview?.ok !== true) {
+        const detail = preview?.detail || `replace preview ${previewRes.status}`;
+        throw new Error(detail);
+      }
+      const previewSummary = preview?.summary || {};
+      const replacements = previewSummary.replacements_total ?? 0;
+      const toModify = previewSummary.files_to_modify ?? files.length;
+      if (!replacements) {
+        this.showToast("Nessuna occorrenza da sostituire");
+        return;
+      }
+      const confirmed = window.confirm(`Sostituire ${replacements} occorrenze in ${toModify} file?`);
+      if (!confirmed) return;
+
+      const applyRes = await fetch(`${this.apiBase}api/search/replace/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      let apply: any = null;
+      try {
+        apply = await applyRes.json();
+      } catch {
+        apply = null;
+      }
+      if (!applyRes.ok || apply?.ok !== true) {
+        const detail = apply?.detail || `replace apply ${applyRes.status}`;
+        throw new Error(detail);
+      }
+      const summary = apply?.summary || {};
+      const modified = summary.files_modified ?? summary.files_to_modify ?? 0;
+      const stale = summary.stale_files ?? 0;
+      const msg = `Replace completato: ${modified} file aggiornati${stale ? `, ${stale} stale` : ""}`;
+      this.showToast(msg);
+      await this.performSearch();
+    } catch (e) {
+      this.showToast("Errore replace", "error");
+    } finally {
+      this.searchLoading = false;
+    }
+  }
+
+  private openSearchMatch(res: SearchResult, match: SearchMatch) {
+    this.pendingJump = { path: res.path, line: match.line, col: match.column };
+    this.openFile(res.path);
+  }
+
   private insertSnippet(snippet: Snippet) {
     if (!this.editorRef || !this.activePath) {
       this.showToast("Apri un file prima di inserire", "error");
@@ -1758,6 +2105,7 @@ export class AppRoot extends LitElement {
       this.lineCount = Math.max(1, cached.split("\n").length);
       this.cursorLine = 1;
       this.cursorCol = 1;
+      requestAnimationFrame(() => this.syncEditorOverlay());
     } else {
       this.content = "";
       this.lineCount = 1;
@@ -1848,8 +2196,15 @@ export class AppRoot extends LitElement {
     if (this.gutterRef) this.gutterRef.style.transform = `translateY(-${top}px)`;
   }
 
+  private isNarrowLayout() {
+    return window.matchMedia("(max-width: 900px)").matches;
+  }
+
   private setActivity(name: "explorer" | "search" | "entity" | "snippet") {
     this.activeActivity = name;
+    if (this.isNarrowLayout()) {
+      this.sidebarOpen = true;
+    }
   }
 
   private toggleDomain(domain: string) {
@@ -1987,12 +2342,80 @@ export class AppRoot extends LitElement {
     this.lastDomains = domainSet;
   }
 
+  private renderSearchResults() {
+    if (this.searchLoading && this.searchResults.length === 0) {
+      return html`<div class="searchStatus">Ricerca in corso...</div>`;
+    }
+    if (this.searchResults.length === 0) {
+      return html`<div class="searchStatus muted">Nessun risultato</div>`;
+    }
+    return html`<div class="searchResults">
+      ${this.searchResults.map(
+        (r) => html`<div class="searchFile">
+          <div class="searchFileHeader">
+            <div class="path">${r.path}</div>
+            <div class="hits">${r.matches_count} hit</div>
+          </div>
+          <div class="searchMatches">
+            ${r.matches.map(
+              (m) => html`<div class="searchMatch" @click=${() => this.openSearchMatch(r, m)}>
+                <span class="lineTag">L${m.line}</span>
+                <span class="preview">${m.preview}</span>
+              </div>`
+            )}
+          </div>
+        </div>`
+      )}
+      ${this.searchTruncated ? html`<div class="searchStatus muted">Risultati troncati dai limiti impostati</div>` : nothing}
+    </div>`;
+  }
+
   private renderSidebarContent() {
     if (this.activeActivity === "explorer") {
       return html`<div class="tree">${this.renderTree("")}</div>`;
     }
     if (this.activeActivity === "search") {
-      return html`<div class="sidebarContent">Search coming soon…</div>`;
+      const summary = this.searchSummary;
+      return html`<div class="sidebarContent searchPane">
+        <div class="searchRow">
+          <input
+            type="text"
+            class="searchInput"
+            placeholder="Search..."
+            .value=${this.searchQuery}
+            @input=${(e: Event) => (this.searchQuery = (e.target as HTMLInputElement).value)}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter") this.performSearch();
+            }}
+          />
+        </div>
+        <div class="searchRow">
+          <input
+            type="text"
+            class="searchInput"
+            placeholder="Replace..."
+            .value=${this.searchReplace}
+            @input=${(e: Event) => (this.searchReplace = (e.target as HTMLInputElement).value)}
+          />
+        </div>
+        <div class="searchControls">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+            <input type="checkbox" .checked=${this.searchCaseSensitive} @change=${(e: Event) => (this.searchCaseSensitive = (e.target as HTMLInputElement).checked)} />
+            Case sensitive
+          </label>
+          <div style="flex:1;"></div>
+          <button class="btn" ?disabled=${this.searchLoading} @click=${() => this.performSearch()}>${this.searchLoading ? "Searching..." : "Find"}</button>
+          <button class="btn primary" ?disabled=${this.searchLoading || this.searchResults.length === 0} @click=${() => this.replaceAll()}>
+            ${this.searchLoading ? "Working..." : "Replace All"}
+          </button>
+        </div>
+        ${summary
+          ? html`<div class="searchSummary">
+              ${summary.matches_total ?? 0} hit in ${summary.files_with_matches ?? 0}/${summary.files_scanned ?? 0} file${this.searchTruncated ? " (troncato)" : ""}
+            </div>`
+          : html``}
+        ${this.renderSearchResults()}
+      </div>`;
     }
     if (this.activeActivity === "snippet") {
       const term = this.snippetSearchText.toLowerCase();
@@ -2025,9 +2448,9 @@ export class AppRoot extends LitElement {
         <div class="snippetGrid">
           ${filtered.map(
             (s) => html`<div class="snippetCard">
-              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+              <div class="snippetHeader">
                 <div class="snippetTitle">${s.name}</div>
-                <div style="display:flex; gap:6px;">
+                <div class="snippetActions">
                   <button class="statusToggle" title="Modify" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.openSnippetModal(s); }}>✏️</button>
                   <button class="statusToggle" title="Cancel" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.deleteSnippet(s); }}>🗙</button>
                   <button class="statusToggle" title="Insert" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.insertSnippet(s); }}>➕</button>
@@ -2222,7 +2645,9 @@ export class AppRoot extends LitElement {
             <div class="act ${this.activeActivity === "snippet" ? "active" : ""}" title="Snippet" @click=${() => this.setActivity("snippet")}>📜</div>
           </div>
 
-          <div class="sidebar">
+          <div class="sidebarBackdrop ${this.sidebarOpen ? "open" : ""}" @click=${() => (this.sidebarOpen = false)}></div>
+
+          <div class="sidebar ${this.sidebarOpen ? "open" : ""}">
             <div class="sidebarHeader">
               <div class="explorerTitle">
                 ${this.activeActivity === "explorer"
@@ -2233,6 +2658,7 @@ export class AppRoot extends LitElement {
                       ? "Entity"
                       : "Snippet"}
               </div>
+              <button class="sidebarClose" title="Close" @click=${() => (this.sidebarOpen = false)}>✕</button>
             </div>
             ${this.renderSidebarContent()}
           </div>

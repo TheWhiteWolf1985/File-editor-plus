@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import fnmatch
 import io
 import os
 import shutil
 import time
 import logging
 import uuid
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -25,6 +27,20 @@ SNIPPET_FILE = SNIPPET_DIR / "snippets.json"
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 logger = logging.getLogger("file_editor_plus")
 MAX_FORMAT_SIZE = 2 * 1024 * 1024  # 2MB
+MAX_SEARCH_FILE_SIZE = 2 * 1024 * 1024  # 2MB per file
+SEARCH_MAX_FILES = 200
+SEARCH_MAX_MATCHES_TOTAL = 5000
+SEARCH_MAX_MATCHES_PER_FILE = 200
+SEARCH_SKIP_DIRS = {
+    ".fep-backups",
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    ".pytest_cache",
+    "dist",
+    "build",
+}
 
 # roba che di solito non vuoi toccare/vedere nell’editor
 DEFAULT_IGNORE = {
@@ -107,6 +123,84 @@ def atomic_write(target: Path, data: str) -> None:
         os.fsync(f.fileno())
 
     os.replace(tmp, target)  # atomic sulla stessa FS
+
+
+def _match_globs(rel_path: Path, globs: Optional[List[str]]) -> bool:
+    if not globs:
+        return False
+    posix = rel_path.as_posix()
+    return any(fnmatch.fnmatch(posix, g) for g in globs)
+
+
+def _should_skip(rel_path: Path, exclude_globs: Optional[List[str]]) -> bool:
+    if any(part in SEARCH_SKIP_DIRS for part in rel_path.parts):
+        return True
+    if exclude_globs and _match_globs(rel_path, exclude_globs):
+        return True
+    return False
+
+
+def _is_binary_file(p: Path) -> bool:
+    try:
+        with open(p, "rb") as f:
+            chunk = f.read(8192)
+    except Exception:
+        return True
+    return b"\0" in chunk
+
+
+def _iter_search_files(include_globs: Optional[List[str]], exclude_globs: Optional[List[str]], max_files: int):
+    scanned = 0
+    for root, dirs, files in os.walk(BASE_DIR):
+        rel_root = Path(root).resolve().relative_to(BASE_DIR)
+
+        # pruna le dir da saltare
+        dirs[:] = [d for d in dirs if not _should_skip(rel_root / d, exclude_globs)]
+
+        for fname in files:
+            rel = rel_root / fname
+            if _should_skip(rel, exclude_globs):
+                continue
+            if include_globs and not _match_globs(rel, include_globs):
+                continue
+            yield rel
+            scanned += 1
+            if scanned >= max_files:
+                return
+
+
+def _find_matches(text: str, query: str, case_sensitive: bool, limit: int):
+    if not query:
+        return []
+    hay = text if case_sensitive else text.lower()
+    needle = query if case_sensitive else query.lower()
+    matches = []
+    start = 0
+    while True:
+        idx = hay.find(needle, start)
+        if idx == -1:
+            break
+        line = hay.count("\n", 0, idx) + 1
+        last_nl = hay.rfind("\n", 0, idx)
+        col = idx - (last_nl if last_nl != -1 else -1)
+        next_nl = hay.find("\n", idx)
+        if next_nl == -1:
+            next_nl = len(text)
+        line_text = text[(last_nl + 1 if last_nl != -1 else 0) : next_nl]
+        matches.append({"line": line, "column": col, "preview": line_text[:240], "match_len": len(query)})
+        if len(matches) >= limit:
+            break
+        start = idx + len(needle) if len(needle) > 0 else idx + 1
+    return matches
+
+
+def _replace_text(text: str, query: str, replace: str, case_sensitive: bool):
+    if not query:
+        return text, 0
+    flags = 0 if case_sensitive else re.IGNORECASE
+    pattern = re.escape(query)
+    repl, count = re.subn(pattern, replace, text, flags=flags)
+    return repl, count
 
 
 def ensure_snippet_store() -> None:
@@ -195,9 +289,219 @@ def format_yaml_text(text: str) -> str:
     return formatted
 
 
+def _clamp(val: int, default: int, min_val: int, max_val: int) -> int:
+    try:
+        ival = int(val)
+    except Exception:
+        return default
+    return max(min_val, min(max_val, ival))
+
+
+def perform_search(payload: dict):
+    query = str(payload.get("query") or "")
+    if not query:
+        raise HTTPException(400, "Query required")
+    case_sensitive = bool(payload.get("case_sensitive"))
+    include_globs = [g for g in payload.get("include_globs") or [] if g]
+    exclude_globs = [g for g in payload.get("exclude_globs") or [] if g]
+
+    max_files = _clamp(payload.get("max_files", SEARCH_MAX_FILES), SEARCH_MAX_FILES, 1, SEARCH_MAX_FILES)
+    max_matches_total = _clamp(payload.get("max_matches_total", SEARCH_MAX_MATCHES_TOTAL), SEARCH_MAX_MATCHES_TOTAL, 1, 100000)
+    max_matches_per_file = _clamp(payload.get("max_matches_per_file", SEARCH_MAX_MATCHES_PER_FILE), SEARCH_MAX_MATCHES_PER_FILE, 1, 10000)
+
+    # esclusioni fisse
+    default_exclude = [f"**/{d}/**" for d in SEARCH_SKIP_DIRS]
+    exclude_globs = list(set(exclude_globs + default_exclude))
+
+    files_scanned = 0
+    files_with_matches = 0
+    matches_total = 0
+    truncated = False
+    results = []
+
+    for rel in _iter_search_files(include_globs, exclude_globs, max_files):
+        files_scanned += 1
+        try:
+            target = safe_path(rel.as_posix())
+        except HTTPException:
+            continue
+        try:
+            st = target.stat()
+        except Exception:
+            continue
+
+        if st.st_size > MAX_SEARCH_FILE_SIZE:
+            continue
+        if _is_binary_file(target):
+            continue
+
+        try:
+            text = target.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            text = target.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+
+        matches = _find_matches(text, query, case_sensitive, max_matches_per_file)
+        if not matches:
+            continue
+        if len(matches) >= max_matches_per_file:
+            truncated = True
+        matches_total += len(matches)
+        files_with_matches += 1
+        results.append(
+            {
+                "path": rel.as_posix(),
+                "mtime": st.st_mtime,
+                "size": st.st_size,
+                "matches": matches,
+                "matches_count": len(matches),
+            }
+        )
+        if matches_total >= max_matches_total:
+            truncated = True
+            break
+
+    if files_scanned >= max_files:
+        truncated = True
+
+    return {
+        "ok": True,
+        "query": query,
+        "case_sensitive": case_sensitive,
+        "truncated": truncated,
+        "summary": {"files_scanned": files_scanned, "files_with_matches": files_with_matches, "matches_total": matches_total},
+        "results": results,
+    }
+
+
+def _normalize_files(payload_files, max_files: int):
+    files = []
+    for item in payload_files or []:
+        path = str(item.get("path") or "").strip()
+        if not path:
+            continue
+        mtime = item.get("mtime")
+        files.append({"path": path, "mtime": mtime})
+        if len(files) >= max_files:
+            break
+    if not files:
+        raise HTTPException(400, "files required")
+    return files
+
+
+def _replace_on_files(payload: dict, apply: bool):
+    query = str(payload.get("query") or "")
+    if not query:
+        raise HTTPException(400, "Query required")
+    replace = str(payload.get("replace") or "")
+    case_sensitive = bool(payload.get("case_sensitive"))
+    scope = payload.get("scope") or "files"
+    max_files = _clamp(payload.get("max_files", SEARCH_MAX_FILES), SEARCH_MAX_FILES, 1, SEARCH_MAX_FILES)
+    if scope != "files":
+        raise HTTPException(400, "scope must be 'files'")
+    files = _normalize_files(payload.get("files"), max_files)
+
+    per_file = []
+    summary = {
+        "files_considered": 0,
+        "files_to_modify": 0,
+        "replacements_total": 0,
+        "stale_files": 0,
+        "files_modified": 0,
+    }
+
+    for entry in files:
+        summary["files_considered"] += 1
+        rel_path = entry["path"]
+        expected_mtime = entry.get("mtime")
+        try:
+            target = safe_path(rel_path)
+        except HTTPException as e:
+            per_file.append({"path": rel_path, "status": "error", "error": e.detail if hasattr(e, "detail") else str(e), "replacements": 0})
+            continue
+        if not target.exists() or not target.is_file():
+            per_file.append({"path": rel_path, "status": "error", "error": "File not found", "replacements": 0})
+            continue
+        try:
+            st = target.stat()
+        except Exception as e:
+            per_file.append({"path": rel_path, "status": "error", "error": str(e), "replacements": 0})
+            continue
+
+        if expected_mtime is not None and st.st_mtime != expected_mtime:
+            summary["stale_files"] += 1
+            per_file.append({"path": rel_path, "status": "stale", "replacements": 0, "mtime": st.st_mtime, "size": st.st_size})
+            continue
+        if st.st_size > MAX_SEARCH_FILE_SIZE or _is_binary_file(target):
+            per_file.append({"path": rel_path, "status": "skipped", "replacements": 0, "mtime": st.st_mtime, "size": st.st_size})
+            continue
+
+        try:
+            text = target.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            text = target.read_text(encoding="utf-8", errors="replace")
+        except Exception as e:
+            per_file.append({"path": rel_path, "status": "error", "error": str(e), "replacements": 0})
+            continue
+
+        new_text, replacements = _replace_text(text, query, replace, case_sensitive)
+        status = "unchanged"
+        backup_path = None
+        if replacements > 0:
+            summary["replacements_total"] += replacements
+            summary["files_to_modify"] += 1
+            if apply:
+                try:
+                    backup = make_backup(target)
+                    backup_path = str(backup.relative_to(BASE_DIR)) if backup else None
+                    atomic_write(target, new_text)
+                    status = "modified"
+                    summary["files_modified"] += 1
+                except Exception as e:
+                    per_file.append({"path": rel_path, "status": "error", "error": str(e), "replacements": replacements})
+                    continue
+            else:
+                status = "ok"
+        per_file.append(
+            {
+                "path": rel_path,
+                "status": status,
+                "replacements": replacements,
+                "backup_path": backup_path,
+                "mtime": st.st_mtime,
+                "size": st.st_size,
+            }
+        )
+
+    return {
+        "ok": True,
+        "summary": summary,
+        "per_file": per_file,
+    }
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
+
+
+@app.post("/api/search")
+async def search_endpoint(request: Request):
+    payload = await request.json()
+    return perform_search(payload)
+
+
+@app.post("/api/search/replace/preview")
+async def search_replace_preview(request: Request):
+    payload = await request.json()
+    return _replace_on_files(payload, apply=False)
+
+
+@app.post("/api/search/replace/apply")
+async def search_replace_apply(request: Request):
+    payload = await request.json()
+    return _replace_on_files(payload, apply=True)
 
 
 @app.get("/api/ha/states")
