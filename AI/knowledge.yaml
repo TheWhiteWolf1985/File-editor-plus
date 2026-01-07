@@ -339,6 +339,20 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-07"
     actor: "codex"
+    version: "0.1.74"
+    change: "Aggiunto README dell'add-on per descrizione in Home Assistant Store; bump versione."
+    reason: "Fornire documentazione visibile ai beta tester."
+    touched_files:
+      - "file_editor_plus/README.md"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "README visibile nella scheda add-on"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
     version: "0.1.73"
     change: "Workflow release: rsync ora esclude .git per evitare 'not a git repository' durante la pubblicazione su main; bump versione."
     reason: "Il publish step cancellava la cartella .git e i comandi git fallivano."
