@@ -339,6 +339,20 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-07"
     actor: "codex"
+    version: "0.1.72"
+    change: "Fix regex workflow release: la verifica versione ora usa pattern corretti (\\s) e non fallisce su config.yaml; bump versione."
+    reason: "Il workflow non trovava la versione perché il pattern cercava '\\\\s' letterale."
+    touched_files:
+      - ".github/workflows/release.yml"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Run workflow manuale non fallisce su 'Version not found'"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
     version: "0.1.71"
     change: "Aggiunto workflow manuale di release (input versione) per pubblicare su main solo i file necessari via whitelist; bump versione."
     reason: "Separare develop (sviluppo) e main (release) con rilascio controllato per beta tester."
