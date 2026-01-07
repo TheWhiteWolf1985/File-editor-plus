@@ -1,0 +1,36 @@
+model = "gpt-5.2-codex"
+model_reasoning_effort = "xhigh"
+# Configurazione per Codex Max 5.1
+
+[general]
+model = "gpt-5.1"  # Codex Max 5.1 (modello avanzato)
+reasoning_level = "high"  # Impostazione reasoning alto per capacità avanzate
+temperature = 0.7  # Temperatura per la generazione del testo
+max_tokens = 2000  # Limite massimo di tokens per risposta
+top_p = 1  # Parametro per la variabilità
+frequency_penalty = 0  # Penalizzazione per la ripetizione
+presence_penalty = 0  # Penalizzazione per la presenza di parole già usate
+
+# Configurazione del workflow di Codex
+[workflow]
+read_knowledge_file_first = true  # Legge sempre AI/knowledge.yaml prima di procedere
+log_changes = true  # Registra tutte le modifiche
+increment_version_on_patch = true  # Incrementa la versione ad ogni patch
+
+# File e regole
+[files]
+agents_file = "AI/agents.md"  # File delle regole operative
+knowledge_file = "AI/knowledge.yaml"  # File della memoria estesa e stato del progetto
+project_readme = "README.md"  # File di documentazione del progetto
+app_version = "0.0.1"  # Versione iniziale del progetto
+
+# Memoria e aggiornamenti
+[memoria]
+log_section = "log"  # Sezione di knowledge.yaml dove vengono registrati i log
+auto_update_knowledge = true  # Aggiorna automaticamente knowledge.yaml dopo ogni patch
+
+# Sicurezza e affidabilità
+[security]
+allow_network_access = true  # Abilitato l'accesso alla rete per ricerca/aggiornamenti esterni
+allow_dangerous_commands = false  # Comandi distruttivi non permessi
+preferred_commands = ["ls", "cat", "git status"]  # Comandi sicuri

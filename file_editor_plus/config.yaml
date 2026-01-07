@@ -1,5 +1,5 @@
 name: "File Editor Plus"
-version: "0.1.70"
+version: "0.1.71"
 slug: "file_editor_plus"
 description: "Pro File Editor for Home Assistant"
 arch:
@@ -18,7 +18,6 @@ ports:
   8099/tcp: null
 panel_icon: "mdi:file-document-edit-outline"
 
-# Per ora niente permessi strani: MVP super safe
 map:
   - config:rw
 

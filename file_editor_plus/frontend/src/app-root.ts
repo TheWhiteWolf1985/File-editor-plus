@@ -1147,7 +1147,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = 1.125;
   private readonly fontBaseStep = 0.0625;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.70";
+  private readonly appVersion = "0.1.71";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private diffRequestId = 0;
