@@ -42,11 +42,11 @@ jobs:
 
           cfg_version = read_version(
             "file_editor_plus/config.yaml",
-            r'^\\s*version:\\s*"?([0-9]+\\.[0-9]+\\.[0-9]+)"?\\s*$',
+            r'^\s*version:\s*"?([0-9]+\.[0-9]+\.[0-9]+)"?\s*$',
           )
           app_version = read_version(
             "file_editor_plus/frontend/src/app-root.ts",
-            r'appVersion\\s*=\\s*"([^"]+)"',
+            r'appVersion\s*=\s*"([^"]+)"',
           )
 
           if cfg_version != version or app_version != version:
