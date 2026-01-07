@@ -13,6 +13,7 @@ Questa build e pensata per beta tester.
 - Search & Replace multi-file (MVP)
 - Split view + Compare (beta)
 - Settings: tema, auto-indent, dimensione font
+- Autocomplete MDI: suggerimenti icone con nome (mdi:)
 
 ## Installazione (custom repo)
 

@@ -6,6 +6,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@mdi/font": "^7.4.47",
     "lit": "^3.2.1"
   },
   "devDependencies": {

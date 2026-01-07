@@ -26,6 +26,7 @@ FRONTEND_DIR = Path("/app/frontend").resolve()
 SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
 SNIPPET_FILE = SNIPPET_DIR / "snippets.json"
 USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
+MDI_META_FILE = (Path(__file__).parent / "mdi_meta.json").resolve()
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 logger = logging.getLogger("file_editor_plus")
 MAX_FORMAT_SIZE = 2 * 1024 * 1024  # 2MB
@@ -35,6 +36,7 @@ MAX_DIFF_TOTAL = 4 * 1024 * 1024  # 4MB totale
 SEARCH_MAX_FILES = 200
 SEARCH_MAX_MATCHES_TOTAL = 5000
 SEARCH_MAX_MATCHES_PER_FILE = 200
+MDI_MAX_RESULTS = 50
 SEARCH_SKIP_DIRS = {
     ".fep-backups",
     ".git",
@@ -206,6 +208,83 @@ def _replace_text(text: str, query: str, replace: str, case_sensitive: bool):
     pattern = re.escape(query)
     repl, count = re.subn(pattern, replace, text, flags=flags)
     return repl, count
+
+
+MDI_ICON_INDEX: Optional[List[dict]] = None
+
+
+def load_mdi_index() -> List[dict]:
+    global MDI_ICON_INDEX
+    if MDI_ICON_INDEX is not None:
+        return MDI_ICON_INDEX
+    if not MDI_META_FILE.exists():
+        raise HTTPException(500, "File MDI mancante (mdi_meta.json)")
+    try:
+        with open(MDI_META_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        logger.exception("mdi: errore lettura %s: %s", MDI_META_FILE, e)
+        raise HTTPException(500, f"Errore lettura mdi_meta.json: {e}")
+    if isinstance(data, list):
+        items = data
+    elif isinstance(data, dict) and isinstance(data.get("icons"), list):
+        items = data.get("icons")
+    else:
+        items = []
+    index: List[dict] = []
+    seen = set()
+    for d in items:
+        if not isinstance(d, dict):
+            continue
+        name = d.get("name")
+        codepoint = d.get("codepoint")
+        if not name:
+            continue
+        if isinstance(codepoint, int):
+            codepoint = format(codepoint, "X")
+        elif isinstance(codepoint, str):
+            codepoint = codepoint.strip().replace("0x", "").replace("0X", "")
+        else:
+            codepoint = ""
+        if not codepoint:
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+        index.append({"name": name, "codepoint": codepoint})
+    if not index:
+        raise HTTPException(500, "Nessuna icona MDI trovata")
+    index.sort(key=lambda item: item["name"])
+    MDI_ICON_INDEX = index
+    return index
+
+
+def search_mdi(query: str, limit: int) -> List[dict]:
+    index = load_mdi_index()
+    q = (query or "").strip().lower()
+    if not q:
+        return index[:limit]
+    results: List[dict] = []
+    seen = set()
+    for item in index:
+        name = item["name"]
+        name_lower = name.lower()
+        if name_lower.startswith(q):
+            results.append(item)
+            seen.add(name)
+            if len(results) >= limit:
+                return results
+    if len(results) < limit:
+        for item in index:
+            name = item["name"]
+            if name in seen:
+                continue
+            if q in name.lower():
+                results.append(item)
+                seen.add(name)
+                if len(results) >= limit:
+                    break
+    return results[:limit]
 
 
 def ensure_user_config() -> None:
@@ -819,6 +898,13 @@ def delete_snippet(snippet_id: str):
         raise HTTPException(404, "Snippet not found")
     save_snippets(next_items)
     return {"ok": True}
+
+
+@app.get("/api/mdi/search")
+def mdi_search(query: str = "", limit: int = MDI_MAX_RESULTS):
+    limit = _clamp(limit, MDI_MAX_RESULTS, 1, 200)
+    results = search_mdi(query, limit)
+    return {"ok": True, "items": results}
 
 
 @app.get("/api/user-config")
