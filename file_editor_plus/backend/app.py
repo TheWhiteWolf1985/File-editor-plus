@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import fnmatch
 import io
 import os
@@ -28,6 +29,8 @@ SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 logger = logging.getLogger("file_editor_plus")
 MAX_FORMAT_SIZE = 2 * 1024 * 1024  # 2MB
 MAX_SEARCH_FILE_SIZE = 2 * 1024 * 1024  # 2MB per file
+MAX_DIFF_SIZE = 2 * 1024 * 1024  # 2MB per text
+MAX_DIFF_TOTAL = 4 * 1024 * 1024  # 4MB totale
 SEARCH_MAX_FILES = 200
 SEARCH_MAX_MATCHES_TOTAL = 5000
 SEARCH_MAX_MATCHES_PER_FILE = 200
@@ -287,6 +290,45 @@ def format_yaml_text(text: str) -> str:
     if not had_trailing_nl:
         formatted = formatted.rstrip("\n")
     return formatted
+
+
+def compute_diff(base_text: str, modified_text: str):
+    base_bytes = base_text.encode("utf-8")
+    mod_bytes = modified_text.encode("utf-8")
+    if len(base_bytes) > MAX_DIFF_SIZE or len(mod_bytes) > MAX_DIFF_SIZE:
+        raise HTTPException(413, "Diff troppo grande (limite 2MB per testo).")
+    if len(base_bytes) + len(mod_bytes) > MAX_DIFF_TOTAL:
+        raise HTTPException(413, "Diff troppo grande (limite totale 4MB).")
+
+    base_norm = base_text.replace("\r\n", "\n").replace("\r", "\n")
+    mod_norm = modified_text.replace("\r\n", "\n").replace("\r", "\n")
+    base_lines = base_norm.split("\n")
+    mod_lines = mod_norm.split("\n")
+
+    matcher = difflib.SequenceMatcher(a=base_lines, b=mod_lines)
+    hunks = []
+    summary = {"added": 0, "removed": 0, "changed": 0}
+
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        base_len = i2 - i1
+        mod_len = j2 - j1
+        if tag == "insert":
+            summary["added"] += mod_len
+        elif tag == "delete":
+            summary["removed"] += base_len
+        elif tag == "replace":
+            summary["changed"] += max(base_len, mod_len)
+        hunks.append(
+            {
+                "type": tag,
+                "base_start": i1 + 1 if base_len > 0 else i1 + 1,
+                "base_len": base_len,
+                "mod_start": j1 + 1 if mod_len > 0 else j1 + 1,
+                "mod_len": mod_len,
+            }
+        )
+
+    return {"summary": summary, "hunks": hunks}
 
 
 def _clamp(val: int, default: int, min_val: int, max_val: int) -> int:
@@ -750,6 +792,23 @@ async def format_yaml(body: dict):
         raise HTTPException(400, "Field 'text' richiesto")
     formatted = format_yaml_text(str(text))
     return {"ok": True, "formatted": formatted}
+
+
+@app.post("/api/diff")
+async def diff_endpoint(body: dict):
+    if not isinstance(body, dict):
+        raise HTTPException(400, "Invalid JSON body")
+    base_text = body.get("base_text")
+    modified_text = body.get("modified_text")
+    if base_text is None or modified_text is None:
+        raise HTTPException(400, "Fields 'base_text' and 'modified_text' richiesti")
+    try:
+        diff = compute_diff(str(base_text), str(modified_text))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(422, detail={"message": str(e)})
+    return {"ok": True, **diff}
 
 
 # ---- Frontend (Ingress friendly): serve static + SPA fallback

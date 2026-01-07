@@ -9,6 +9,8 @@ type Snippet = { id: string; name: string; description: string; content: string 
 type SearchMatch = { line: number; column: number; preview: string; match_len: number };
 type SearchResult = { path: string; mtime: number; size: number; matches: SearchMatch[]; matches_count: number };
 type SearchSummary = { files_scanned: number; files_with_matches: number; matches_total: number };
+type DiffHunk = { type: "insert" | "delete" | "replace" | "equal"; base_start: number; base_len: number; mod_start: number; mod_len: number };
+type DiffSummary = { added: number; removed: number; changed: number };
 
 @customElement("app-root")
 export class AppRoot extends LitElement {
@@ -552,6 +554,19 @@ export class AppRoot extends LitElement {
       overflow: hidden;
       position: relative;
     }
+    .splitWrap {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      height: 100%;
+      overflow: hidden;
+    }
+    .splitPane {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
     .gutter {
       width: 52px;
       padding: 12px 8px;
@@ -603,6 +618,15 @@ export class AppRoot extends LitElement {
       min-height: 1.4em;
       line-height: 1.4;
     }
+    .codeLine.diff-insert {
+      background: rgba(46, 160, 67, 0.2);
+    }
+    .codeLine.diff-delete {
+      background: rgba(248, 81, 73, 0.2);
+    }
+    .codeLine.diff-replace {
+      background: rgba(255, 211, 61, 0.2);
+    }
     .token-key {
       color: #9cdcfe;
     }
@@ -641,6 +665,25 @@ export class AppRoot extends LitElement {
     }
     textarea:focus {
       border-color: #3a3a3a;
+    }
+    .basePre {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      border: none;
+      background: transparent;
+      color: transparent;
+      caret-color: transparent;
+      padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 13px;
+      line-height: 1.4;
+      outline: none;
+      box-sizing: border-box;
+      overflow: auto;
+      white-space: pre;
+      word-wrap: normal;
+      scrollbar-gutter: stable;
     }
 
     /* Status bar */
@@ -954,6 +997,13 @@ export class AppRoot extends LitElement {
     searchTruncated: { state: true },
     searchLoading: { state: true },
     sidebarOpen: { state: true },
+    openSnapshotText: { state: true },
+    savedBaseText: { state: true },
+    splitViewEnabled: { state: true },
+    compareEnabled: { state: true },
+    diffHunks: { state: true },
+    diffSummary: { state: true },
+    diffLoading: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -1000,6 +1050,13 @@ export class AppRoot extends LitElement {
   declare searchTruncated: boolean;
   declare searchLoading: boolean;
   declare sidebarOpen: boolean;
+  declare openSnapshotText: string;
+  declare savedBaseText: string;
+  declare splitViewEnabled: boolean;
+  declare compareEnabled: boolean;
+  declare diffHunks: DiffHunk[];
+  declare diffSummary: DiffSummary | null;
+  declare diffLoading: boolean;
   private suggestBlocked = false;
   private snippetMocks: Snippet[] = [
     { id: "mock-1", name: "Light toggle", description: "Esempio di automazione per accendere/spegnere una luce tramite switch con condizione oraria.", content: "alias: Toggle light\ntrigger:\n  - platform: state\n    entity_id: binary_sensor.motion\naction:\n  - service: light.toggle\n    target:\n      entity_id: light.living_room" },
@@ -1016,17 +1073,24 @@ export class AppRoot extends LitElement {
   private loadedPaths = new Set<string>();
   private loadingPaths = new Set<string>();
   private fileCache: Record<string, string> = {};
+  private openSnapshotByPath: Record<string, string> = {};
+  private savedBaseByPath: Record<string, string> = {};
   private codeRef: HTMLDivElement | null = null;
   private gutterRef: HTMLDivElement | null = null;
   private editorRef: HTMLTextAreaElement | null = null;
+  private baseCodeRef: HTMLDivElement | null = null;
+  private baseGutterRef: HTMLDivElement | null = null;
+  private basePreRef: HTMLPreElement | null = null;
   private cursorRaf: number | null = null;
   private lastCursorLine = 1;
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.59";
+  private readonly appVersion = "0.1.60";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
+  private diffRequestId = 0;
+  private diffDebounce: number | null = null;
   private pendingJump: { path: string; line: number; col: number } | null = null;
   private selectionListener = () => {
     if (!this.editorRef) return;
@@ -1081,6 +1145,13 @@ export class AppRoot extends LitElement {
     this.searchTruncated = false;
     this.searchLoading = false;
     this.sidebarOpen = false;
+    this.openSnapshotText = "";
+    this.savedBaseText = "";
+    this.splitViewEnabled = false;
+    this.compareEnabled = false;
+    this.diffHunks = [];
+    this.diffSummary = null;
+    this.diffLoading = false;
     this.rootItems = [];
     this.treeData = {};
     this.lineCount = 1;
@@ -1178,6 +1249,10 @@ export class AppRoot extends LitElement {
     }
     this.activePath = path;
     this.content = "";
+    this.openSnapshotText = "";
+    this.savedBaseText = "";
+    this.diffHunks = [];
+    this.diffSummary = null;
     this.loadFile(path);
   }
 
@@ -1193,6 +1268,12 @@ export class AppRoot extends LitElement {
       this.content = data.content ?? "";
       this.lineCount = Math.max(1, this.content.split("\n").length);
       this.fileCache[path] = this.content;
+      this.openSnapshotByPath[path] = this.content;
+      this.savedBaseByPath[path] = this.content;
+      this.openSnapshotText = this.content;
+      this.savedBaseText = this.content;
+      this.diffHunks = [];
+      this.diffSummary = null;
       this.cursorLine = 1;
       this.cursorCol = 1;
       this.tabs = this.tabs.map((t) => (t.path === path ? { ...t, dirty: false } : t));
@@ -1200,8 +1281,10 @@ export class AppRoot extends LitElement {
       this.pendingJump = null;
       requestAnimationFrame(() => {
         this.syncEditorOverlay();
+        this.syncBaseOverlay();
         if (jump) this.jumpToPosition(jump.line, jump.col);
       });
+      this.scheduleDiff();
       this.status = "Ready";
     } catch (e) {
       this.status = "Errore caricamento file";
@@ -1238,6 +1321,97 @@ export class AppRoot extends LitElement {
     this.tabs = this.tabs.map((t) =>
       t.path === this.activePath ? { ...t, dirty: true } : t
     );
+    this.scheduleDiff();
+  }
+
+  private scheduleDiff() {
+    if (!this.splitViewEnabled || !this.compareEnabled) {
+      this.diffHunks = [];
+      this.diffSummary = null;
+      this.diffLoading = false;
+      if (this.diffDebounce !== null) {
+        clearTimeout(this.diffDebounce);
+        this.diffDebounce = null;
+      }
+      return;
+    }
+    if (!this.activePath) {
+      this.diffHunks = [];
+      this.diffSummary = null;
+      this.diffLoading = false;
+      return;
+    }
+    if (this.diffDebounce !== null) {
+      clearTimeout(this.diffDebounce);
+    }
+    this.diffDebounce = window.setTimeout(() => {
+      this.diffDebounce = null;
+      this.fetchDiff();
+    }, 350);
+  }
+
+  private async fetchDiff() {
+    if (!this.splitViewEnabled || !this.compareEnabled) return;
+    const requestId = ++this.diffRequestId;
+    this.diffLoading = true;
+    try {
+      const payload = {
+        base_text: this.savedBaseText,
+        modified_text: this.content,
+        mode: "saved",
+      };
+      const res = await fetch(`${this.apiBase}api/diff`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+      if (requestId !== this.diffRequestId) return;
+      if (!res.ok || data?.ok !== true) {
+        const msg = data?.error?.message || data?.detail?.message || `Diff non disponibile (HTTP ${res.status})`;
+        this.showToast(msg, "error");
+        this.diffHunks = [];
+        this.diffSummary = null;
+        this.compareEnabled = false;
+        return;
+      }
+      this.diffHunks = Array.isArray(data?.hunks) ? (data.hunks as DiffHunk[]) : [];
+      this.diffSummary = (data?.summary as DiffSummary) || null;
+    } catch (e) {
+      if (requestId !== this.diffRequestId) return;
+      this.showToast("Errore diff", "error");
+      this.diffHunks = [];
+      this.diffSummary = null;
+      this.compareEnabled = false;
+    } finally {
+      if (requestId === this.diffRequestId) {
+        this.diffLoading = false;
+      }
+    }
+  }
+
+  private getDiffMaps() {
+    const left = new Map<number, string>();
+    const right = new Map<number, string>();
+    if (!this.splitViewEnabled || !this.compareEnabled) {
+      return { left, right };
+    }
+    for (const h of this.diffHunks) {
+      if (h.type === "insert") {
+        for (let i = 0; i < h.mod_len; i++) left.set(h.mod_start + i, "diff-insert");
+      } else if (h.type === "delete") {
+        for (let i = 0; i < h.base_len; i++) right.set(h.base_start + i, "diff-delete");
+      } else if (h.type === "replace") {
+        for (let i = 0; i < h.mod_len; i++) left.set(h.mod_start + i, "diff-replace");
+        for (let i = 0; i < h.base_len; i++) right.set(h.base_start + i, "diff-replace");
+      }
+    }
+    return { left, right };
   }
 
   private updateCursorFromPos(pos: number, value?: string) {
@@ -1265,6 +1439,11 @@ export class AppRoot extends LitElement {
   private syncEditorOverlay() {
     if (!this.editorRef) return;
     this.syncScroll({ target: this.editorRef } as unknown as Event);
+  }
+
+  private syncBaseOverlay() {
+    if (!this.basePreRef) return;
+    this.syncBaseScroll({ target: this.basePreRef } as unknown as Event);
   }
 
   private jumpToPosition(line: number, col: number) {
@@ -2028,8 +2207,32 @@ export class AppRoot extends LitElement {
     } else if (menu === "view") {
       if (action === "Reload tree") {
         this.reloadTree();
-      } else if (action === "Split") {
-        this.showToast("Split view non implementata", "info");
+      } else if (action === "Split view") {
+        const next = !this.splitViewEnabled;
+        this.splitViewEnabled = next;
+        if (!next) {
+          this.compareEnabled = false;
+          this.diffHunks = [];
+          this.diffSummary = null;
+        } else {
+          requestAnimationFrame(() => this.syncBaseOverlay());
+        }
+      } else if (action === "Compare…") {
+        if (!this.splitViewEnabled) {
+          this.showToast("Attiva prima Split view", "info");
+          return;
+        }
+        if (!this.activePath) {
+          this.showToast("Apri un file per confrontare", "info");
+          return;
+        }
+        this.compareEnabled = !this.compareEnabled;
+        if (!this.compareEnabled) {
+          this.diffHunks = [];
+          this.diffSummary = null;
+        } else {
+          this.scheduleDiff();
+        }
       }
     }
   }
@@ -2151,7 +2354,15 @@ export class AppRoot extends LitElement {
       this.lineCount = Math.max(1, cached.split("\n").length);
       this.cursorLine = 1;
       this.cursorCol = 1;
-      requestAnimationFrame(() => this.syncEditorOverlay());
+      this.openSnapshotText = this.openSnapshotByPath[path] ?? cached;
+      this.savedBaseText = this.savedBaseByPath[path] ?? cached;
+      this.diffHunks = [];
+      this.diffSummary = null;
+      requestAnimationFrame(() => {
+        this.syncEditorOverlay();
+        this.syncBaseOverlay();
+      });
+      this.scheduleDiff();
     } else {
       this.content = "";
       this.lineCount = 1;
@@ -2210,12 +2421,16 @@ export class AppRoot extends LitElement {
     return segments;
   }
 
-  private renderHighlighted() {
-    const lines = this.content.split("\n");
-    return lines.map(
-      (line, idx) =>
-        html`<div class="codeLine" data-gutter-line=${idx + 1}>${this.highlightLine(line).map((seg) => html`<span class=${seg.cls ?? ""}>${seg.text || " "}</span>`)}</div>`
-    );
+  private renderHighlighted(text: string, diffMap?: Map<number, string>) {
+    const lines = text.split("\n");
+    return lines.map((line, idx) => {
+      const lineNo = idx + 1;
+      const diffClass = diffMap?.get(lineNo);
+      const cls = diffClass ? `codeLine ${diffClass}` : "codeLine";
+      return html`<div class=${cls} data-gutter-line=${lineNo}>
+        ${this.highlightLine(line).map((seg) => html`<span class=${seg.cls ?? ""}>${seg.text || " "}</span>`)}
+      </div>`;
+    });
   }
 
   private renderMenu(label: string, name: string, items: { icon: string; label: string }[]) {
@@ -2240,6 +2455,13 @@ export class AppRoot extends LitElement {
     const left = (e.target as HTMLElement).scrollLeft;
     if (this.codeRef) this.codeRef.style.transform = `translate(${-left}px, -${top}px)`;
     if (this.gutterRef) this.gutterRef.style.transform = `translateY(-${top}px)`;
+  }
+
+  private syncBaseScroll(e: Event) {
+    const top = (e.target as HTMLElement).scrollTop;
+    const left = (e.target as HTMLElement).scrollLeft;
+    if (this.baseCodeRef) this.baseCodeRef.style.transform = `translate(${-left}px, -${top}px)`;
+    if (this.baseGutterRef) this.baseGutterRef.style.transform = `translateY(-${top}px)`;
   }
 
   private isNarrowLayout() {
@@ -2578,6 +2800,11 @@ export class AppRoot extends LitElement {
     return Array.from({ length: count }, (_, i) => String(i + 1)).join("\n");
   }
 
+  private renderLineNumbersFor(text: string) {
+    const count = Math.max(1, text.split("\n").length);
+    return Array.from({ length: count }, (_, i) => String(i + 1)).join("\n");
+  }
+
   private async save() {
     if (!this.activePath) return;
     this.status = "Saving...";
@@ -2592,9 +2819,13 @@ export class AppRoot extends LitElement {
         throw new Error(`save ${res.status}`);
       }
       this.fileCache[this.activePath] = this.content;
+      this.savedBaseByPath[this.activePath] = this.content;
+      this.savedBaseText = this.content;
       this.tabs = this.tabs.map((t) =>
         t.path === this.activePath ? { ...t, dirty: false } : t
       );
+      this.scheduleDiff();
+      requestAnimationFrame(() => this.syncBaseOverlay());
       this.status = "Saved";
       setTimeout(() => (this.status = "Ready"), 800);
     } catch (e) {
@@ -2637,6 +2868,7 @@ export class AppRoot extends LitElement {
 
   render() {
     const activeTab = this.tabs.find((t) => t.path === this.activePath) ?? null;
+    const diffMaps = this.getDiffMaps();
 
     return html`
       <div class="shell">
@@ -2659,7 +2891,8 @@ export class AppRoot extends LitElement {
             ])}
             ${this.renderMenu("View", "view", [
               { icon: "🔄", label: "Reload tree" },
-              { icon: "🪟", label: "Split" },
+              { icon: "🪟", label: "Split view" },
+              { icon: "🧭", label: "Compare…" },
             ])}
             ${this.renderMenu("Help", "help", [
               { icon: "📖", label: "Docs" },
@@ -2730,28 +2963,68 @@ export class AppRoot extends LitElement {
                 </div>
               </div>
 
-              <div class="editorWrap">
-                <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${this.renderLineNumbers()}</div>
-                <div class="codeWrap">
-                  <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted()}</div>
-                  <textarea
-                    ${ref((el) => (this.editorRef = el))}
-                    .value=${this.content}
-                    placeholder="Seleziona un file a sinistra…"
-                    wrap="off"
-                    @scroll=${this.syncScroll}
-                    @input=${this.handleInput}
-                    @keyup=${this.handleCursorMove}
-                    @keydown=${this.handleEditorKeyDown}
-                    @click=${this.handleCursorMove}
-                    @mouseup=${this.handleCursorMove}
-                    @select=${this.handleCursorMove}
-                    @contextmenu=${this.handleContextMenu}
-                    @focus=${() => this.startCursorTracking()}
-                    @blur=${() => this.stopCursorTracking()}
-                  ></textarea>
-                </div>
-              </div>
+              ${this.splitViewEnabled
+                ? html`<div class="splitWrap">
+                    <div class="splitPane">
+                      <div class="editorWrap">
+                        <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${this.renderLineNumbers()}</div>
+                        <div class="codeWrap">
+                          <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted(this.content, diffMaps.left)}</div>
+                          <textarea
+                            ${ref((el) => (this.editorRef = el))}
+                            .value=${this.content}
+                            placeholder="Seleziona un file a sinistra…"
+                            wrap="off"
+                            @scroll=${this.syncScroll}
+                            @input=${this.handleInput}
+                            @keyup=${this.handleCursorMove}
+                            @keydown=${this.handleEditorKeyDown}
+                            @click=${this.handleCursorMove}
+                            @mouseup=${this.handleCursorMove}
+                            @select=${this.handleCursorMove}
+                            @contextmenu=${this.handleContextMenu}
+                            @focus=${() => this.startCursorTracking()}
+                            @blur=${() => this.stopCursorTracking()}
+                          ></textarea>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="splitPane">
+                      <div class="editorWrap">
+                        <div class="gutter" ${ref((el) => (this.baseGutterRef = el))}>${this.renderLineNumbersFor(this.savedBaseText)}</div>
+                        <div class="codeWrap">
+                          <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${this.renderHighlighted(this.savedBaseText, diffMaps.right)}</div>
+                          <pre
+                            class="basePre"
+                            ${ref((el) => (this.basePreRef = el))}
+                            @scroll=${this.syncBaseScroll}
+                          >${this.savedBaseText}</pre>
+                        </div>
+                      </div>
+                    </div>
+                  </div>`
+                : html`<div class="editorWrap">
+                    <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${this.renderLineNumbers()}</div>
+                    <div class="codeWrap">
+                      <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted(this.content)}</div>
+                      <textarea
+                        ${ref((el) => (this.editorRef = el))}
+                        .value=${this.content}
+                        placeholder="Seleziona un file a sinistra…"
+                        wrap="off"
+                        @scroll=${this.syncScroll}
+                        @input=${this.handleInput}
+                        @keyup=${this.handleCursorMove}
+                        @keydown=${this.handleEditorKeyDown}
+                        @click=${this.handleCursorMove}
+                        @mouseup=${this.handleCursorMove}
+                        @select=${this.handleCursorMove}
+                        @contextmenu=${this.handleContextMenu}
+                        @focus=${() => this.startCursorTracking()}
+                        @blur=${() => this.stopCursorTracking()}
+                      ></textarea>
+                    </div>
+                  </div>`}
 
               <div style="font-size:12px; opacity:.75;">
                 Hint: Explorer e editor usano /api/tree e /api/file (PUT) sull'ingress corrente.
