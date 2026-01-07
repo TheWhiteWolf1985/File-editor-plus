@@ -339,6 +339,20 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-07"
     actor: "codex"
+    version: "0.1.73"
+    change: "Workflow release: rsync ora esclude .git per evitare 'not a git repository' durante la pubblicazione su main; bump versione."
+    reason: "Il publish step cancellava la cartella .git e i comandi git fallivano."
+    touched_files:
+      - ".github/workflows/release.yml"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Run workflow manuale non fallisce su 'not a git repository'"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
     version: "0.1.72"
     change: "Fix regex workflow release: la verifica versione ora usa pattern corretti (\\s) e non fallisce su config.yaml; bump versione."
     reason: "Il workflow non trovava la versione perché il pattern cercava '\\\\s' letterale."
