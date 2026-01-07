@@ -23,7 +23,13 @@ export class AppRoot extends LitElement {
       overflow: hidden;
       position: relative;
       color: var(--text-color);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      font-family: Roboto, "Noto Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      --font-size-xs: 0.6875rem;
+      --font-size-sm: 0.75rem;
+      --font-size-md: 0.8125rem;
+      --font-size-base: 0.875rem;
+      --font-size-lg: 1rem;
+      font-size: var(--font-size-base);
       background: var(--bg-color);
       box-sizing: border-box;
       --bg-color: #1e1e1e;
@@ -69,7 +75,7 @@ export class AppRoot extends LitElement {
       border-bottom: 1px solid var(--border-color);
       background: var(--panel-strong);
       user-select: none;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       position: relative;
       overflow: visible;
       z-index: 30;
@@ -115,7 +121,7 @@ export class AppRoot extends LitElement {
       gap: 10px;
       padding: 8px 12px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
     }
     .menuItemRow:hover {
       background: var(--hover-color);
@@ -170,7 +176,7 @@ export class AppRoot extends LitElement {
     }
     .sidebarContent {
       padding: 8px 6px 12px;
-      font-size: 13px;
+      font-size: var(--font-size-md);
       overflow-x: hidden;
       overflow-y: auto;
       flex: 1;
@@ -200,7 +206,7 @@ export class AppRoot extends LitElement {
       gap: 8px;
     }
     .searchSummary {
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       opacity: 0.8;
     }
     .searchResults {
@@ -223,7 +229,7 @@ export class AppRoot extends LitElement {
       gap: 8px;
       font-weight: 600;
       margin-bottom: 4px;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       word-break: break-all;
     }
     .searchMatches {
@@ -245,7 +251,7 @@ export class AppRoot extends LitElement {
       background: var(--hover-color);
     }
     .lineTag {
-      font-size: 11px;
+      font-size: var(--font-size-xs);
       opacity: 0.8;
       color: var(--muted-color);
     }
@@ -256,7 +262,7 @@ export class AppRoot extends LitElement {
       white-space: nowrap;
     }
     .searchStatus {
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       opacity: 0.8;
       padding: 6px;
     }
@@ -301,12 +307,12 @@ export class AppRoot extends LitElement {
       overflow-wrap: anywhere;
     }
     .entityId {
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       opacity: 0.8;
       overflow-wrap: anywhere;
     }
     .entityMeta {
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       margin-top: 4px;
       overflow-wrap: anywhere;
     }
@@ -320,7 +326,7 @@ export class AppRoot extends LitElement {
       border-radius: 8px;
       padding: 4px 6px;
       cursor: pointer;
-      font-size: 11px;
+      font-size: var(--font-size-xs);
       display: inline-flex;
       align-items: center;
       gap: 4px;
@@ -334,7 +340,7 @@ export class AppRoot extends LitElement {
       background: var(--error-bg);
       padding: 8px;
       border-radius: 8px;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       box-sizing: border-box;
     }
     .entityGroup {
@@ -358,7 +364,7 @@ export class AppRoot extends LitElement {
       cursor: pointer;
       text-align: left;
       box-sizing: border-box;
-      font-size: 13px;
+      font-size: var(--font-size-md);
     }
     .entityGroupHeader:hover {
       background: #2d2d2d;
@@ -374,7 +380,7 @@ export class AppRoot extends LitElement {
     }
     .entityEmpty {
       padding: 8px;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       opacity: 0.75;
     }
 
@@ -392,7 +398,7 @@ export class AppRoot extends LitElement {
       align-items: center;
       padding: 0 10px;
       border-bottom: 1px solid var(--border-color);
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       letter-spacing: 0.04em;
       color: var(--muted-color);
     }
@@ -408,7 +414,7 @@ export class AppRoot extends LitElement {
       background: transparent;
       color: var(--muted-color);
       cursor: pointer;
-      font-size: 14px;
+      font-size: var(--font-size-base);
       padding: 0 6px;
     }
     .sidebarClose:hover {
@@ -420,7 +426,7 @@ export class AppRoot extends LitElement {
 
     .tree {
       padding: 8px 6px 12px;
-      font-size: 13px;
+      font-size: var(--font-size-md);
     }
     .treeRow {
       display: flex;
@@ -479,7 +485,7 @@ export class AppRoot extends LitElement {
       background: var(--panel-strong);
       color: var(--muted-color);
       cursor: pointer;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
     }
     .tab.active {
       background: var(--bg-color);
@@ -495,7 +501,7 @@ export class AppRoot extends LitElement {
       padding: 0;
       margin: 0;
       opacity: 0.65;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       display: grid;
       place-items: center;
       line-height: 1;
@@ -517,7 +523,7 @@ export class AppRoot extends LitElement {
     }
 
     .crumbs {
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       opacity: 0.75;
       display: flex;
       align-items: center;
@@ -531,7 +537,7 @@ export class AppRoot extends LitElement {
       border-radius: 10px;
       padding: 8px 12px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
     }
     .btn:hover {
       background: var(--btn-hover, var(--hover-color));
@@ -575,7 +581,7 @@ export class AppRoot extends LitElement {
       border: 1px solid var(--border-color);
       border-right: none;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 13px;
+      font-size: var(--font-size-md);
       line-height: 1.4;
       text-align: right;
       white-space: pre;
@@ -601,7 +607,7 @@ export class AppRoot extends LitElement {
       left: 0;
       padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 13px;
+      font-size: var(--font-size-md);
       line-height: 1.4;
       white-space: pre;
       word-wrap: normal;
@@ -654,7 +660,7 @@ export class AppRoot extends LitElement {
       caret-color: #d4d4d4;
       padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 13px;
+      font-size: var(--font-size-md);
       line-height: 1.4;
       outline: none;
       box-sizing: border-box;
@@ -676,7 +682,7 @@ export class AppRoot extends LitElement {
       caret-color: transparent;
       padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 13px;
+      font-size: var(--font-size-md);
       line-height: 1.4;
       outline: none;
       box-sizing: border-box;
@@ -692,7 +698,7 @@ export class AppRoot extends LitElement {
       align-items: center;
       gap: 10px;
       padding: 0 10px;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       background: var(--status-bg);
       color: white;
       user-select: none;
@@ -711,7 +717,7 @@ export class AppRoot extends LitElement {
       border-radius: 8px;
       padding: 2px 8px;
       cursor: pointer;
-      font-size: 11px;
+      font-size: var(--font-size-xs);
     }
     .statusToggle:hover {
       background: rgba(255, 255, 255, 0.12);
@@ -793,7 +799,7 @@ export class AppRoot extends LitElement {
       overflow-wrap: anywhere;
     }
     .snippetDesc {
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       color: var(--muted-color);
       overflow-wrap: anywhere;
     }
@@ -814,7 +820,7 @@ export class AppRoot extends LitElement {
       gap: 8px;
       padding: 8px 12px;
       cursor: pointer;
-      font-size: 13px;
+      font-size: var(--font-size-md);
     }
     .contextMenuItem:hover {
       background: var(--hover-color);
@@ -835,7 +841,7 @@ export class AppRoot extends LitElement {
     .suggestItem {
       padding: 8px 12px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       display: flex;
       gap: 6px;
       align-items: center;
@@ -871,10 +877,10 @@ export class AppRoot extends LitElement {
     }
     .modal h3 {
       margin: 0;
-      font-size: 16px;
+      font-size: var(--font-size-lg);
     }
     .modal label {
-      font-size: 12px;
+      font-size: var(--font-size-sm);
       color: #c8c8c8;
       display: grid;
       gap: 6px;
@@ -885,7 +891,7 @@ export class AppRoot extends LitElement {
       color: var(--text-color);
       padding: 8px;
       border-radius: 8px;
-      font-size: 13px;
+      font-size: var(--font-size-md);
     }
     .modal .actions {
       display: flex;
@@ -910,7 +916,7 @@ export class AppRoot extends LitElement {
       border-radius: 10px;
       padding: 12px 16px;
       box-shadow: var(--toast-shadow);
-      font-size: 14px;
+      font-size: var(--font-size-base);
       transform: translateX(120%);
       animation: slide-in 180ms ease-out forwards, slide-out 180ms ease-in forwards;
       animation-delay: 0s, 4.8s;
@@ -1086,7 +1092,7 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly appVersion = "0.1.64";
+  private readonly appVersion = "0.1.67";
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private diffRequestId = 0;
@@ -2116,8 +2122,12 @@ export class AppRoot extends LitElement {
 
   private handleGlobalClick = (e: MouseEvent) => {
     if (this.openMenu) {
-      const target = e.target as HTMLElement | null;
-      const insideMenu = target?.closest?.(".menuItem");
+      const path = e.composedPath();
+      const insideMenu = path.some(
+        (node) =>
+          node instanceof HTMLElement &&
+          (node.classList.contains("menuItem") || node.classList.contains("menuPopup"))
+      );
       if (!insideMenu) this.openMenu = null;
     }
     if (this.contextMenuOpen) {
@@ -2671,7 +2681,7 @@ export class AppRoot extends LitElement {
           />
         </div>
         <div class="searchControls">
-          <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:var(--font-size-sm);">
             <input type="checkbox" .checked=${this.searchCaseSensitive} @change=${(e: Event) => (this.searchCaseSensitive = (e.target as HTMLInputElement).checked)} />
             Case sensitive
           </label>
@@ -2776,7 +2786,7 @@ export class AppRoot extends LitElement {
                     <button class="entityGroupHeader" type="button" @click=${() => this.toggleDomain(domain)}>
                       <span class="chevron">${isOpen ? "▾" : "▸"}</span>
                       <span class="entityGroupTitle">${domain}</span>
-                      <span style="margin-left:auto; opacity:0.75; font-size:12px;">${items.length}</span>
+                      <span style="margin-left:auto; opacity:0.75; font-size:var(--font-size-sm);">${items.length}</span>
                     </button>
                     ${isOpen
                       ? html`<div class="entityGroupBody">
@@ -2903,8 +2913,6 @@ export class AppRoot extends LitElement {
               { icon: "❓", label: "About" },
             ])}
           </div>
-          <div class="title">File Editor Plus</div>
-          <button class="btn" style="margin-left:12px;" @click=${() => this.showToast("Toast di test", "info")}>Toast test</button>
         </div>
 
         <div class="main">
