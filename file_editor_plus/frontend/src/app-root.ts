@@ -629,6 +629,9 @@ export class AppRoot extends LitElement {
       min-height: 1.4em;
       line-height: 1.4;
     }
+    .codeIndent {
+      white-space: pre;
+    }
     .codeLine.diff-insert {
       background: rgba(46, 160, 67, 0.2);
     }
@@ -1218,7 +1221,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = 1.125;
   private readonly fontBaseStep = 0.0625;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.79";
+  private readonly appVersion = "0.1.81";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -2699,8 +2702,16 @@ export class AppRoot extends LitElement {
       const lineNo = idx + 1;
       const diffClass = diffMap?.get(lineNo);
       const cls = diffClass ? `codeLine ${diffClass}` : "codeLine";
+      const indentMatch = line.match(/^[\t ]+/);
+      const indentRaw = indentMatch ? indentMatch[0] : "";
+      const rest = indentRaw ? line.slice(indentRaw.length) : line;
+      const indentRendered = indentRaw
+        ? indentRaw.replace(/\t/g, "  ").replace(/ /g, "\u00A0")
+        : "";
+      const indentNode = indentRendered ? html`<span class="codeIndent">${indentRendered}</span>` : nothing;
       return html`<div class=${cls} data-gutter-line=${lineNo}>
-        ${this.highlightLine(line).map((seg) => html`<span class=${seg.cls ?? ""}>${seg.text || " "}</span>`)}
+        ${indentNode}
+        ${this.highlightLine(rest).map((seg) => html`<span class=${seg.cls ?? ""}>${seg.text || " "}</span>`)}
       </div>`;
     });
   }
