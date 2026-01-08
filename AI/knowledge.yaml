@@ -339,6 +339,20 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-07"
     actor: "codex"
+    version: "0.1.83"
+    change: "Sidebar ridimensionabile con drag, limitata al 50% della pagina."
+    reason: "Richiesta resize sidebar con limite massimo."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Drag bordo destro sidebar: si ridimensiona"
+      - "La sidebar non supera il 50% della larghezza"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
     version: "0.1.82"
     change: "Suggest box: posizionamento sopra/sotto il cursore in base allo spazio disponibile, con altezza massima adattiva."
     reason: "Evitare che il modale suggerimenti esca dallo schermo vicino ai bordi."

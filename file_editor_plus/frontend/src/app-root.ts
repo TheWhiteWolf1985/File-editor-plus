@@ -33,6 +33,7 @@ export class AppRoot extends LitElement {
       --font-size-md: 0.8125rem;
       --font-size-base: 0.875rem;
       --font-size-lg: 1rem;
+      --sidebar-width: 280px;
       font-size: var(--font-size-base);
       background: var(--bg-color);
       box-sizing: border-box;
@@ -148,7 +149,7 @@ export class AppRoot extends LitElement {
     /* Main area */
     .main {
       display: grid;
-      grid-template-columns: 48px 280px 1fr; /* activity, sidebar, editor */
+      grid-template-columns: 48px var(--sidebar-width) 1fr; /* activity, sidebar, editor */
       height: 100%;
       overflow: hidden;
       position: relative;
@@ -396,6 +397,7 @@ export class AppRoot extends LitElement {
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      position: relative;
     }
     .sidebarHeader {
       height: 34px;
@@ -427,6 +429,20 @@ export class AppRoot extends LitElement {
     }
     .sidebarBackdrop {
       display: none;
+    }
+    .sidebarResizer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      background: transparent;
+      z-index: 5;
+    }
+    .sidebarResizer:hover,
+    .sidebarResizer.active {
+      background: rgba(255, 255, 255, 0.08);
     }
 
     .tree {
@@ -799,6 +815,9 @@ export class AppRoot extends LitElement {
       .sidebarClose {
         display: inline-flex;
       }
+      .sidebarResizer {
+        display: none;
+      }
     }
     .snippetTitle {
       font-weight: 700;
@@ -1128,6 +1147,7 @@ export class AppRoot extends LitElement {
     searchTruncated: { state: true },
     searchLoading: { state: true },
     sidebarOpen: { state: true },
+    sidebarResizing: { state: true },
     openSnapshotText: { state: true },
     savedBaseText: { state: true },
     splitViewEnabled: { state: true },
@@ -1188,6 +1208,7 @@ export class AppRoot extends LitElement {
   declare searchTruncated: boolean;
   declare searchLoading: boolean;
   declare sidebarOpen: boolean;
+  declare sidebarResizing: boolean;
   declare openSnapshotText: string;
   declare savedBaseText: string;
   declare splitViewEnabled: boolean;
@@ -1216,6 +1237,8 @@ export class AppRoot extends LitElement {
   private codeRef: HTMLDivElement | null = null;
   private gutterRef: HTMLDivElement | null = null;
   private editorRef: HTMLTextAreaElement | null = null;
+  private mainRef: HTMLDivElement | null = null;
+  private sidebarRef: HTMLDivElement | null = null;
   private baseCodeRef: HTMLDivElement | null = null;
   private baseGutterRef: HTMLDivElement | null = null;
   private basePreRef: HTMLPreElement | null = null;
@@ -1229,7 +1252,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = 1.125;
   private readonly fontBaseStep = 0.0625;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.82";
+  private readonly appVersion = "0.1.83";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -1298,6 +1321,7 @@ export class AppRoot extends LitElement {
     this.searchTruncated = false;
     this.searchLoading = false;
     this.sidebarOpen = false;
+    this.sidebarResizing = false;
     this.openSnapshotText = "";
     this.savedBaseText = "";
     this.splitViewEnabled = false;
@@ -1330,6 +1354,7 @@ export class AppRoot extends LitElement {
   disconnectedCallback(): void {
     document.removeEventListener("selectionchange", this.selectionListener);
     document.removeEventListener("click", this.handleGlobalClick, true);
+    this.stopSidebarResize();
     if (this.themeMedia) {
       this.themeMedia.removeEventListener("change", this.handleThemeChange);
       this.themeMedia = null;
@@ -1981,6 +2006,37 @@ export class AppRoot extends LitElement {
     const top = placement === "above" ? anchorTop : anchorTop + lineHeight;
     return { top, left, placement, maxHeight };
   }
+
+  private startSidebarResize(e: MouseEvent) {
+    e.preventDefault();
+    this.sidebarResizing = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", this.handleSidebarResize);
+    window.addEventListener("mouseup", this.stopSidebarResize);
+  }
+
+  private handleSidebarResize = (e: MouseEvent) => {
+    if (!this.sidebarResizing) return;
+    const hostRect = this.getBoundingClientRect();
+    const mainRect = this.mainRef?.getBoundingClientRect() ?? hostRect;
+    const sidebarRect = this.sidebarRef?.getBoundingClientRect();
+    const sidebarLeft = sidebarRect ? sidebarRect.left : mainRect.left + 48;
+    const minWidth = 200;
+    const maxWidth = Math.max(minWidth, Math.floor(mainRect.width * 0.5));
+    const nextWidth = Math.round(e.clientX - sidebarLeft);
+    const clamped = Math.max(minWidth, Math.min(nextWidth, maxWidth));
+    this.style.setProperty("--sidebar-width", `${clamped}px`);
+  };
+
+  private stopSidebarResize = () => {
+    if (!this.sidebarResizing) return;
+    this.sidebarResizing = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    window.removeEventListener("mousemove", this.handleSidebarResize);
+    window.removeEventListener("mouseup", this.stopSidebarResize);
+  };
 
   private async fetchMdiSuggestions(query: string): Promise<MdiIcon[]> {
     const key = query.toLowerCase();
@@ -3311,7 +3367,7 @@ export class AppRoot extends LitElement {
           </div>
         </div>
 
-        <div class="main">
+        <div class="main" ${ref((el) => (this.mainRef = el))}>
           <div class="activity">
             <div class="act ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>📁</div>
             <div class="act ${this.activeActivity === "search" ? "active" : ""}" title="Search" @click=${() => this.setActivity("search")}>🔎</div>
@@ -3321,7 +3377,7 @@ export class AppRoot extends LitElement {
 
           <div class="sidebarBackdrop ${this.sidebarOpen ? "open" : ""}" @click=${() => (this.sidebarOpen = false)}></div>
 
-          <div class="sidebar ${this.sidebarOpen ? "open" : ""}">
+          <div class="sidebar ${this.sidebarOpen ? "open" : ""}" ${ref((el) => (this.sidebarRef = el))}>
             <div class="sidebarHeader">
               <div class="explorerTitle">
                 ${this.activeActivity === "explorer"
@@ -3335,6 +3391,7 @@ export class AppRoot extends LitElement {
               <button class="sidebarClose" title="Close" @click=${() => (this.sidebarOpen = false)}>✕</button>
             </div>
             ${this.renderSidebarContent()}
+            <div class="sidebarResizer ${this.sidebarResizing ? "active" : ""}" @mousedown=${this.startSidebarResize}></div>
           </div>
 
           <div class="editor">
