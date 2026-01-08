@@ -11,6 +11,10 @@ type SearchResult = { path: string; mtime: number; size: number; matches: Search
 type SearchSummary = { files_scanned: number; files_with_matches: number; matches_total: number };
 type DiffHunk = { type: "insert" | "delete" | "replace" | "equal"; base_start: number; base_len: number; mod_start: number; mod_len: number };
 type DiffSummary = { added: number; removed: number; changed: number };
+type MdiIcon = { name: string; codepoint: string };
+type SuggestItem =
+  | { type: "entity"; value: string }
+  | { type: "mdi"; value: string; codepoint: string };
 
 @customElement("app-root")
 export class AppRoot extends LitElement {
@@ -846,6 +850,28 @@ export class AppRoot extends LitElement {
       display: flex;
       gap: 6px;
       align-items: center;
+      justify-content: space-between;
+    }
+    .suggestItemLabel {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .suggestItemIcon {
+      font-family: "Material Design Icons";
+      font-style: normal;
+      font-weight: normal;
+      font-size: 2.2em;
+      opacity: 0.9;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 2.4em;
     }
     .suggestItem:hover,
     .suggestItem.active {
@@ -898,6 +924,47 @@ export class AppRoot extends LitElement {
       display: flex;
       justify-content: flex-end;
       gap: 10px;
+    }
+    .aboutModal {
+      width: 420px;
+      height: 360px;
+      box-sizing: border-box;
+    }
+    .aboutHeader {
+      display: grid;
+      gap: 8px;
+      justify-items: center;
+      text-align: center;
+    }
+    .aboutLogo {
+      width: 72px;
+      height: 72px;
+      border-radius: 12px;
+      background: var(--panel-color);
+      border: 1px solid var(--border-color);
+      object-fit: cover;
+    }
+    .aboutBody {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+    .aboutRow {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 10px;
+      align-items: center;
+      font-size: var(--font-size-sm);
+    }
+    .aboutLabel {
+      opacity: 0.75;
+    }
+    .aboutValue a {
+      color: var(--accent-color);
+      text-decoration: none;
+    }
+    .aboutValue a:hover {
+      text-decoration: underline;
     }
     .settingsTabs {
       display: flex;
@@ -1021,11 +1088,13 @@ export class AppRoot extends LitElement {
     themeMode: { state: true },
     suggestOpen: { state: true },
     suggestItems: { state: true },
+    suggestContext: { state: true },
     suggestIndex: { state: true },
     suggestTop: { state: true },
     suggestLeft: { state: true },
     snippetEditingId: { state: true },
     showSnippetModal: { state: true },
+    showAboutModal: { state: true },
     showSettingsModal: { state: true },
     settingsTab: { state: true },
     settingsFontBaseRem: { state: true },
@@ -1081,12 +1150,14 @@ export class AppRoot extends LitElement {
   declare contextMenuY: number;
   declare themeMode: "auto" | "dark" | "light";
   declare suggestOpen: boolean;
-  declare suggestItems: string[];
+  declare suggestItems: SuggestItem[];
+  declare suggestContext: "entity" | "mdi" | null;
   declare suggestIndex: number;
   declare suggestTop: number;
   declare suggestLeft: number;
   declare snippetEditingId: string | null;
   declare showSnippetModal: boolean;
+  declare showAboutModal: boolean;
   declare showSettingsModal: boolean;
   declare settingsTab: "appearance" | "localization";
   declare settingsFontBaseRem: number;
@@ -1147,11 +1218,14 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = 1.125;
   private readonly fontBaseStep = 0.0625;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.74";
+  private readonly appVersion = "0.1.79";
+  private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
   private diffRequestId = 0;
   private diffDebounce: number | null = null;
+  private mdiSuggestCache = new Map<string, MdiIcon[]>();
+  private mdiSuggestRequestId = 0;
   private pendingJump: { path: string; line: number; col: number } | null = null;
   private selectionListener = () => {
     if (!this.editorRef) return;
@@ -1185,11 +1259,13 @@ export class AppRoot extends LitElement {
     this.themeMode = "auto";
     this.suggestOpen = false;
     this.suggestItems = [];
+    this.suggestContext = null;
     this.suggestIndex = 0;
     this.suggestTop = 0;
     this.suggestLeft = 0;
     this.snippetEditingId = null;
     this.showSnippetModal = false;
+    this.showAboutModal = false;
     this.showSettingsModal = false;
     this.settingsTab = "appearance";
     this.settingsFontBaseRem = this.fontBaseRem;
@@ -1535,7 +1611,7 @@ export class AppRoot extends LitElement {
     const ta = e.target as HTMLTextAreaElement;
     this.markDirty(ta.value);
     this.updateSuggestions();
-    if (this.suggestBlocked && !ta.value.endsWith(".")) {
+    if (this.suggestBlocked && !/[.:]$/.test(ta.value)) {
       this.suggestBlocked = false;
     }
     requestAnimationFrame(() => this.updateCursorFromTextarea());
@@ -1781,12 +1857,13 @@ export class AppRoot extends LitElement {
       this.suggestItems = [];
       this.suggestIndex = 0;
     }
+    this.suggestContext = null;
     if (block) {
       this.suggestBlocked = true;
     }
   }
 
-  private updateSuggestions() {
+  private async updateSuggestions() {
     if (this.suggestBlocked) return;
     if (!this.editorRef) {
       this.closeSuggestions();
@@ -1794,6 +1871,21 @@ export class AppRoot extends LitElement {
     }
     const pos = this.editorRef.selectionStart ?? 0;
     const before = this.content.slice(0, pos);
+    const mdiMatch = before.match(/mdi[:.]([a-zA-Z0-9_\\-]*)$/i);
+    if (mdiMatch) {
+      const query = mdiMatch[1] || "";
+      const icons = await this.fetchMdiSuggestions(query);
+      if (!icons.length) {
+        this.closeSuggestions();
+        return;
+      }
+      const items = icons.map((icon) => ({ type: "mdi", value: icon.name, codepoint: icon.codepoint }));
+      const coords = this.getSuggestCoords(before);
+      if (!coords) return;
+      this.openSuggestions(items, "mdi", coords.top, coords.left);
+      return;
+    }
+
     const match = before.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_\\-]*)$/);
     if (!match) {
       this.closeSuggestions();
@@ -1810,10 +1902,37 @@ export class AppRoot extends LitElement {
       this.closeSuggestions();
       return;
     }
+    const suggestItems = items.map((id) => ({ type: "entity", value: id }));
+    const coords = this.getSuggestCoords(before);
+    if (!coords) return;
+    this.openSuggestions(suggestItems, "entity", coords.top, coords.left);
+  }
+
+  private isSameSuggestItem(a: SuggestItem, b: SuggestItem) {
+    if (a.type !== b.type || a.value !== b.value) return false;
+    if (a.type === "mdi" && b.type === "mdi") {
+      return a.codepoint === b.codepoint;
+    }
+    return true;
+  }
+
+  private openSuggestions(items: SuggestItem[], context: "entity" | "mdi", top: number, left: number) {
     const sameItems =
       this.suggestOpen &&
+      this.suggestContext === context &&
       this.suggestItems.length === items.length &&
-      this.suggestItems.every((v, i) => v === items[i]);
+      this.suggestItems.every((v, i) => this.isSameSuggestItem(v, items[i]));
+    this.suggestOpen = true;
+    this.suggestContext = context;
+    this.suggestItems = items;
+    this.suggestIndex = sameItems ? Math.min(this.suggestIndex, items.length - 1) : 0;
+    this.suggestTop = top;
+    this.suggestLeft = left;
+    requestAnimationFrame(() => this.scrollSuggestIntoView());
+  }
+
+  private getSuggestCoords(before: string) {
+    if (!this.editorRef) return null;
     const lines = before.split("\n");
     const line = lines.length;
     const col = lines[lines.length - 1].length;
@@ -1824,12 +1943,59 @@ export class AppRoot extends LitElement {
     const charWidth = 8;
     const left = taRect.left - hostRect.left + padding + col * charWidth;
     const top = taRect.top - hostRect.top + padding + (line - 1) * lineHeight - (this.editorRef.scrollTop || 0) - 2;
-    this.suggestOpen = true;
-    this.suggestItems = items;
-    this.suggestIndex = sameItems ? Math.min(this.suggestIndex, items.length - 1) : 0;
-    this.suggestTop = top;
-    this.suggestLeft = left;
-    requestAnimationFrame(() => this.scrollSuggestIntoView());
+    return { top, left };
+  }
+
+  private async fetchMdiSuggestions(query: string): Promise<MdiIcon[]> {
+    const key = query.toLowerCase();
+    const cached = this.mdiSuggestCache.get(key);
+    if (cached) return cached;
+    const requestId = ++this.mdiSuggestRequestId;
+    try {
+      const res = await fetch(`${this.apiBase}api/mdi/search?query=${encodeURIComponent(key)}&limit=50`);
+      let payload: any = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+      if (requestId !== this.mdiSuggestRequestId) return [];
+      if (!res.ok || payload?.ok !== true) {
+        return [];
+      }
+      const items = Array.isArray(payload?.items) ? payload.items : [];
+      const icons = items
+        .map((it: any) => {
+          if (!it) return null;
+          if (typeof it === "string") {
+            return { name: it, codepoint: "" };
+          }
+          const name = typeof it.name === "string" ? it.name : null;
+          let codepoint = typeof it.codepoint === "string" ? it.codepoint : null;
+          if (typeof it.codepoint === "number") {
+            codepoint = it.codepoint.toString(16).toUpperCase();
+          }
+          if (!name) return null;
+          return { name, codepoint: codepoint ?? "" };
+        })
+        .filter((it: MdiIcon | null): it is MdiIcon => Boolean(it && it.name));
+      this.mdiSuggestCache.set(key, icons);
+      return icons;
+    } catch {
+      if (requestId === this.mdiSuggestRequestId) {
+        this.mdiSuggestCache.set(key, []);
+      }
+      return [];
+    }
+  }
+
+  private renderMdiGlyph(codepoint?: string) {
+    if (!codepoint) return "";
+    const normalized = codepoint.trim().replace(/^0x/i, "");
+    if (!normalized) return "";
+    const value = Number.parseInt(normalized, 16);
+    if (Number.isNaN(value)) return "";
+    return String.fromCodePoint(value);
   }
 
   private applySuggestion() {
@@ -1837,6 +2003,31 @@ export class AppRoot extends LitElement {
     const ta = this.editorRef;
     const pos = ta.selectionStart ?? 0;
     const before = this.content.slice(0, pos);
+    const current = this.suggestItems[this.suggestIndex];
+    if (!current) return;
+    if (current.type === "mdi") {
+      const match = before.match(/mdi[:.]([a-zA-Z0-9_\\-]*)$/i);
+      if (!match) {
+        this.closeSuggestions();
+        return;
+      }
+      const prefixLen = match[0].length;
+      const start = pos - prefixLen;
+      const end = ta.selectionEnd ?? pos;
+      const insert = `mdi:${current.value}`;
+      const next = `${this.content.slice(0, start)}${insert}${this.content.slice(end)}`;
+      this.markDirty(next);
+      const newPos = start + insert.length;
+      requestAnimationFrame(() => {
+        if (!this.editorRef) return;
+        this.editorRef.selectionStart = newPos;
+        this.editorRef.selectionEnd = newPos;
+        this.editorRef.focus();
+        this.updateCursorFromPos(newPos, this.content);
+      });
+      this.closeSuggestions();
+      return;
+    }
     const match = before.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_\\-]*)$/);
     if (!match) {
       this.closeSuggestions();
@@ -1845,7 +2036,7 @@ export class AppRoot extends LitElement {
     const prefixLen = match[0].length;
     const start = pos - prefixLen;
     const end = ta.selectionEnd ?? pos;
-    const insert = this.suggestItems[this.suggestIndex];
+    const insert = current.value;
     const next = `${this.content.slice(0, start)}${insert}${this.content.slice(end)}`;
     this.markDirty(next);
     const newPos = start + insert.length;
@@ -2309,6 +2500,12 @@ export class AppRoot extends LitElement {
           this.scheduleDiff();
         }
       }
+    } else if (menu === "help") {
+      if (action === "About") {
+        this.openAboutModal();
+      } else if (action === "Docs") {
+        this.showToast("Docs non disponibili", "info");
+      }
     }
   }
 
@@ -2720,6 +2917,14 @@ export class AppRoot extends LitElement {
     const next = this.clampFontBase(raw);
     this.settingsFontBaseRem = next;
     this.applyFontScale(next);
+  }
+
+  private openAboutModal() {
+    this.showAboutModal = true;
+  }
+
+  private closeAboutModal() {
+    this.showAboutModal = false;
   }
 
   private insertEntityId(entityId: string) {
@@ -3217,7 +3422,13 @@ export class AppRoot extends LitElement {
                     this.applySuggestion();
                   }}
                 >
-                  🧭 <span>${s}</span>
+                  <span class="suggestItemLabel">
+                    ${s.type === "entity" ? "🧭" : ""}
+                    <span>${s.type === "mdi" ? `mdi:${s.value}` : s.value}</span>
+                  </span>
+                  ${s.type === "mdi"
+                    ? html`<span class="suggestItemIcon">${this.renderMdiGlyph(s.codepoint)}</span>`
+                    : nothing}
                 </div>`
               )}
             </div>`
@@ -3257,6 +3468,48 @@ export class AppRoot extends LitElement {
                   <div class="actions">
                     <button class="btn" @click=${() => this.cancelNewItem()}>Cancel</button>
                     <button class="btn primary" @click=${() => this.createNewItem()}>Create</button>
+                  </div>
+                </div>
+              </div>
+            `
+          : nothing}
+
+        ${this.showAboutModal
+          ? html`
+              <div class="modalBackdrop" @click=${() => this.closeAboutModal()}>
+                <div class="modal aboutModal" @click=${(e: Event) => e.stopPropagation()}>
+                  <div class="aboutHeader">
+                    <img class="aboutLogo" src=${this.iconUrl} alt="File Editor Plus" />
+                    <h3>About</h3>
+                  </div>
+                  <div class="aboutBody">
+                    <div class="aboutRow">
+                      <div class="aboutLabel">Developer</div>
+                      <div class="aboutValue">Juri Zanella</div>
+                    </div>
+                    <div class="aboutRow">
+                      <div class="aboutLabel">GitHub</div>
+                      <div class="aboutValue">TheWhiteWolf1985</div>
+                    </div>
+                    <div class="aboutRow">
+                      <div class="aboutLabel">Repository</div>
+                      <div class="aboutValue">
+                        <a href="https://github.com/TheWhiteWolf1985/File-editor-plus" target="_blank" rel="noopener">
+                          https://github.com/TheWhiteWolf1985/File-editor-plus
+                        </a>
+                      </div>
+                    </div>
+                    <div class="aboutRow">
+                      <div class="aboutLabel">Version</div>
+                      <div class="aboutValue">${this.appVersion}</div>
+                    </div>
+                    <div class="aboutRow">
+                      <div class="aboutLabel">License</div>
+                      <div class="aboutValue">MIT</div>
+                    </div>
+                  </div>
+                  <div class="actions">
+                    <button class="btn" @click=${() => this.closeAboutModal()}>Close</button>
                   </div>
                 </div>
               </div>
