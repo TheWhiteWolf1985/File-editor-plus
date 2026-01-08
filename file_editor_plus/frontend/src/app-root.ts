@@ -840,11 +840,17 @@ export class AppRoot extends LitElement {
       border-radius: 8px;
       box-shadow: var(--menu-shadow);
       min-width: 220px;
-      max-height: 220px;
+      max-height: var(--suggest-max-height, 220px);
       overflow: auto;
       z-index: 350;
       color: var(--text-color);
+      transform: translateY(0);
+    }
+    .suggestBox.above {
       transform: translateY(-4px) translateY(-100%);
+    }
+    .suggestBox.below {
+      transform: translateY(4px);
     }
     .suggestItem {
       padding: 8px 12px;
@@ -1158,6 +1164,8 @@ export class AppRoot extends LitElement {
   declare suggestIndex: number;
   declare suggestTop: number;
   declare suggestLeft: number;
+  declare suggestPlacement: "above" | "below";
+  declare suggestMaxHeight: number;
   declare snippetEditingId: string | null;
   declare showSnippetModal: boolean;
   declare showAboutModal: boolean;
@@ -1221,7 +1229,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = 1.125;
   private readonly fontBaseStep = 0.0625;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.81";
+  private readonly appVersion = "0.1.82";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -1266,6 +1274,8 @@ export class AppRoot extends LitElement {
     this.suggestIndex = 0;
     this.suggestTop = 0;
     this.suggestLeft = 0;
+    this.suggestPlacement = "above";
+    this.suggestMaxHeight = 220;
     this.snippetEditingId = null;
     this.showSnippetModal = false;
     this.showAboutModal = false;
@@ -1861,6 +1871,8 @@ export class AppRoot extends LitElement {
       this.suggestIndex = 0;
     }
     this.suggestContext = null;
+    this.suggestPlacement = "above";
+    this.suggestMaxHeight = 220;
     if (block) {
       this.suggestBlocked = true;
     }
@@ -1885,7 +1897,7 @@ export class AppRoot extends LitElement {
       const items = icons.map((icon) => ({ type: "mdi", value: icon.name, codepoint: icon.codepoint }));
       const coords = this.getSuggestCoords(before);
       if (!coords) return;
-      this.openSuggestions(items, "mdi", coords.top, coords.left);
+      this.openSuggestions(items, "mdi", coords.top, coords.left, coords.placement, coords.maxHeight);
       return;
     }
 
@@ -1908,7 +1920,7 @@ export class AppRoot extends LitElement {
     const suggestItems = items.map((id) => ({ type: "entity", value: id }));
     const coords = this.getSuggestCoords(before);
     if (!coords) return;
-    this.openSuggestions(suggestItems, "entity", coords.top, coords.left);
+    this.openSuggestions(suggestItems, "entity", coords.top, coords.left, coords.placement, coords.maxHeight);
   }
 
   private isSameSuggestItem(a: SuggestItem, b: SuggestItem) {
@@ -1919,7 +1931,14 @@ export class AppRoot extends LitElement {
     return true;
   }
 
-  private openSuggestions(items: SuggestItem[], context: "entity" | "mdi", top: number, left: number) {
+  private openSuggestions(
+    items: SuggestItem[],
+    context: "entity" | "mdi",
+    top: number,
+    left: number,
+    placement: "above" | "below",
+    maxHeight: number
+  ) {
     const sameItems =
       this.suggestOpen &&
       this.suggestContext === context &&
@@ -1931,6 +1950,8 @@ export class AppRoot extends LitElement {
     this.suggestIndex = sameItems ? Math.min(this.suggestIndex, items.length - 1) : 0;
     this.suggestTop = top;
     this.suggestLeft = left;
+    this.suggestPlacement = placement;
+    this.suggestMaxHeight = maxHeight;
     requestAnimationFrame(() => this.scrollSuggestIntoView());
   }
 
@@ -1944,9 +1965,21 @@ export class AppRoot extends LitElement {
     const hostRect = this.getBoundingClientRect();
     const padding = 12;
     const charWidth = 8;
-    const left = taRect.left - hostRect.left + padding + col * charWidth;
-    const top = taRect.top - hostRect.top + padding + (line - 1) * lineHeight - (this.editorRef.scrollTop || 0) - 2;
-    return { top, left };
+    const anchorLeft = taRect.left - hostRect.left + padding + col * charWidth;
+    const anchorTop =
+      taRect.top - hostRect.top + padding + (line - 1) * lineHeight - (this.editorRef.scrollTop || 0) - 2;
+    const margin = 8;
+    const maxBoxHeight = 220;
+    const spaceAbove = Math.max(0, anchorTop - margin);
+    const spaceBelow = Math.max(0, hostRect.height - (anchorTop + lineHeight + margin));
+    const placement = spaceBelow >= spaceAbove ? "below" : "above";
+    const maxHeight = Math.min(maxBoxHeight, placement === "above" ? spaceAbove : spaceBelow);
+    const minLeft = margin;
+    const defaultWidth = 240;
+    const maxLeft = Math.max(minLeft, hostRect.width - defaultWidth);
+    const left = Math.min(Math.max(anchorLeft, minLeft), maxLeft);
+    const top = placement === "above" ? anchorTop : anchorTop + lineHeight;
+    return { top, left, placement, maxHeight };
   }
 
   private async fetchMdiSuggestions(query: string): Promise<MdiIcon[]> {
@@ -3421,8 +3454,8 @@ export class AppRoot extends LitElement {
 
         ${this.suggestOpen
           ? html`<div
-              class="suggestBox"
-              style="top:${this.suggestTop}px; left:${this.suggestLeft}px;"
+              class="suggestBox ${this.suggestPlacement}"
+              style="top:${this.suggestTop}px; left:${this.suggestLeft}px; --suggest-max-height:${this.suggestMaxHeight}px;"
             >
               ${this.suggestItems.map(
                 (s, idx) => html`<div

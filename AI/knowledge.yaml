@@ -339,6 +339,20 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-07"
     actor: "codex"
+    version: "0.1.82"
+    change: "Suggest box: posizionamento sopra/sotto il cursore in base allo spazio disponibile, con altezza massima adattiva."
+    reason: "Evitare che il modale suggerimenti esca dallo schermo vicino ai bordi."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Suggerimenti in alto (prime righe) compaiono sotto il cursore"
+      - "Suggerimenti in basso compaiono sopra il cursore"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
     version: "0.1.81"
     change: "Highlight overlay: preservati gli spazi iniziali con span .codeIndent (NBSP), lasciando .codeLine in white-space: normal."
     reason: "Mostrare indentazioni digitando Tab/Space senza alterare l'allineamento con il gutter."
