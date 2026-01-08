@@ -33,6 +33,7 @@ export class AppRoot extends LitElement {
       --font-size-md: 0.8125rem;
       --font-size-base: 0.875rem;
       --font-size-lg: 1rem;
+      --sidebar-width: 280px;
       font-size: var(--font-size-base);
       background: var(--bg-color);
       box-sizing: border-box;
@@ -148,7 +149,7 @@ export class AppRoot extends LitElement {
     /* Main area */
     .main {
       display: grid;
-      grid-template-columns: 48px 280px 1fr; /* activity, sidebar, editor */
+      grid-template-columns: 48px var(--sidebar-width) 1fr; /* activity, sidebar, editor */
       height: 100%;
       overflow: hidden;
       position: relative;
@@ -396,6 +397,7 @@ export class AppRoot extends LitElement {
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      position: relative;
     }
     .sidebarHeader {
       height: 34px;
@@ -427,6 +429,20 @@ export class AppRoot extends LitElement {
     }
     .sidebarBackdrop {
       display: none;
+    }
+    .sidebarResizer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 6px;
+      height: 100%;
+      cursor: col-resize;
+      background: transparent;
+      z-index: 5;
+    }
+    .sidebarResizer:hover,
+    .sidebarResizer.active {
+      background: rgba(255, 255, 255, 0.08);
     }
 
     .tree {
@@ -629,6 +645,9 @@ export class AppRoot extends LitElement {
       min-height: 1.4em;
       line-height: 1.4;
     }
+    .codeIndent {
+      white-space: pre;
+    }
     .codeLine.diff-insert {
       background: rgba(46, 160, 67, 0.2);
     }
@@ -796,6 +815,9 @@ export class AppRoot extends LitElement {
       .sidebarClose {
         display: inline-flex;
       }
+      .sidebarResizer {
+        display: none;
+      }
     }
     .snippetTitle {
       font-weight: 700;
@@ -837,11 +859,17 @@ export class AppRoot extends LitElement {
       border-radius: 8px;
       box-shadow: var(--menu-shadow);
       min-width: 220px;
-      max-height: 220px;
+      max-height: var(--suggest-max-height, 220px);
       overflow: auto;
       z-index: 350;
       color: var(--text-color);
+      transform: translateY(0);
+    }
+    .suggestBox.above {
       transform: translateY(-4px) translateY(-100%);
+    }
+    .suggestBox.below {
+      transform: translateY(4px);
     }
     .suggestItem {
       padding: 8px 12px;
@@ -1119,6 +1147,7 @@ export class AppRoot extends LitElement {
     searchTruncated: { state: true },
     searchLoading: { state: true },
     sidebarOpen: { state: true },
+    sidebarResizing: { state: true },
     openSnapshotText: { state: true },
     savedBaseText: { state: true },
     splitViewEnabled: { state: true },
@@ -1155,6 +1184,8 @@ export class AppRoot extends LitElement {
   declare suggestIndex: number;
   declare suggestTop: number;
   declare suggestLeft: number;
+  declare suggestPlacement: "above" | "below";
+  declare suggestMaxHeight: number;
   declare snippetEditingId: string | null;
   declare showSnippetModal: boolean;
   declare showAboutModal: boolean;
@@ -1177,6 +1208,7 @@ export class AppRoot extends LitElement {
   declare searchTruncated: boolean;
   declare searchLoading: boolean;
   declare sidebarOpen: boolean;
+  declare sidebarResizing: boolean;
   declare openSnapshotText: string;
   declare savedBaseText: string;
   declare splitViewEnabled: boolean;
@@ -1205,6 +1237,8 @@ export class AppRoot extends LitElement {
   private codeRef: HTMLDivElement | null = null;
   private gutterRef: HTMLDivElement | null = null;
   private editorRef: HTMLTextAreaElement | null = null;
+  private mainRef: HTMLDivElement | null = null;
+  private sidebarRef: HTMLDivElement | null = null;
   private baseCodeRef: HTMLDivElement | null = null;
   private baseGutterRef: HTMLDivElement | null = null;
   private basePreRef: HTMLPreElement | null = null;
@@ -1218,7 +1252,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = 1.125;
   private readonly fontBaseStep = 0.0625;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.79";
+  private readonly appVersion = "0.1.83";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -1263,6 +1297,8 @@ export class AppRoot extends LitElement {
     this.suggestIndex = 0;
     this.suggestTop = 0;
     this.suggestLeft = 0;
+    this.suggestPlacement = "above";
+    this.suggestMaxHeight = 220;
     this.snippetEditingId = null;
     this.showSnippetModal = false;
     this.showAboutModal = false;
@@ -1285,6 +1321,7 @@ export class AppRoot extends LitElement {
     this.searchTruncated = false;
     this.searchLoading = false;
     this.sidebarOpen = false;
+    this.sidebarResizing = false;
     this.openSnapshotText = "";
     this.savedBaseText = "";
     this.splitViewEnabled = false;
@@ -1317,6 +1354,7 @@ export class AppRoot extends LitElement {
   disconnectedCallback(): void {
     document.removeEventListener("selectionchange", this.selectionListener);
     document.removeEventListener("click", this.handleGlobalClick, true);
+    this.stopSidebarResize();
     if (this.themeMedia) {
       this.themeMedia.removeEventListener("change", this.handleThemeChange);
       this.themeMedia = null;
@@ -1858,6 +1896,8 @@ export class AppRoot extends LitElement {
       this.suggestIndex = 0;
     }
     this.suggestContext = null;
+    this.suggestPlacement = "above";
+    this.suggestMaxHeight = 220;
     if (block) {
       this.suggestBlocked = true;
     }
@@ -1882,7 +1922,7 @@ export class AppRoot extends LitElement {
       const items = icons.map((icon) => ({ type: "mdi", value: icon.name, codepoint: icon.codepoint }));
       const coords = this.getSuggestCoords(before);
       if (!coords) return;
-      this.openSuggestions(items, "mdi", coords.top, coords.left);
+      this.openSuggestions(items, "mdi", coords.top, coords.left, coords.placement, coords.maxHeight);
       return;
     }
 
@@ -1905,7 +1945,7 @@ export class AppRoot extends LitElement {
     const suggestItems = items.map((id) => ({ type: "entity", value: id }));
     const coords = this.getSuggestCoords(before);
     if (!coords) return;
-    this.openSuggestions(suggestItems, "entity", coords.top, coords.left);
+    this.openSuggestions(suggestItems, "entity", coords.top, coords.left, coords.placement, coords.maxHeight);
   }
 
   private isSameSuggestItem(a: SuggestItem, b: SuggestItem) {
@@ -1916,7 +1956,14 @@ export class AppRoot extends LitElement {
     return true;
   }
 
-  private openSuggestions(items: SuggestItem[], context: "entity" | "mdi", top: number, left: number) {
+  private openSuggestions(
+    items: SuggestItem[],
+    context: "entity" | "mdi",
+    top: number,
+    left: number,
+    placement: "above" | "below",
+    maxHeight: number
+  ) {
     const sameItems =
       this.suggestOpen &&
       this.suggestContext === context &&
@@ -1928,6 +1975,8 @@ export class AppRoot extends LitElement {
     this.suggestIndex = sameItems ? Math.min(this.suggestIndex, items.length - 1) : 0;
     this.suggestTop = top;
     this.suggestLeft = left;
+    this.suggestPlacement = placement;
+    this.suggestMaxHeight = maxHeight;
     requestAnimationFrame(() => this.scrollSuggestIntoView());
   }
 
@@ -1941,10 +1990,53 @@ export class AppRoot extends LitElement {
     const hostRect = this.getBoundingClientRect();
     const padding = 12;
     const charWidth = 8;
-    const left = taRect.left - hostRect.left + padding + col * charWidth;
-    const top = taRect.top - hostRect.top + padding + (line - 1) * lineHeight - (this.editorRef.scrollTop || 0) - 2;
-    return { top, left };
+    const anchorLeft = taRect.left - hostRect.left + padding + col * charWidth;
+    const anchorTop =
+      taRect.top - hostRect.top + padding + (line - 1) * lineHeight - (this.editorRef.scrollTop || 0) - 2;
+    const margin = 8;
+    const maxBoxHeight = 220;
+    const spaceAbove = Math.max(0, anchorTop - margin);
+    const spaceBelow = Math.max(0, hostRect.height - (anchorTop + lineHeight + margin));
+    const placement = spaceBelow >= spaceAbove ? "below" : "above";
+    const maxHeight = Math.min(maxBoxHeight, placement === "above" ? spaceAbove : spaceBelow);
+    const minLeft = margin;
+    const defaultWidth = 240;
+    const maxLeft = Math.max(minLeft, hostRect.width - defaultWidth);
+    const left = Math.min(Math.max(anchorLeft, minLeft), maxLeft);
+    const top = placement === "above" ? anchorTop : anchorTop + lineHeight;
+    return { top, left, placement, maxHeight };
   }
+
+  private startSidebarResize(e: MouseEvent) {
+    e.preventDefault();
+    this.sidebarResizing = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("mousemove", this.handleSidebarResize);
+    window.addEventListener("mouseup", this.stopSidebarResize);
+  }
+
+  private handleSidebarResize = (e: MouseEvent) => {
+    if (!this.sidebarResizing) return;
+    const hostRect = this.getBoundingClientRect();
+    const mainRect = this.mainRef?.getBoundingClientRect() ?? hostRect;
+    const sidebarRect = this.sidebarRef?.getBoundingClientRect();
+    const sidebarLeft = sidebarRect ? sidebarRect.left : mainRect.left + 48;
+    const minWidth = 200;
+    const maxWidth = Math.max(minWidth, Math.floor(mainRect.width * 0.5));
+    const nextWidth = Math.round(e.clientX - sidebarLeft);
+    const clamped = Math.max(minWidth, Math.min(nextWidth, maxWidth));
+    this.style.setProperty("--sidebar-width", `${clamped}px`);
+  };
+
+  private stopSidebarResize = () => {
+    if (!this.sidebarResizing) return;
+    this.sidebarResizing = false;
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    window.removeEventListener("mousemove", this.handleSidebarResize);
+    window.removeEventListener("mouseup", this.stopSidebarResize);
+  };
 
   private async fetchMdiSuggestions(query: string): Promise<MdiIcon[]> {
     const key = query.toLowerCase();
@@ -2699,8 +2791,16 @@ export class AppRoot extends LitElement {
       const lineNo = idx + 1;
       const diffClass = diffMap?.get(lineNo);
       const cls = diffClass ? `codeLine ${diffClass}` : "codeLine";
+      const indentMatch = line.match(/^[\t ]+/);
+      const indentRaw = indentMatch ? indentMatch[0] : "";
+      const rest = indentRaw ? line.slice(indentRaw.length) : line;
+      const indentRendered = indentRaw
+        ? indentRaw.replace(/\t/g, "  ").replace(/ /g, "\u00A0")
+        : "";
+      const indentNode = indentRendered ? html`<span class="codeIndent">${indentRendered}</span>` : nothing;
       return html`<div class=${cls} data-gutter-line=${lineNo}>
-        ${this.highlightLine(line).map((seg) => html`<span class=${seg.cls ?? ""}>${seg.text || " "}</span>`)}
+        ${indentNode}
+        ${this.highlightLine(rest).map((seg) => html`<span class=${seg.cls ?? ""}>${seg.text || " "}</span>`)}
       </div>`;
     });
   }
@@ -3267,7 +3367,7 @@ export class AppRoot extends LitElement {
           </div>
         </div>
 
-        <div class="main">
+        <div class="main" ${ref((el) => (this.mainRef = el))}>
           <div class="activity">
             <div class="act ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>📁</div>
             <div class="act ${this.activeActivity === "search" ? "active" : ""}" title="Search" @click=${() => this.setActivity("search")}>🔎</div>
@@ -3277,7 +3377,7 @@ export class AppRoot extends LitElement {
 
           <div class="sidebarBackdrop ${this.sidebarOpen ? "open" : ""}" @click=${() => (this.sidebarOpen = false)}></div>
 
-          <div class="sidebar ${this.sidebarOpen ? "open" : ""}">
+          <div class="sidebar ${this.sidebarOpen ? "open" : ""}" ${ref((el) => (this.sidebarRef = el))}>
             <div class="sidebarHeader">
               <div class="explorerTitle">
                 ${this.activeActivity === "explorer"
@@ -3291,6 +3391,7 @@ export class AppRoot extends LitElement {
               <button class="sidebarClose" title="Close" @click=${() => (this.sidebarOpen = false)}>✕</button>
             </div>
             ${this.renderSidebarContent()}
+            <div class="sidebarResizer ${this.sidebarResizing ? "active" : ""}" @mousedown=${this.startSidebarResize}></div>
           </div>
 
           <div class="editor">
@@ -3410,8 +3511,8 @@ export class AppRoot extends LitElement {
 
         ${this.suggestOpen
           ? html`<div
-              class="suggestBox"
-              style="top:${this.suggestTop}px; left:${this.suggestLeft}px;"
+              class="suggestBox ${this.suggestPlacement}"
+              style="top:${this.suggestTop}px; left:${this.suggestLeft}px; --suggest-max-height:${this.suggestMaxHeight}px;"
             >
               ${this.suggestItems.map(
                 (s, idx) => html`<div
