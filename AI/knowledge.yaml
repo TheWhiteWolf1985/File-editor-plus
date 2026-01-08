@@ -339,6 +339,19 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-07"
     actor: "codex"
+    version: "0.1.84"
+    change: "Manifest: aggiunte architetture ARM comuni (aarch64, armv7, armhf)."
+    reason: "Supportare installazione add-on su dispositivi ARM."
+    touched_files:
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "config.yaml contiene arch aarch64/armv7/armhf"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
     version: "0.1.83"
     change: "Sidebar ridimensionabile con drag, limitata al 50% della pagina."
     reason: "Richiesta resize sidebar con limite massimo."
