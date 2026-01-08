@@ -448,6 +448,9 @@ export class AppRoot extends LitElement {
     .tree {
       padding: 8px 6px 12px;
       font-size: var(--font-size-md);
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
     }
     .treeRow {
       display: flex;
@@ -1252,7 +1255,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = 1.125;
   private readonly fontBaseStep = 0.0625;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.84";
+  private readonly appVersion = "0.1.85";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;

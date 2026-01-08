@@ -339,6 +339,19 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-07"
     actor: "codex"
+    version: "0.1.85"
+    change: "Sidebar Explorer: abilitato overflow verticale sul tree per consentire lo scroll."
+    reason: "Il menu file/folder non scorreva; ora la lista tree è scrollabile come gli altri pannelli."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Explorer: lista file scorre verticalmente"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
     version: "0.1.84"
     change: "Manifest: aggiunte architetture ARM comuni (aarch64, armv7, armhf)."
     reason: "Supportare installazione add-on su dispositivi ARM."
