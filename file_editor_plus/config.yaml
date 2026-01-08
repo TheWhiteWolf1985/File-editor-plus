@@ -1,9 +1,12 @@
 name: "File Editor Plus"
-version: "0.1.83"
+version: "0.1.84"
 slug: "file_editor_plus"
 description: "Pro File Editor for Home Assistant"
 arch:
   - amd64
+  - aarch64
+  - armv7
+  - armhf
 startup: application
 boot: auto
 init: false
