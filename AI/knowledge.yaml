@@ -339,6 +339,33 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-07"
     actor: "codex"
+    version: "0.1.92"
+    change: "CHANGELOG aggiornato con le ultime modifiche (spellcheck + note)."
+    reason: "Richiesto aggiornamento changelog per la UI di Home Assistant."
+    touched_files:
+      - "file_editor_plus/CHANGELOG.md"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "CHANGELOG contiene 0.1.92 e 0.1.91"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
+    version: "0.1.91"
+    change: "Disabilitato spellcheck nelle textarea dell'editor per evitare sottolineature rosse."
+    reason: "Gli underscore rossi erano dovuti alla correzione ortografica del browser."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Textarea non mostra più sottolineature rosse"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
     version: "0.1.90"
     change: "Aggiunto CHANGELOG per mostrare gli aggiornamenti nella UI di Home Assistant."
     reason: "Richiesto file changelog per la UI di update."

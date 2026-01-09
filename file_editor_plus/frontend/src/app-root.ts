@@ -1314,7 +1314,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = 1.125;
   private readonly fontBaseStep = 0.0625;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.90";
+  private readonly appVersion = "0.1.92";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -3621,12 +3621,13 @@ export class AppRoot extends LitElement {
                         <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${this.renderLineNumbers()}</div>
                         <div class="codeWrap">
                           <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted(this.content, diffMaps.left)}</div>
-                          <textarea
-                            ${ref((el) => (this.editorRef = el))}
-                            .value=${this.content}
-                            placeholder="Seleziona un file a sinistra…"
-                            wrap="off"
-                            @scroll=${this.syncScroll}
+                      <textarea
+                        ${ref((el) => (this.editorRef = el))}
+                        .value=${this.content}
+                        placeholder="Seleziona un file a sinistra…"
+                        spellcheck="false"
+                        wrap="off"
+                        @scroll=${this.syncScroll}
                             @input=${this.handleInput}
                             @keyup=${this.handleCursorMove}
                             @keydown=${this.handleEditorKeyDown}
@@ -3662,6 +3663,7 @@ export class AppRoot extends LitElement {
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}
                         placeholder="Seleziona un file a sinistra…"
+                        spellcheck="false"
                         wrap="off"
                         @scroll=${this.syncScroll}
                         @input=${this.handleInput}
