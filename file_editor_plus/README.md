@@ -33,8 +33,7 @@ Questa build e pensata per beta tester.
 
 - File utente: `/config`
 - Backup automatici: `/config/.fep-backups`
-- Snippets: `/config/.fep-snippets/snippets.json`
-- Impostazioni UI: `backend/user_config.json` (contenitore add-on)
+- Snippets e impostazioni UI: `/config/.fep-config/`
 
 ## Supporto
 

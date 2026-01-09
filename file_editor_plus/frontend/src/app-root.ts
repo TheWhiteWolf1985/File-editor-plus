@@ -11,6 +11,7 @@ type SearchResult = { path: string; mtime: number; size: number; matches: Search
 type SearchSummary = { files_scanned: number; files_with_matches: number; matches_total: number };
 type DiffHunk = { type: "insert" | "delete" | "replace" | "equal"; base_start: number; base_len: number; mod_start: number; mod_len: number };
 type DiffSummary = { added: number; removed: number; changed: number };
+type UserConfig = { font_base_rem?: number; theme_mode?: "auto" | "dark" | "light" };
 type MdiIcon = { name: string; codepoint: string };
 type SuggestItem =
   | { type: "entity"; value: string }
@@ -164,6 +165,25 @@ export class AppRoot extends LitElement {
       align-items: center;
       padding: 8px 0;
       gap: 8px;
+    }
+    .activityGroup {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .activityGroup.bottom {
+      margin-top: auto;
+      padding-bottom: 6px;
+    }
+    .mdiGlyph {
+      font-family: "Material Design Icons";
+      font-style: normal;
+      font-weight: normal;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .act {
       width: 36px;
@@ -780,6 +800,41 @@ export class AppRoot extends LitElement {
       gap: 6px;
       flex: 0 0 auto;
     }
+    .systemPane {
+      display: grid;
+      gap: 12px;
+    }
+    .systemGrid {
+      display: grid;
+      gap: 10px;
+    }
+    .systemCard {
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 10px;
+      background: var(--card-color);
+      display: grid;
+      gap: 6px;
+      text-align: left;
+      color: var(--text-color);
+      cursor: pointer;
+      box-shadow: var(--menu-shadow);
+    }
+    .systemCard:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .systemCardTitle {
+      font-weight: 700;
+      font-size: var(--font-size-md);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .systemCardDesc {
+      font-size: var(--font-size-sm);
+      color: var(--muted-color);
+    }
     @media (max-width: 900px) {
       .main {
         grid-template-columns: 48px 0 1fr;
@@ -1151,6 +1206,8 @@ export class AppRoot extends LitElement {
     searchLoading: { state: true },
     sidebarOpen: { state: true },
     sidebarResizing: { state: true },
+    systemActionLoading: { state: true },
+    systemActionPending: { state: true },
     openSnapshotText: { state: true },
     savedBaseText: { state: true },
     splitViewEnabled: { state: true },
@@ -1169,7 +1226,7 @@ export class AppRoot extends LitElement {
   declare newItemKind: "file" | "folder" | null;
   declare newItemName: string;
   declare newItemExt: string;
-  declare activeActivity: "explorer" | "search" | "entity" | "snippet";
+  declare activeActivity: "explorer" | "search" | "entity" | "snippet" | "system";
   declare toastMessage: string | null;
   declare toastType: "info" | "error";
   declare entityFilter: string;
@@ -1212,6 +1269,8 @@ export class AppRoot extends LitElement {
   declare searchLoading: boolean;
   declare sidebarOpen: boolean;
   declare sidebarResizing: boolean;
+  declare systemActionLoading: boolean;
+  declare systemActionPending: string | null;
   declare openSnapshotText: string;
   declare savedBaseText: string;
   declare splitViewEnabled: boolean;
@@ -1255,7 +1314,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = 1.125;
   private readonly fontBaseStep = 0.0625;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.85";
+  private readonly appVersion = "0.1.92";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -1325,6 +1384,8 @@ export class AppRoot extends LitElement {
     this.searchLoading = false;
     this.sidebarOpen = false;
     this.sidebarResizing = false;
+    this.systemActionLoading = false;
+    this.systemActionPending = null;
     this.openSnapshotText = "";
     this.savedBaseText = "";
     this.splitViewEnabled = false;
@@ -2353,6 +2414,40 @@ export class AppRoot extends LitElement {
     }
   }
 
+  private async runSystemAction(action: string, label: string, confirm: boolean) {
+    if (this.systemActionLoading) return;
+    if (confirm) {
+      const ok = window.confirm(`Confermi: ${label}?`);
+      if (!ok) return;
+    }
+    this.systemActionLoading = true;
+    this.systemActionPending = action;
+    try {
+      const res = await fetch(`${this.apiBase}api/ha/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      let payload: any = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+      if (!res.ok || payload?.ok !== true) {
+        const msg = payload?.error?.message || payload?.detail || `Errore azione (HTTP ${res.status})`;
+        this.showToast(msg, "error");
+        return;
+      }
+      this.showToast(`${label} avviato`);
+    } catch {
+      this.showToast("Errore chiamata sistema", "error");
+    } finally {
+      this.systemActionLoading = false;
+      this.systemActionPending = null;
+    }
+  }
+
   private openSearchMatch(res: SearchResult, match: SearchMatch) {
     this.pendingJump = { path: res.path, line: match.line, col: match.column };
     this.openFile(res.path);
@@ -2843,7 +2938,7 @@ export class AppRoot extends LitElement {
     return window.matchMedia("(max-width: 900px)").matches;
   }
 
-  private setActivity(name: "explorer" | "search" | "entity" | "snippet") {
+  private setActivity(name: "explorer" | "search" | "entity" | "snippet" | "system") {
     this.activeActivity = name;
     if (this.isNarrowLayout()) {
       this.sidebarOpen = true;
@@ -2866,10 +2961,14 @@ export class AppRoot extends LitElement {
     }
   };
 
-  private cycleTheme() {
+  private async cycleTheme() {
     const next = this.themeMode === "auto" ? "light" : this.themeMode === "light" ? "dark" : "auto";
     this.themeMode = next;
     this.applyTheme();
+    const ok = await this.persistUserConfig({ theme_mode: this.themeMode });
+    if (!ok) {
+      this.showToast("Errore salvataggio tema", "error");
+    }
   }
 
   private getEffectiveTheme(): "dark" | "light" {
@@ -2951,6 +3050,29 @@ export class AppRoot extends LitElement {
     this.style.setProperty("--font-size-lg", toRem(this.fontDefaults.lg));
   }
 
+  private async persistUserConfig(config: UserConfig) {
+    const payload = {
+      font_base_rem: config.font_base_rem ?? this.fontBaseRem,
+      theme_mode: config.theme_mode ?? this.themeMode,
+    };
+    try {
+      const res = await fetch(`${this.apiBase}api/user-config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: payload }),
+      });
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+      return res.ok && data?.ok === true;
+    } catch {
+      return false;
+    }
+  }
+
   private async loadFontSettings() {
     try {
       const res = await fetch(`${this.apiBase}api/user-config`);
@@ -2961,10 +3083,13 @@ export class AppRoot extends LitElement {
         } catch {
           payload = null;
         }
-        const cfg = payload?.config ?? payload ?? {};
+        const cfg = (payload?.config ?? payload ?? {}) as UserConfig;
         const raw = Number(cfg.font_base_rem);
         if (!Number.isNaN(raw)) {
           this.fontBaseRem = this.clampFontBase(raw);
+        }
+        if (cfg.theme_mode === "auto" || cfg.theme_mode === "dark" || cfg.theme_mode === "light") {
+          this.themeMode = cfg.theme_mode;
         }
       }
     } catch {
@@ -2972,6 +3097,7 @@ export class AppRoot extends LitElement {
     }
     this.settingsFontBaseRem = this.fontBaseRem;
     this.applyFontScale(this.fontBaseRem);
+    this.applyTheme();
   }
 
   private openSettingsModal() {
@@ -2989,18 +3115,8 @@ export class AppRoot extends LitElement {
   private async applySettingsModal() {
     const next = this.settingsFontBaseRem;
     try {
-      const res = await fetch(`${this.apiBase}api/user-config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config: { font_base_rem: next } }),
-      });
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
-      if (!res.ok || payload?.ok !== true) {
+      const ok = await this.persistUserConfig({ font_base_rem: next });
+      if (!ok) {
         throw new Error("save-failed");
       }
     } catch {
@@ -3198,6 +3314,64 @@ export class AppRoot extends LitElement {
         </div>
       </div>`;
     }
+    if (this.activeActivity === "system") {
+      const actions = [
+        {
+          id: "reload_yaml",
+          label: "Reload YAML",
+          desc: "Ricarica configuration.yaml e include.",
+          icon: "🧾",
+          confirm: false,
+        },
+        {
+          id: "restart_core",
+          label: "Restart Core",
+          desc: "Riavvia Home Assistant Core.",
+          icon: "🔄",
+          confirm: true,
+        },
+        {
+          id: "restart_supervisor",
+          label: "Restart Supervisor",
+          desc: "Riavvia Supervisor (gestione add-on).",
+          icon: "🧩",
+          confirm: true,
+        },
+        {
+          id: "reboot_host",
+          label: "Reboot Host",
+          desc: "Riavvia il dispositivo/OS.",
+          icon: "💻",
+          confirm: true,
+        },
+        {
+          id: "shutdown_host",
+          label: "Shutdown Host",
+          desc: "Spegni il dispositivo/OS.",
+          icon: "⏻",
+          confirm: true,
+        },
+      ];
+      return html`<div class="sidebarContent systemPane">
+        <div class="systemGrid">
+          ${actions.map((action) => {
+            const pending = this.systemActionPending === action.id;
+            return html`<button
+              class="systemCard"
+              type="button"
+              ?disabled=${this.systemActionLoading}
+              @click=${() => this.runSystemAction(action.id, action.label, action.confirm)}
+            >
+              <div class="systemCardTitle">
+                <span>${action.icon}</span>
+                <span>${pending ? "In corso..." : action.label}</span>
+              </div>
+              <div class="systemCardDesc">${action.desc}</div>
+            </button>`;
+          })}
+        </div>
+      </div>`;
+    }
     // entity mock
     const entries = Object.values(this.entities);
     const filtered = entries
@@ -3372,10 +3546,17 @@ export class AppRoot extends LitElement {
 
         <div class="main" ${ref((el) => (this.mainRef = el))}>
           <div class="activity">
-            <div class="act ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>📁</div>
-            <div class="act ${this.activeActivity === "search" ? "active" : ""}" title="Search" @click=${() => this.setActivity("search")}>🔎</div>
-            <div class="act ${this.activeActivity === "entity" ? "active" : ""}" title="Entity" @click=${() => this.setActivity("entity")}>🗂️</div>
-            <div class="act ${this.activeActivity === "snippet" ? "active" : ""}" title="Snippet" @click=${() => this.setActivity("snippet")}>📜</div>
+            <div class="activityGroup">
+              <div class="act ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>📁</div>
+              <div class="act ${this.activeActivity === "search" ? "active" : ""}" title="Search" @click=${() => this.setActivity("search")}>🔎</div>
+              <div class="act ${this.activeActivity === "entity" ? "active" : ""}" title="Entity" @click=${() => this.setActivity("entity")}>🗂️</div>
+              <div class="act ${this.activeActivity === "snippet" ? "active" : ""}" title="Snippet" @click=${() => this.setActivity("snippet")}>📜</div>
+            </div>
+            <div class="activityGroup bottom">
+              <div class="act ${this.activeActivity === "system" ? "active" : ""}" title="System" @click=${() => this.setActivity("system")}>
+                <span class="mdiGlyph">${this.renderMdiGlyph("F0425")}</span>
+              </div>
+            </div>
           </div>
 
           <div class="sidebarBackdrop ${this.sidebarOpen ? "open" : ""}" @click=${() => (this.sidebarOpen = false)}></div>
@@ -3389,7 +3570,9 @@ export class AppRoot extends LitElement {
                     ? "Search"
                     : this.activeActivity === "entity"
                       ? "Entity"
-                      : "Snippet"}
+                      : this.activeActivity === "snippet"
+                        ? "Snippet"
+                        : "System"}
               </div>
               <button class="sidebarClose" title="Close" @click=${() => (this.sidebarOpen = false)}>✕</button>
             </div>
@@ -3438,12 +3621,13 @@ export class AppRoot extends LitElement {
                         <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${this.renderLineNumbers()}</div>
                         <div class="codeWrap">
                           <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted(this.content, diffMaps.left)}</div>
-                          <textarea
-                            ${ref((el) => (this.editorRef = el))}
-                            .value=${this.content}
-                            placeholder="Seleziona un file a sinistra…"
-                            wrap="off"
-                            @scroll=${this.syncScroll}
+                      <textarea
+                        ${ref((el) => (this.editorRef = el))}
+                        .value=${this.content}
+                        placeholder="Seleziona un file a sinistra…"
+                        spellcheck="false"
+                        wrap="off"
+                        @scroll=${this.syncScroll}
                             @input=${this.handleInput}
                             @keyup=${this.handleCursorMove}
                             @keydown=${this.handleEditorKeyDown}
@@ -3479,6 +3663,7 @@ export class AppRoot extends LitElement {
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}
                         placeholder="Seleziona un file a sinistra…"
+                        spellcheck="false"
                         wrap="off"
                         @scroll=${this.syncScroll}
                         @input=${this.handleInput}

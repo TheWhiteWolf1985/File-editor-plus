@@ -23,9 +23,12 @@ from fastapi.staticfiles import StaticFiles
 BASE_DIR = Path("/config").resolve()
 BACKUP_DIR = (BASE_DIR / ".fep-backups").resolve()
 FRONTEND_DIR = Path("/app/frontend").resolve()
-SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
+FEP_CONFIG_DIR = (BASE_DIR / ".fep-config").resolve()
+SNIPPET_DIR = FEP_CONFIG_DIR
 SNIPPET_FILE = SNIPPET_DIR / "snippets.json"
-USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
+USER_CONFIG_FILE = FEP_CONFIG_DIR / "user_config.json"
+LEGACY_SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
+LEGACY_USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
 MDI_META_FILE = (Path(__file__).parent / "mdi_meta.json").resolve()
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 logger = logging.getLogger("file_editor_plus")
@@ -47,7 +50,14 @@ SEARCH_SKIP_DIRS = {
     "dist",
     "build",
 }
-DEFAULT_USER_CONFIG = {"font_base_rem": 0.875}
+DEFAULT_USER_CONFIG = {"font_base_rem": 0.875, "theme_mode": "auto"}
+HA_ACTIONS = {
+    "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_core_config"},
+    "restart_core": {"type": "service", "domain": "homeassistant", "service": "restart"},
+    "restart_supervisor": {"type": "supervisor", "path": "/supervisor/restart"},
+    "reboot_host": {"type": "supervisor", "path": "/host/reboot"},
+    "shutdown_host": {"type": "supervisor", "path": "/host/shutdown"},
+}
 
 # roba che di solito non vuoi toccare/vedere nell’editor
 DEFAULT_IGNORE = {
@@ -287,7 +297,29 @@ def search_mdi(query: str, limit: int) -> List[dict]:
     return results[:limit]
 
 
+def ensure_config_store() -> None:
+    FEP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    if LEGACY_SNIPPET_DIR.exists() and not SNIPPET_DIR.exists():
+        try:
+            shutil.move(str(LEGACY_SNIPPET_DIR), str(SNIPPET_DIR))
+        except Exception as e:
+            logger.exception("config_store: errore migrazione snippet dir: %s", e)
+    elif LEGACY_SNIPPET_DIR.exists() and SNIPPET_DIR.exists():
+        legacy_file = LEGACY_SNIPPET_DIR / "snippets.json"
+        if legacy_file.exists() and not SNIPPET_FILE.exists():
+            try:
+                shutil.copy2(legacy_file, SNIPPET_FILE)
+            except Exception as e:
+                logger.exception("config_store: errore copia snippet: %s", e)
+    if not USER_CONFIG_FILE.exists() and LEGACY_USER_CONFIG_FILE.exists():
+        try:
+            shutil.copy2(LEGACY_USER_CONFIG_FILE, USER_CONFIG_FILE)
+        except Exception as e:
+            logger.exception("config_store: errore migrazione user_config: %s", e)
+
+
 def ensure_user_config() -> None:
+    ensure_config_store()
     if not USER_CONFIG_FILE.exists():
         try:
             atomic_write(USER_CONFIG_FILE, json.dumps(DEFAULT_USER_CONFIG, ensure_ascii=False, indent=2))
@@ -308,21 +340,30 @@ def load_user_config() -> dict:
         raise HTTPException(500, f"Errore lettura user_config: {e}")
     if not isinstance(data, dict):
         data = DEFAULT_USER_CONFIG.copy()
-    return data
+    return normalize_user_config(data)
 
 
 def save_user_config(data: dict) -> None:
     if not isinstance(data, dict):
         raise HTTPException(400, "Config must be an object")
     try:
-        atomic_write(USER_CONFIG_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+        normalized = normalize_user_config(data)
+        atomic_write(USER_CONFIG_FILE, json.dumps(normalized, ensure_ascii=False, indent=2))
     except Exception as e:
         logger.exception("user_config: errore salvataggio %s: %s", USER_CONFIG_FILE, e)
         raise HTTPException(500, f"Errore salvataggio user_config: {e}")
 
 
+def normalize_user_config(data: dict) -> dict:
+    out = DEFAULT_USER_CONFIG.copy()
+    for key, value in data.items():
+        if value is not None:
+            out[key] = value
+    return out
+
+
 def ensure_snippet_store() -> None:
-    SNIPPET_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_config_store()
     if not SNIPPET_FILE.exists():
         default_snippets = [
           {
@@ -742,6 +783,51 @@ async def ha_ws(ws: WebSocket):
     except Exception as e:
         logger.exception("ha_ws: error in proxy: %s", e)
         await ws.close(code=1011)
+
+
+@app.post("/api/ha/action")
+async def ha_action(request: Request):
+    payload = await request.json()
+    action = payload.get("action") if isinstance(payload, dict) else None
+    if action not in HA_ACTIONS:
+        raise HTTPException(400, "Invalid action")
+    if not SUPERVISOR_TOKEN:
+        logger.error("ha_action: missing SUPERVISOR_TOKEN for %s", action)
+        raise HTTPException(500, "Missing supervisor token")
+    cfg = HA_ACTIONS[action]
+    try:
+        token_preview = SUPERVISOR_TOKEN[:8] + "..." if SUPERVISOR_TOKEN else ""
+        if cfg["type"] == "service":
+            domain = cfg["domain"]
+            service = cfg["service"]
+            logger.info("ha_action: core service %s.%s token_prefix=%s", domain, service, token_preview)
+            async with httpx.AsyncClient(base_url="http://supervisor/core/api", timeout=15) as client:
+                res = await client.post(
+                    f"/services/{domain}/{service}",
+                    headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+                    json={},
+                )
+        else:
+            path = cfg["path"]
+            logger.info("ha_action: supervisor %s token_prefix=%s", path, token_preview)
+            async with httpx.AsyncClient(base_url="http://supervisor", timeout=15) as client:
+                res = await client.post(
+                    path,
+                    headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+                )
+        if res.status_code in (401, 403):
+            raise HTTPException(403, "Unauthorized to call Home Assistant")
+        res.raise_for_status()
+        try:
+            data = res.json()
+        except Exception:
+            data = None
+        return {"ok": True, "action": action, "result": data}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("ha_action: error on %s: %s", action, e)
+        raise HTTPException(500, f"Error calling Home Assistant: {e}")
 @app.post("/api/folder")
 def create_folder(path: str):
     target = safe_path(path)
