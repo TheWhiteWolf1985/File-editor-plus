@@ -1,3 +1,4 @@
 {
-  "font_base_rem": 0.875
+  "font_base_rem": 0.875,
+  "theme_mode": "auto"
 }

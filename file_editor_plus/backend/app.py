@@ -47,7 +47,14 @@ SEARCH_SKIP_DIRS = {
     "dist",
     "build",
 }
-DEFAULT_USER_CONFIG = {"font_base_rem": 0.875}
+DEFAULT_USER_CONFIG = {"font_base_rem": 0.875, "theme_mode": "auto"}
+HA_ACTIONS = {
+    "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_core_config"},
+    "restart_core": {"type": "service", "domain": "homeassistant", "service": "restart"},
+    "restart_supervisor": {"type": "supervisor", "path": "/supervisor/restart"},
+    "reboot_host": {"type": "supervisor", "path": "/host/reboot"},
+    "shutdown_host": {"type": "supervisor", "path": "/host/shutdown"},
+}
 
 # roba che di solito non vuoi toccare/vedere nell’editor
 DEFAULT_IGNORE = {
@@ -308,17 +315,26 @@ def load_user_config() -> dict:
         raise HTTPException(500, f"Errore lettura user_config: {e}")
     if not isinstance(data, dict):
         data = DEFAULT_USER_CONFIG.copy()
-    return data
+    return normalize_user_config(data)
 
 
 def save_user_config(data: dict) -> None:
     if not isinstance(data, dict):
         raise HTTPException(400, "Config must be an object")
     try:
-        atomic_write(USER_CONFIG_FILE, json.dumps(data, ensure_ascii=False, indent=2))
+        normalized = normalize_user_config(data)
+        atomic_write(USER_CONFIG_FILE, json.dumps(normalized, ensure_ascii=False, indent=2))
     except Exception as e:
         logger.exception("user_config: errore salvataggio %s: %s", USER_CONFIG_FILE, e)
         raise HTTPException(500, f"Errore salvataggio user_config: {e}")
+
+
+def normalize_user_config(data: dict) -> dict:
+    out = DEFAULT_USER_CONFIG.copy()
+    for key, value in data.items():
+        if value is not None:
+            out[key] = value
+    return out
 
 
 def ensure_snippet_store() -> None:
@@ -742,6 +758,51 @@ async def ha_ws(ws: WebSocket):
     except Exception as e:
         logger.exception("ha_ws: error in proxy: %s", e)
         await ws.close(code=1011)
+
+
+@app.post("/api/ha/action")
+async def ha_action(request: Request):
+    payload = await request.json()
+    action = payload.get("action") if isinstance(payload, dict) else None
+    if action not in HA_ACTIONS:
+        raise HTTPException(400, "Invalid action")
+    if not SUPERVISOR_TOKEN:
+        logger.error("ha_action: missing SUPERVISOR_TOKEN for %s", action)
+        raise HTTPException(500, "Missing supervisor token")
+    cfg = HA_ACTIONS[action]
+    try:
+        token_preview = SUPERVISOR_TOKEN[:8] + "..." if SUPERVISOR_TOKEN else ""
+        if cfg["type"] == "service":
+            domain = cfg["domain"]
+            service = cfg["service"]
+            logger.info("ha_action: core service %s.%s token_prefix=%s", domain, service, token_preview)
+            async with httpx.AsyncClient(base_url="http://supervisor/core/api", timeout=15) as client:
+                res = await client.post(
+                    f"/services/{domain}/{service}",
+                    headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+                    json={},
+                )
+        else:
+            path = cfg["path"]
+            logger.info("ha_action: supervisor %s token_prefix=%s", path, token_preview)
+            async with httpx.AsyncClient(base_url="http://supervisor", timeout=15) as client:
+                res = await client.post(
+                    path,
+                    headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+                )
+        if res.status_code in (401, 403):
+            raise HTTPException(403, "Unauthorized to call Home Assistant")
+        res.raise_for_status()
+        try:
+            data = res.json()
+        except Exception:
+            data = None
+        return {"ok": True, "action": action, "result": data}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("ha_action: error on %s: %s", action, e)
+        raise HTTPException(500, f"Error calling Home Assistant: {e}")
 @app.post("/api/folder")
 def create_folder(path: str):
     target = safe_path(path)
