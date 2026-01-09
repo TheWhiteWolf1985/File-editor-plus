@@ -23,9 +23,12 @@ from fastapi.staticfiles import StaticFiles
 BASE_DIR = Path("/config").resolve()
 BACKUP_DIR = (BASE_DIR / ".fep-backups").resolve()
 FRONTEND_DIR = Path("/app/frontend").resolve()
-SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
+FEP_CONFIG_DIR = (BASE_DIR / ".fep-config").resolve()
+SNIPPET_DIR = FEP_CONFIG_DIR
 SNIPPET_FILE = SNIPPET_DIR / "snippets.json"
-USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
+USER_CONFIG_FILE = FEP_CONFIG_DIR / "user_config.json"
+LEGACY_SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
+LEGACY_USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
 MDI_META_FILE = (Path(__file__).parent / "mdi_meta.json").resolve()
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 logger = logging.getLogger("file_editor_plus")
@@ -294,7 +297,29 @@ def search_mdi(query: str, limit: int) -> List[dict]:
     return results[:limit]
 
 
+def ensure_config_store() -> None:
+    FEP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    if LEGACY_SNIPPET_DIR.exists() and not SNIPPET_DIR.exists():
+        try:
+            shutil.move(str(LEGACY_SNIPPET_DIR), str(SNIPPET_DIR))
+        except Exception as e:
+            logger.exception("config_store: errore migrazione snippet dir: %s", e)
+    elif LEGACY_SNIPPET_DIR.exists() and SNIPPET_DIR.exists():
+        legacy_file = LEGACY_SNIPPET_DIR / "snippets.json"
+        if legacy_file.exists() and not SNIPPET_FILE.exists():
+            try:
+                shutil.copy2(legacy_file, SNIPPET_FILE)
+            except Exception as e:
+                logger.exception("config_store: errore copia snippet: %s", e)
+    if not USER_CONFIG_FILE.exists() and LEGACY_USER_CONFIG_FILE.exists():
+        try:
+            shutil.copy2(LEGACY_USER_CONFIG_FILE, USER_CONFIG_FILE)
+        except Exception as e:
+            logger.exception("config_store: errore migrazione user_config: %s", e)
+
+
 def ensure_user_config() -> None:
+    ensure_config_store()
     if not USER_CONFIG_FILE.exists():
         try:
             atomic_write(USER_CONFIG_FILE, json.dumps(DEFAULT_USER_CONFIG, ensure_ascii=False, indent=2))
@@ -338,7 +363,7 @@ def normalize_user_config(data: dict) -> dict:
 
 
 def ensure_snippet_store() -> None:
-    SNIPPET_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_config_store()
     if not SNIPPET_FILE.exists():
         default_snippets = [
           {
