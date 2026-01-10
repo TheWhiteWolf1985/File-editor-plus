@@ -837,6 +837,102 @@ def create_folder(path: str):
     return {"ok": True, "path": target.resolve().relative_to(BASE_DIR).as_posix()}
 
 
+@app.post("/api/fs/copy")
+async def copy_path(request: Request):
+    payload = await request.json()
+    src = payload.get("src") if isinstance(payload, dict) else None
+    dest_dir = payload.get("dest_dir") if isinstance(payload, dict) else None
+    dest_name = payload.get("dest_name") if isinstance(payload, dict) else None
+    if not src:
+        raise HTTPException(400, "Source path required")
+    src_path = safe_path(src)
+    if not src_path.exists():
+        raise HTTPException(404, "Source not found")
+    dest_dir_path = safe_path(dest_dir or "")
+    if not dest_dir_path.exists() or not dest_dir_path.is_dir():
+        raise HTTPException(400, "Destination must be a directory")
+    dest_name_clean = None
+    if dest_name is not None:
+        if not isinstance(dest_name, str):
+            raise HTTPException(400, "Invalid destination name")
+        dest_name_clean = dest_name.strip()
+        if not dest_name_clean:
+            raise HTTPException(400, "Invalid destination name")
+        if Path(dest_name_clean).name != dest_name_clean:
+            raise HTTPException(400, "Invalid destination name")
+    dest_path = dest_dir_path / (dest_name_clean or src_path.name)
+    if not _is_within_base(dest_path.resolve()):
+        raise HTTPException(403, "Access denied")
+    if dest_path.exists():
+        if dest_name_clean:
+            base_name = dest_path.name
+            if base_name.startswith(".") and base_name.count(".") == 1:
+                base = base_name
+                ext = ""
+            else:
+                if "." in base_name:
+                    base, ext = base_name.rsplit(".", 1)
+                    ext = f".{ext}"
+                else:
+                    base, ext = base_name, ""
+            found = False
+            for idx in range(2, 1000):
+                candidate = dest_path.with_name(f"{base}{idx}{ext}")
+                if not candidate.exists():
+                    dest_path = candidate
+                    found = True
+                    break
+            if not found:
+                raise HTTPException(409, "Destination exists")
+        else:
+            raise HTTPException(409, "Destination exists")
+    try:
+        if src_path.is_dir():
+            try:
+                dest_path.resolve().relative_to(src_path.resolve())
+                raise HTTPException(400, "Cannot copy directory into itself")
+            except ValueError:
+                pass
+            shutil.copytree(src_path, dest_path)
+        elif src_path.is_file():
+            shutil.copy2(src_path, dest_path)
+        else:
+            raise HTTPException(400, "Unsupported source type")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("fs_copy: error %s -> %s: %s", src_path, dest_path, e)
+        raise HTTPException(500, f"Copy failed: {e}")
+    return {"ok": True, "dest": dest_path.resolve().relative_to(BASE_DIR).as_posix()}
+
+
+@app.post("/api/fs/delete")
+async def delete_path(request: Request):
+    payload = await request.json()
+    path = payload.get("path") if isinstance(payload, dict) else None
+    if not path:
+        raise HTTPException(400, "Path required")
+    target = safe_path(path)
+    if target == BASE_DIR:
+        raise HTTPException(400, "Cannot delete base directory")
+    if not target.exists():
+        raise HTTPException(404, "Path not found")
+    try:
+        if target.is_file():
+            make_backup(target)
+            target.unlink()
+            return {"ok": True, "path": target.resolve().relative_to(BASE_DIR).as_posix(), "type": "file"}
+        if target.is_dir():
+            shutil.rmtree(target)
+            return {"ok": True, "path": target.resolve().relative_to(BASE_DIR).as_posix(), "type": "dir"}
+        raise HTTPException(400, "Unsupported path type")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("fs_delete: error %s: %s", target, e)
+        raise HTTPException(500, f"Delete failed: {e}")
+
+
 @app.get("/api/tree")
 def tree(path: str = ""):
     folder = safe_path(path)

@@ -594,6 +594,14 @@ export class AppRoot extends LitElement {
     .btn.primary:hover {
       background: var(--accent-hover);
     }
+    .btn.danger {
+      background: #b93a3a;
+      border-color: #b93a3a;
+      color: white;
+    }
+    .btn.danger:hover {
+      background: #a13232;
+    }
 
     .editorWrap {
       display: grid;
@@ -906,9 +914,19 @@ export class AppRoot extends LitElement {
       padding: 8px 12px;
       cursor: pointer;
       font-size: var(--font-size-md);
+      background: transparent;
+      border: none;
+      width: 100%;
+      text-align: left;
+      color: inherit;
+      font: inherit;
     }
     .contextMenuItem:hover {
       background: var(--hover-color);
+    }
+    .contextMenuItem.disabled {
+      opacity: 0.5;
+      pointer-events: none;
     }
     .suggestBox {
       position: absolute;
@@ -1208,6 +1226,14 @@ export class AppRoot extends LitElement {
     sidebarResizing: { state: true },
     systemActionLoading: { state: true },
     systemActionPending: { state: true },
+    treeMenuOpen: { state: true },
+    treeMenuX: { state: true },
+    treeMenuY: { state: true },
+    treeMenuPath: { state: true },
+    treeMenuType: { state: true },
+    showTreeDeleteModal: { state: true },
+    deleteTargetPath: { state: true },
+    deleteTargetType: { state: true },
     openSnapshotText: { state: true },
     savedBaseText: { state: true },
     splitViewEnabled: { state: true },
@@ -1271,6 +1297,14 @@ export class AppRoot extends LitElement {
   declare sidebarResizing: boolean;
   declare systemActionLoading: boolean;
   declare systemActionPending: string | null;
+  declare treeMenuOpen: boolean;
+  declare treeMenuX: number;
+  declare treeMenuY: number;
+  declare treeMenuPath: string | null;
+  declare treeMenuType: "file" | "dir" | null;
+  declare showTreeDeleteModal: boolean;
+  declare deleteTargetPath: string | null;
+  declare deleteTargetType: "file" | "dir" | null;
   declare openSnapshotText: string;
   declare savedBaseText: string;
   declare splitViewEnabled: boolean;
@@ -1314,7 +1348,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = 1.125;
   private readonly fontBaseStep = 0.0625;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.92";
+  private readonly appVersion = "0.1.94";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -1323,6 +1357,7 @@ export class AppRoot extends LitElement {
   private mdiSuggestCache = new Map<string, MdiIcon[]>();
   private mdiSuggestRequestId = 0;
   private pendingJump: { path: string; line: number; col: number } | null = null;
+  private treeClipboard: { path: string; type: "file" | "dir" } | null = null;
   private selectionListener = () => {
     if (!this.editorRef) return;
     const active = this.shadowRoot?.activeElement || document.activeElement;
@@ -1386,6 +1421,14 @@ export class AppRoot extends LitElement {
     this.sidebarResizing = false;
     this.systemActionLoading = false;
     this.systemActionPending = null;
+    this.treeMenuOpen = false;
+    this.treeMenuX = 0;
+    this.treeMenuY = 0;
+    this.treeMenuPath = null;
+    this.treeMenuType = null;
+    this.showTreeDeleteModal = false;
+    this.deleteTargetPath = null;
+    this.deleteTargetType = null;
     this.openSnapshotText = "";
     this.savedBaseText = "";
     this.splitViewEnabled = false;
@@ -1830,6 +1873,144 @@ export class AppRoot extends LitElement {
     if (this.contextMenuOpen) {
       this.contextMenuOpen = false;
     }
+  }
+
+  private handleTreeContextMenu(e: MouseEvent, item: TreeItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    this.treeMenuOpen = true;
+    this.treeMenuX = e.clientX;
+    this.treeMenuY = e.clientY;
+    this.treeMenuPath = item.path;
+    this.treeMenuType = item.type;
+    this.contextMenuOpen = false;
+    this.openMenu = null;
+    this.closeSuggestions();
+  }
+
+  private closeTreeMenu() {
+    if (this.treeMenuOpen) {
+      this.treeMenuOpen = false;
+    }
+  }
+
+  private copyTreeItem() {
+    if (!this.treeMenuPath || !this.treeMenuType) return;
+    this.treeClipboard = { path: this.treeMenuPath, type: this.treeMenuType };
+    this.showToast(`Copiato: ${this.treeMenuPath}`);
+    this.closeTreeMenu();
+  }
+
+  private getCopyName(path: string, type: "file" | "dir") {
+    const name = path.split("/").pop() || path;
+    if (type === "dir") {
+      return `${name}_copy`;
+    }
+    const dot = name.lastIndexOf(".");
+    if (dot > 0) {
+      const base = name.slice(0, dot);
+      const ext = name.slice(dot);
+      return `${base}_copy${ext}`;
+    }
+    return `${name}_copy`;
+  }
+
+  private async pasteTreeItem() {
+    if (!this.treeClipboard || !this.treeMenuPath || !this.treeMenuType) return;
+    const destDir =
+      this.treeMenuType === "dir"
+        ? this.treeMenuPath
+        : this.treeMenuPath.includes("/")
+          ? this.treeMenuPath.split("/").slice(0, -1).join("/")
+          : "";
+    const destName = this.getCopyName(this.treeClipboard.path, this.treeClipboard.type);
+    try {
+      const res = await fetch(`${this.apiBase}api/fs/copy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ src: this.treeClipboard.path, dest_dir: destDir, dest_name: destName }),
+      });
+      let payload: any = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+      if (!res.ok || payload?.ok !== true) {
+        const msg = payload?.detail || payload?.error?.message || `Errore copia (HTTP ${res.status})`;
+        this.showToast(msg, "error");
+        return;
+      }
+      const destPath = payload?.dest ? String(payload.dest) : destName;
+      this.showToast(`Incollato: ${destPath}`);
+      await this.reloadTreePath(destDir);
+    } catch {
+      this.showToast("Errore copia", "error");
+    } finally {
+      this.closeTreeMenu();
+    }
+  }
+
+  private confirmTreeDelete() {
+    if (!this.treeMenuPath || !this.treeMenuType) return;
+    this.deleteTargetPath = this.treeMenuPath;
+    this.deleteTargetType = this.treeMenuType;
+    this.showTreeDeleteModal = true;
+    this.closeTreeMenu();
+  }
+
+  private cancelTreeDelete() {
+    this.showTreeDeleteModal = false;
+    this.deleteTargetPath = null;
+    this.deleteTargetType = null;
+  }
+
+  private async executeTreeDelete() {
+    if (!this.deleteTargetPath || !this.deleteTargetType) return;
+    const target = this.deleteTargetPath;
+    const parent = target.includes("/") ? target.split("/").slice(0, -1).join("/") : "";
+    try {
+      const res = await fetch(`${this.apiBase}api/fs/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: target }),
+      });
+      let payload: any = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+      if (!res.ok || payload?.ok !== true) {
+        const msg = payload?.detail || payload?.error?.message || `Errore eliminazione (HTTP ${res.status})`;
+        this.showToast(msg, "error");
+        return;
+      }
+      this.closeTabsForDeletedPath(target, this.deleteTargetType);
+      this.showToast("Elemento eliminato");
+      await this.reloadTreePath(parent);
+    } catch {
+      this.showToast("Errore eliminazione", "error");
+    } finally {
+      this.cancelTreeDelete();
+    }
+  }
+
+  private closeTabsForDeletedPath(path: string, type: "file" | "dir") {
+    if (type === "file") {
+      this.closeTab(path);
+      return;
+    }
+    const prefix = path.endsWith("/") ? path : `${path}/`;
+    const affected = this.tabs.filter((t) => t.path === path || t.path.startsWith(prefix));
+    if (affected.length === 0) return;
+    affected.forEach((t) => this.closeTab(t.path));
+  }
+
+  private async reloadTreePath(path: string) {
+    this.loadedPaths.delete(path);
+    await this.loadTree(path, true);
+    this.expanded = new Set(this.expanded).add(path);
   }
 
   private async handleCopyCut(action: "copy" | "cut") {
@@ -2574,6 +2755,11 @@ export class AppRoot extends LitElement {
       const target = e.target as HTMLElement | null;
       const inside = target?.closest?.(".contextMenu");
       if (!inside) this.closeContextMenu();
+    }
+    if (this.treeMenuOpen) {
+      const target = e.target as HTMLElement | null;
+      const inside = target?.closest?.(".treeContextMenu");
+      if (!inside) this.closeTreeMenu();
     }
     if (this.suggestOpen) {
       const target = e.target as HTMLElement | null;
@@ -3495,6 +3681,7 @@ export class AppRoot extends LitElement {
             if (isDir) this.toggleDir(it.path);
             else this.openFile(it.path);
           }}
+          @contextmenu=${(e: MouseEvent) => this.handleTreeContextMenu(e, it)}
         >
           <span class="twisty">${isDir ? (isExpanded ? "▾" : "▸") : ""}</span>
           <span>${isDir ? "📁" : "📄"}</span>
@@ -3697,6 +3884,23 @@ export class AppRoot extends LitElement {
             </div>`
           : nothing}
 
+        ${this.treeMenuOpen
+          ? html`<div
+              class="contextMenu treeContextMenu"
+              style="top:${this.treeMenuY}px; left:${this.treeMenuX}px;"
+              @click=${(e: Event) => e.stopPropagation()}
+            >
+              <div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
+              <div
+                class="contextMenuItem ${this.treeClipboard ? "" : "disabled"}"
+                @click=${() => this.pasteTreeItem()}
+              >
+                📥 Incolla
+              </div>
+              <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}>🗑️ Elimina</div>
+            </div>`
+          : nothing}
+
         ${this.suggestOpen
           ? html`<div
               class="suggestBox ${this.suggestPlacement}"
@@ -3720,6 +3924,22 @@ export class AppRoot extends LitElement {
                     : nothing}
                 </div>`
               )}
+            </div>`
+          : nothing}
+
+        ${this.showTreeDeleteModal
+          ? html`<div class="modalBackdrop" @click=${() => this.cancelTreeDelete()}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
+                <h3>Conferma eliminazione</h3>
+                <div class="muted" style="font-size: var(--font-size-sm);">
+                  Vuoi eliminare ${this.deleteTargetType === "dir" ? "la cartella" : "il file"}:
+                  <strong>${this.deleteTargetPath}</strong>?
+                </div>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.cancelTreeDelete()}>Cancel</button>
+                  <button class="btn danger" @click=${() => this.executeTreeDelete()}>Delete</button>
+                </div>
+              </div>
             </div>`
           : nothing}
 
