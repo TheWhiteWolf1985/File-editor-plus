@@ -9,6 +9,8 @@ import time
 import logging
 import uuid
 import re
+import tempfile
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -16,7 +18,7 @@ from typing import List, Optional
 import json
 import httpx
 import websockets
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -835,6 +837,32 @@ def create_folder(path: str):
         raise HTTPException(400, "Path already exists")
     target.mkdir(parents=True, exist_ok=True)
     return {"ok": True, "path": target.resolve().relative_to(BASE_DIR).as_posix()}
+
+
+@app.get("/api/backup")
+def download_backup(background_tasks: BackgroundTasks):
+    filename = datetime.now().strftime("config-backup-%Y%m%d-%H%M%S.zip")
+    tmp = tempfile.NamedTemporaryFile(prefix="fep-backup-", suffix=".zip", delete=False)
+    tmp_path = Path(tmp.name)
+    tmp.close()
+    try:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(BASE_DIR):
+                dirs[:] = [d for d in dirs if not Path(root, d).is_symlink()]
+                for name in files:
+                    full = Path(root) / name
+                    if full.is_symlink():
+                        continue
+                    try:
+                        rel = full.resolve().relative_to(BASE_DIR).as_posix()
+                    except Exception:
+                        continue
+                    zf.write(full, rel)
+    except Exception as e:
+        logger.exception("backup: errore creazione zip: %s", e)
+        raise HTTPException(500, f"Backup failed: {e}")
+    background_tasks.add_task(lambda p=tmp_path: p.unlink(missing_ok=True))
+    return FileResponse(tmp_path, media_type="application/zip", filename=filename, background=background_tasks)
 
 
 @app.post("/api/fs/copy")
