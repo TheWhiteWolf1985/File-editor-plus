@@ -9,6 +9,8 @@ import time
 import logging
 import uuid
 import re
+import tempfile
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -16,7 +18,7 @@ from typing import List, Optional
 import json
 import httpx
 import websockets
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -835,6 +837,128 @@ def create_folder(path: str):
         raise HTTPException(400, "Path already exists")
     target.mkdir(parents=True, exist_ok=True)
     return {"ok": True, "path": target.resolve().relative_to(BASE_DIR).as_posix()}
+
+
+@app.get("/api/backup")
+def download_backup(background_tasks: BackgroundTasks):
+    filename = datetime.now().strftime("config-backup-%Y%m%d-%H%M%S.zip")
+    tmp = tempfile.NamedTemporaryFile(prefix="fep-backup-", suffix=".zip", delete=False)
+    tmp_path = Path(tmp.name)
+    tmp.close()
+    try:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(BASE_DIR):
+                dirs[:] = [d for d in dirs if not Path(root, d).is_symlink()]
+                for name in files:
+                    full = Path(root) / name
+                    if full.is_symlink():
+                        continue
+                    try:
+                        rel = full.resolve().relative_to(BASE_DIR).as_posix()
+                    except Exception:
+                        continue
+                    zf.write(full, rel)
+    except Exception as e:
+        logger.exception("backup: errore creazione zip: %s", e)
+        raise HTTPException(500, f"Backup failed: {e}")
+    background_tasks.add_task(lambda p=tmp_path: p.unlink(missing_ok=True))
+    return FileResponse(tmp_path, media_type="application/zip", filename=filename, background=background_tasks)
+
+
+@app.post("/api/fs/copy")
+async def copy_path(request: Request):
+    payload = await request.json()
+    src = payload.get("src") if isinstance(payload, dict) else None
+    dest_dir = payload.get("dest_dir") if isinstance(payload, dict) else None
+    dest_name = payload.get("dest_name") if isinstance(payload, dict) else None
+    if not src:
+        raise HTTPException(400, "Source path required")
+    src_path = safe_path(src)
+    if not src_path.exists():
+        raise HTTPException(404, "Source not found")
+    dest_dir_path = safe_path(dest_dir or "")
+    if not dest_dir_path.exists() or not dest_dir_path.is_dir():
+        raise HTTPException(400, "Destination must be a directory")
+    dest_name_clean = None
+    if dest_name is not None:
+        if not isinstance(dest_name, str):
+            raise HTTPException(400, "Invalid destination name")
+        dest_name_clean = dest_name.strip()
+        if not dest_name_clean:
+            raise HTTPException(400, "Invalid destination name")
+        if Path(dest_name_clean).name != dest_name_clean:
+            raise HTTPException(400, "Invalid destination name")
+    dest_path = dest_dir_path / (dest_name_clean or src_path.name)
+    if not _is_within_base(dest_path.resolve()):
+        raise HTTPException(403, "Access denied")
+    if dest_path.exists():
+        if dest_name_clean:
+            base_name = dest_path.name
+            if base_name.startswith(".") and base_name.count(".") == 1:
+                base = base_name
+                ext = ""
+            else:
+                if "." in base_name:
+                    base, ext = base_name.rsplit(".", 1)
+                    ext = f".{ext}"
+                else:
+                    base, ext = base_name, ""
+            found = False
+            for idx in range(2, 1000):
+                candidate = dest_path.with_name(f"{base}{idx}{ext}")
+                if not candidate.exists():
+                    dest_path = candidate
+                    found = True
+                    break
+            if not found:
+                raise HTTPException(409, "Destination exists")
+        else:
+            raise HTTPException(409, "Destination exists")
+    try:
+        if src_path.is_dir():
+            try:
+                dest_path.resolve().relative_to(src_path.resolve())
+                raise HTTPException(400, "Cannot copy directory into itself")
+            except ValueError:
+                pass
+            shutil.copytree(src_path, dest_path)
+        elif src_path.is_file():
+            shutil.copy2(src_path, dest_path)
+        else:
+            raise HTTPException(400, "Unsupported source type")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("fs_copy: error %s -> %s: %s", src_path, dest_path, e)
+        raise HTTPException(500, f"Copy failed: {e}")
+    return {"ok": True, "dest": dest_path.resolve().relative_to(BASE_DIR).as_posix()}
+
+
+@app.post("/api/fs/delete")
+async def delete_path(request: Request):
+    payload = await request.json()
+    path = payload.get("path") if isinstance(payload, dict) else None
+    if not path:
+        raise HTTPException(400, "Path required")
+    target = safe_path(path)
+    if target == BASE_DIR:
+        raise HTTPException(400, "Cannot delete base directory")
+    if not target.exists():
+        raise HTTPException(404, "Path not found")
+    try:
+        if target.is_file():
+            make_backup(target)
+            target.unlink()
+            return {"ok": True, "path": target.resolve().relative_to(BASE_DIR).as_posix(), "type": "file"}
+        if target.is_dir():
+            shutil.rmtree(target)
+            return {"ok": True, "path": target.resolve().relative_to(BASE_DIR).as_posix(), "type": "dir"}
+        raise HTTPException(400, "Unsupported path type")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("fs_delete: error %s: %s", target, e)
+        raise HTTPException(500, f"Delete failed: {e}")
 
 
 @app.get("/api/tree")
