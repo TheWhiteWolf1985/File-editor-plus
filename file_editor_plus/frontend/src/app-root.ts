@@ -11,6 +11,14 @@ import {
   replaceAll as searchReplaceAll,
 } from "./features/search/search";
 import {
+  closeSnippetModal as snippetCloseSnippetModal,
+  deleteSnippet as snippetDeleteSnippet,
+  insertSnippet as snippetInsertSnippet,
+  loadSnippets as snippetLoadSnippets,
+  openSnippetModal as snippetOpenSnippetModal,
+  saveSnippet as snippetSaveSnippet,
+} from "./features/snippets/snippets";
+import {
   cancelNewItem as treeCancelNewItem,
   closeTreeMenu as treeCloseTreeMenu,
   confirmTreeDelete as treeConfirmTreeDelete,
@@ -27,18 +35,14 @@ import {
   cancelTreeDelete as treeCancelTreeDelete,
 } from "./features/tree/tree";
 import {
-  apiCreateSnippet,
-  apiDeleteSnippet,
   apiFormatYaml,
   apiGetBackup,
   apiGetFile,
-  apiGetSnippets,
   apiGetUserConfig,
   apiMdiSearch,
   apiPostDiff,
   apiPostHaAction,
   apiSaveFile,
-  apiUpdateSnippet,
   apiPutUserConfig,
 } from "./services/api";
 import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS, THEME_MODES } from "./constants";
@@ -238,7 +242,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.106";
+  private readonly appVersion = "0.1.107";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -272,6 +276,12 @@ export class AppRoot extends LitElement {
   private replaceAll = searchReplaceAll.bind(this);
   private openSearchMatch = searchOpenSearchMatch.bind(this);
   private renderSearchResults = searchRenderSearchResults.bind(this);
+  private loadSnippets = snippetLoadSnippets.bind(this);
+  private openSnippetModal = snippetOpenSnippetModal.bind(this);
+  private closeSnippetModal = snippetCloseSnippetModal.bind(this);
+  private saveSnippet = snippetSaveSnippet.bind(this);
+  private insertSnippet = snippetInsertSnippet.bind(this);
+  private deleteSnippet = snippetDeleteSnippet.bind(this);
 
   constructor() {
     super();
@@ -1101,90 +1111,6 @@ export class AppRoot extends LitElement {
     this.closeSuggestions();
   }
 
-  private async loadSnippets() {
-    try {
-      const res = await apiGetSnippets(this.apiBase);
-      if (!res.ok) throw new Error(`snippets ${res.status}`);
-      const data = await res.json();
-      const items = Array.isArray(data?.items) ? (data.items as Snippet[]) : [];
-      this.snippets = items.length > 0 ? items : this.snippetMocks;
-    } catch (e) {
-      this.snippets = this.snippetMocks;
-      this.showToast("Snippet offline (mock)", "error");
-    }
-  }
-
-  private openSnippetModal(existing?: Snippet) {
-    this.showSnippetModal = true;
-    if (existing) {
-      this.snippetEditingId = existing.id;
-      this.snippetName = existing.name;
-      this.snippetDescription = existing.description;
-      this.snippetContent = existing.content;
-    } else {
-      this.snippetEditingId = null;
-      this.snippetName = "";
-      this.snippetDescription = "";
-      this.snippetContent = "";
-    }
-  }
-
-  private closeSnippetModal() {
-    if (this.snippetSaving) return;
-    this.showSnippetModal = false;
-    this.snippetEditingId = null;
-  }
-
-  private async saveSnippet() {
-    if (this.snippetSaving) return;
-    const name = this.snippetName.trim();
-    const description = this.snippetDescription.trim();
-    const content = this.snippetContent;
-    if (!name || !description || !content) {
-      this.showToast("Compila tutti i campi", "error");
-      return;
-    }
-    if (name.length > 100) {
-      this.showToast("Titolo troppo lungo (max 100)", "error");
-      return;
-    }
-    if (description.length > 250) {
-      this.showToast("Descrizione troppo lunga (max 250)", "error");
-      return;
-    }
-    this.snippetSaving = true;
-    try {
-      const payload = { name, description, content };
-      if (this.snippetEditingId) {
-        const res = await apiUpdateSnippet(this.apiBase, this.snippetEditingId, payload);
-        if (!res.ok) throw new Error(`update snippet ${res.status}`);
-        const data = await res.json();
-        const item = data?.item as Snippet | undefined;
-        if (item && item.id) {
-          this.snippets = this.snippets.map((s) => (s.id === item.id ? item : s));
-        }
-        this.showToast("Snippet aggiornato");
-      } else {
-        const res = await apiCreateSnippet(this.apiBase, payload);
-        if (!res.ok) throw new Error(`save snippet ${res.status}`);
-        const data = await res.json();
-        const item = data?.item as Snippet | undefined;
-        if (item && item.id) {
-          this.snippets = [...this.snippets, item];
-        } else {
-          this.snippets = [...this.snippets, { id: `tmp-${Date.now()}`, name, description, content }];
-        }
-        this.showToast("Snippet salvato");
-      }
-      this.showSnippetModal = false;
-      this.snippetEditingId = null;
-    } catch (e) {
-      this.showToast("Errore salvataggio snippet", "error");
-    } finally {
-      this.snippetSaving = false;
-    }
-  }
-
   private scrollSuggestIntoView() {
     if (!this.suggestOpen) return;
     const items = this.shadowRoot?.querySelectorAll(".suggestItem");
@@ -1301,44 +1227,6 @@ export class AppRoot extends LitElement {
     } finally {
       this.backupLoading = false;
       this.backupMode = null;
-    }
-  }
-
-  private insertSnippet(snippet: Snippet) {
-    if (!this.editorRef || !this.activePath) {
-      this.showToast("Apri un file prima di inserire", "error");
-      return;
-    }
-    const ta = this.editorRef;
-    const start = ta.selectionStart ?? this.content.length;
-    const end = ta.selectionEnd ?? start;
-    const insert = snippet.content || "";
-    const next = `${this.content.slice(0, start)}${insert}${this.content.slice(end)}`;
-    this.markDirty(next);
-    const pos = start + insert.length;
-    requestAnimationFrame(() => {
-      if (!this.editorRef) return;
-      this.editorRef.selectionStart = pos;
-      this.editorRef.selectionEnd = pos;
-      this.editorRef.focus();
-      this.updateCursorFromPos(pos, this.content);
-    });
-    this.showToast(`Snippet inserito: ${snippet.name}`);
-  }
-
-  private async deleteSnippet(snippet: Snippet) {
-    const id = snippet.id;
-    if (!id) {
-      this.showToast("ID snippet mancante", "error");
-      return;
-    }
-    try {
-      const res = await apiDeleteSnippet(this.apiBase, id);
-      if (!res.ok) throw new Error(`delete snippet ${res.status}`);
-      this.snippets = this.snippets.filter((s) => s.id !== id);
-      this.showToast("Snippet eliminato");
-    } catch (e) {
-      this.showToast("Errore eliminazione snippet", "error");
     }
   }
 

@@ -339,6 +339,22 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-11"
     actor: "codex"
+    version: "0.1.107"
+    change: "Refactor step 6: estratta la logica Snippets in modulo dedicato."
+    reason: "Isolare CRUD snippet e inserimento senza cambiare la UI."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/features/snippets/snippets.ts"
+      - "file_editor_plus/CHANGELOG.md"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "rg -n \"features/snippets/snippets\" file_editor_plus/frontend/src/app-root.ts"
+      - "rg -n \"loadSnippets\" file_editor_plus/frontend/src/features/snippets/snippets.ts"
+      - "rg -n \"appVersion\" file_editor_plus/frontend/src/app-root.ts"
+      - "rg -n \"version:\" file_editor_plus/config.yaml"
+  - date: "2026-01-11"
+    actor: "codex"
     version: "0.1.106"
     change: "Refactor step 5: estratta la logica Search & Replace in modulo dedicato."
     reason: "Isolare le operazioni di ricerca/sostituzione senza cambiare comportamento."
