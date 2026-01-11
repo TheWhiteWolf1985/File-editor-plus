@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.105
+
+- Refactor: logica Tree/Explorer estratta in modulo dedicato (nessun cambio funzionale).
+
 ## 0.1.104
 
 - Refactor: helper overlay/gutter estratti in modulo dedicato (nessun cambio funzionale).

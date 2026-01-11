@@ -5,15 +5,28 @@ import { HAClient, type HassState } from "./ha-client";
 import { appStyles } from "./styles/app-styles";
 import { renderHighlighted, renderLineNumbers, renderLineNumbersFor } from "./features/editor/overlay";
 import {
-  apiCreateFile,
-  apiCreateFolder,
+  cancelNewItem as treeCancelNewItem,
+  closeTreeMenu as treeCloseTreeMenu,
+  confirmTreeDelete as treeConfirmTreeDelete,
+  copyTreeItem as treeCopyTreeItem,
+  createNewItem as treeCreateNewItem,
+  executeTreeDelete as treeExecuteTreeDelete,
+  handleTreeContextMenu as treeHandleTreeContextMenu,
+  loadTree as treeLoadTree,
+  pasteTreeItem as treePasteTreeItem,
+  reloadTree as treeReloadTree,
+  reloadTreePath as treeReloadTreePath,
+  renderTree as treeRenderTree,
+  toggleDir as treeToggleDir,
+  cancelTreeDelete as treeCancelTreeDelete,
+} from "./features/tree/tree";
+import {
   apiCreateSnippet,
   apiDeleteSnippet,
   apiFormatYaml,
   apiGetBackup,
   apiGetFile,
   apiGetSnippets,
-  apiGetTree,
   apiGetUserConfig,
   apiMdiSearch,
   apiPostDiff,
@@ -22,8 +35,6 @@ import {
   apiSearch,
   apiSearchReplaceApply,
   apiSearchReplacePreview,
-  apiTreeCopy,
-  apiTreeDelete,
   apiUpdateSnippet,
   apiPutUserConfig,
 } from "./services/api";
@@ -224,7 +235,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.104";
+  private readonly appVersion = "0.1.105";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -240,6 +251,20 @@ export class AppRoot extends LitElement {
     if (active !== this.editorRef) return;
     this.updateCursorFromPos(this.editorRef.selectionStart ?? 0, this.editorRef.value);
   };
+  private loadTree = treeLoadTree.bind(this);
+  private reloadTree = treeReloadTree.bind(this);
+  private toggleDir = treeToggleDir.bind(this);
+  private handleTreeContextMenu = treeHandleTreeContextMenu.bind(this);
+  private closeTreeMenu = treeCloseTreeMenu.bind(this);
+  private copyTreeItem = treeCopyTreeItem.bind(this);
+  private pasteTreeItem = treePasteTreeItem.bind(this);
+  private confirmTreeDelete = treeConfirmTreeDelete.bind(this);
+  private cancelTreeDelete = treeCancelTreeDelete.bind(this);
+  private executeTreeDelete = treeExecuteTreeDelete.bind(this);
+  private reloadTreePath = treeReloadTreePath.bind(this);
+  private createNewItem = treeCreateNewItem.bind(this);
+  private cancelNewItem = treeCancelNewItem.bind(this);
+  private renderTree = treeRenderTree.bind(this);
 
   constructor() {
     super();
@@ -350,58 +375,6 @@ export class AppRoot extends LitElement {
       this.haClient = null;
     }
     super.disconnectedCallback();
-  }
-
-  private async loadTree(path: string, force = false) {
-    if ((!force && this.loadedPaths.has(path)) || this.loadingPaths.has(path)) {
-      return;
-    }
-    this.loadingPaths.add(path);
-
-    try {
-      this.status = "Loading tree...";
-      const res = await apiGetTree(this.apiBase, path);
-      if (!res.ok) {
-        throw new Error(`tree ${res.status}`);
-      }
-      const data = await res.json();
-      const key = (data && typeof data.path === "string" ? data.path : path) || "";
-      const items = Array.isArray(data?.items) ? (data.items as TreeItem[]) : [];
-      if (key === "") {
-        this.rootItems = items;
-      }
-      this.treeData = { ...this.treeData, [key]: items };
-      this.status = items.length === 0 ? "Nessun file" : "Ready";
-    } catch (e) {
-      this.status = "Errore caricamento tree";
-    } finally {
-      this.loadingPaths.delete(path);
-      this.loadedPaths.add(path);
-    }
-  }
-
-  private async reloadTree() {
-    const expandedPaths = Array.from(this.expanded).filter((p) => p !== "");
-    this.loadedPaths.clear();
-    this.loadingPaths.clear();
-    this.treeData = {};
-    this.rootItems = [];
-    await this.loadTree("", true);
-    for (const p of expandedPaths) {
-      await this.loadTree(p, true);
-    }
-    this.showToast("Tree ricaricato");
-  }
-
-  private async toggleDir(path: string) {
-    const s = new Set(this.expanded);
-    const willExpand = !s.has(path);
-    willExpand ? s.add(path) : s.delete(path);
-    this.expanded = s;
-
-    if (willExpand && !this.treeData[path]) {
-      await this.loadTree(path);
-    }
   }
 
   private openFile(path: string) {
@@ -745,140 +718,6 @@ export class AppRoot extends LitElement {
     if (this.contextMenuOpen) {
       this.contextMenuOpen = false;
     }
-  }
-
-  private handleTreeContextMenu(e: MouseEvent, item: TreeItem) {
-    e.preventDefault();
-    e.stopPropagation();
-    this.treeMenuOpen = true;
-    this.treeMenuX = e.clientX;
-    this.treeMenuY = e.clientY;
-    this.treeMenuPath = item.path;
-    this.treeMenuType = item.type;
-    this.contextMenuOpen = false;
-    this.openMenu = null;
-    this.closeSuggestions();
-  }
-
-  private closeTreeMenu() {
-    if (this.treeMenuOpen) {
-      this.treeMenuOpen = false;
-    }
-  }
-
-  private copyTreeItem() {
-    if (!this.treeMenuPath || !this.treeMenuType) return;
-    this.treeClipboard = { path: this.treeMenuPath, type: this.treeMenuType };
-    this.showToast(`Copiato: ${this.treeMenuPath}`);
-    this.closeTreeMenu();
-  }
-
-  private getCopyName(path: string, type: "file" | "dir") {
-    const name = path.split("/").pop() || path;
-    if (type === "dir") {
-      return `${name}_copy`;
-    }
-    const dot = name.lastIndexOf(".");
-    if (dot > 0) {
-      const base = name.slice(0, dot);
-      const ext = name.slice(dot);
-      return `${base}_copy${ext}`;
-    }
-    return `${name}_copy`;
-  }
-
-  private async pasteTreeItem() {
-    if (!this.treeClipboard || !this.treeMenuPath || !this.treeMenuType) return;
-    const destDir =
-      this.treeMenuType === "dir"
-        ? this.treeMenuPath
-        : this.treeMenuPath.includes("/")
-          ? this.treeMenuPath.split("/").slice(0, -1).join("/")
-          : "";
-    const destName = this.getCopyName(this.treeClipboard.path, this.treeClipboard.type);
-    try {
-      const res = await apiTreeCopy(this.apiBase, {
-        src: this.treeClipboard.path,
-        dest_dir: destDir,
-        dest_name: destName,
-      });
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
-      if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.detail || payload?.error?.message || `Errore copia (HTTP ${res.status})`;
-        this.showToast(msg, "error");
-        return;
-      }
-      const destPath = payload?.dest ? String(payload.dest) : destName;
-      this.showToast(`Incollato: ${destPath}`);
-      await this.reloadTreePath(destDir);
-    } catch {
-      this.showToast("Errore copia", "error");
-    } finally {
-      this.closeTreeMenu();
-    }
-  }
-
-  private confirmTreeDelete() {
-    if (!this.treeMenuPath || !this.treeMenuType) return;
-    this.deleteTargetPath = this.treeMenuPath;
-    this.deleteTargetType = this.treeMenuType;
-    this.showTreeDeleteModal = true;
-    this.closeTreeMenu();
-  }
-
-  private cancelTreeDelete() {
-    this.showTreeDeleteModal = false;
-    this.deleteTargetPath = null;
-    this.deleteTargetType = null;
-  }
-
-  private async executeTreeDelete() {
-    if (!this.deleteTargetPath || !this.deleteTargetType) return;
-    const target = this.deleteTargetPath;
-    const parent = target.includes("/") ? target.split("/").slice(0, -1).join("/") : "";
-    try {
-      const res = await apiTreeDelete(this.apiBase, { path: target });
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
-      if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.detail || payload?.error?.message || `Errore eliminazione (HTTP ${res.status})`;
-        this.showToast(msg, "error");
-        return;
-      }
-      this.closeTabsForDeletedPath(target, this.deleteTargetType);
-      this.showToast("Elemento eliminato");
-      await this.reloadTreePath(parent);
-    } catch {
-      this.showToast("Errore eliminazione", "error");
-    } finally {
-      this.cancelTreeDelete();
-    }
-  }
-
-  private closeTabsForDeletedPath(path: string, type: "file" | "dir") {
-    if (type === "file") {
-      this.closeTab(path);
-      return;
-    }
-    const prefix = path.endsWith("/") ? path : `${path}/`;
-    const affected = this.tabs.filter((t) => t.path === path || t.path.startsWith(prefix));
-    if (affected.length === 0) return;
-    affected.forEach((t) => this.closeTab(t.path));
-  }
-
-  private async reloadTreePath(path: string) {
-    this.loadedPaths.delete(path);
-    await this.loadTree(path, true);
-    this.expanded = new Set(this.expanded).add(path);
   }
 
   private async handleCopyCut(action: "copy" | "cut") {
@@ -1806,102 +1645,6 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private async createNewItem() {
-    if (!this.newItemKind) return;
-    const dir = this.activePath && this.activePath.includes("/") ? this.activePath.split("/").slice(0, -1).join("/") : "";
-    if (this.newItemKind === "file") {
-      const base = this.newItemName.trim();
-      const ext = this.newItemExt.trim();
-      if (!base) {
-        this.status = "Nome file richiesto";
-        this.showToast("Nome file richiesto", "error");
-        return;
-      }
-      const filename = ext ? `${base}.${ext.replace(/^\./, "")}` : base;
-      const target = dir ? `${dir}/${filename}` : filename;
-      try {
-        const parentItems =
-          dir && dir !== ""
-            ? this.treeData[dir] ?? []
-            : this.rootItems.length > 0
-              ? this.rootItems
-              : this.treeData[""] ?? [];
-        if (parentItems.some((it) => it.name === filename && it.type === "file")) {
-          this.showToast("File already exist", "error");
-          this.status = "File already exist";
-          return;
-        }
-        const res = await apiCreateFile(this.apiBase, target);
-        if (!res.ok) {
-          const detailJson = await res.json().catch(() => null);
-          const detailText = !detailJson ? await res.text().catch(() => "") : "";
-          const msg =
-            (detailJson && (detailJson.detail || detailJson.message)) ||
-            detailText ||
-            (res.status === 400 ? "File already exist" : "Errore creazione file");
-          this.showToast(msg, "error");
-          this.status = msg;
-          return;
-        }
-        this.newItemKind = null;
-        this.loadedPaths.delete(dir);
-        await this.loadTree(dir, true);
-        this.expanded = new Set(this.expanded).add(dir);
-        this.openFile(target);
-      } catch (e) {
-        this.status = "Errore creazione file";
-        this.showToast("Errore creazione file", "error");
-      }
-    } else if (this.newItemKind === "folder") {
-      const base = this.newItemName.trim();
-      if (!base) {
-        this.status = "Nome cartella richiesto";
-        this.showToast("Nome cartella richiesta", "error");
-        return;
-      }
-      const parentItems =
-        dir && dir !== ""
-          ? this.treeData[dir] ?? []
-          : this.rootItems.length > 0
-            ? this.rootItems
-            : this.treeData[""] ?? [];
-      if (parentItems.some((it) => it.name === base && it.type === "dir")) {
-        const msg = "Folder already exist";
-        this.showToast(msg, "error");
-        this.status = msg;
-        return;
-      }
-      const target = dir ? `${dir}/${base}` : base;
-      try {
-        const res = await apiCreateFolder(this.apiBase, target);
-        if (!res.ok) {
-          const detailJson = await res.json().catch(() => null);
-          const detailText = !detailJson ? await res.text().catch(() => "") : "";
-          const msg =
-            (detailJson && (detailJson.detail || detailJson.message)) ||
-            detailText ||
-            (res.status === 400 ? "Folder already exist" : "Cartella esiste già o errore");
-          this.showToast(msg, "error");
-          this.status = msg;
-          return;
-        }
-        this.newItemKind = null;
-        this.loadedPaths.delete(dir);
-        await this.loadTree(dir, true);
-        this.expanded = new Set(this.expanded).add(target);
-      } catch (e) {
-        this.status = "Errore creazione cartella";
-        this.showToast("Errore creazione cartella", "error");
-      }
-    }
-  }
-
-  private cancelNewItem() {
-    this.newItemKind = null;
-    this.newItemName = "";
-    this.newItemExt = "";
-  }
-
   private handleCloseTab(e: Event, path: string) {
     e.stopPropagation();
     e.preventDefault();
@@ -2526,40 +2269,6 @@ export class AppRoot extends LitElement {
     } catch (e) {
       this.status = "Errore salvataggio";
     }
-  }
-
-  private renderTree(path: string, depth = 0) {
-    const items =
-      path === ""
-        ? this.rootItems.length > 0
-          ? this.rootItems
-          : this.treeData[""] ?? []
-        : this.treeData[path] ?? [];
-    return items.map((it) => {
-      const isDir = it.type === "dir";
-      const isExpanded = isDir && this.expanded.has(it.path);
-      const active = this.activePath === it.path;
-
-      return html`
-        <div
-          class="treeRow ${active ? "active" : ""}"
-          style="padding-left:${8 + depth * 14}px"
-          @click=${() => {
-            if (isDir) this.toggleDir(it.path);
-            else this.openFile(it.path);
-          }}
-          @contextmenu=${(e: MouseEvent) => this.handleTreeContextMenu(e, it)}
-        >
-          <span class="twisty">${isDir ? (isExpanded ? "▾" : "▸") : ""}</span>
-          <span>${isDir ? "📁" : "📄"}</span>
-          <span class=${isDir ? "" : "muted"}>${it.name}</span>
-        </div>
-
-        ${isDir && isExpanded
-          ? html`<div>${this.renderTree(it.path, depth + 1)}</div>`
-          : nothing}
-      `;
-    });
   }
 
   render() {
