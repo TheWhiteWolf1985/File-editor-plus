@@ -3,6 +3,30 @@ import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
 import { HAClient, type HassState } from "./ha-client";
 import { appStyles } from "./styles/app-styles";
+import { renderHighlighted, renderLineNumbers, renderLineNumbersFor } from "./features/editor/overlay";
+import {
+  apiCreateFile,
+  apiCreateFolder,
+  apiCreateSnippet,
+  apiDeleteSnippet,
+  apiFormatYaml,
+  apiGetBackup,
+  apiGetFile,
+  apiGetSnippets,
+  apiGetTree,
+  apiGetUserConfig,
+  apiMdiSearch,
+  apiPostDiff,
+  apiPostHaAction,
+  apiSaveFile,
+  apiSearch,
+  apiSearchReplaceApply,
+  apiSearchReplacePreview,
+  apiTreeCopy,
+  apiTreeDelete,
+  apiUpdateSnippet,
+  apiPutUserConfig,
+} from "./services/api";
 import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS, THEME_MODES } from "./constants";
 import type { MdiIcon, SearchMatch, SearchResult, SearchSummary, Snippet, ThemeMode, UserConfig } from "./types/api";
 import type { DiffHunk, DiffSummary, SuggestItem, Tab, TreeItem } from "./types/editor";
@@ -200,7 +224,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.102";
+  private readonly appVersion = "0.1.104";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -336,8 +360,7 @@ export class AppRoot extends LitElement {
 
     try {
       this.status = "Loading tree...";
-      const url = `${this.apiBase}api/tree${path ? `?path=${encodeURIComponent(path)}` : ""}`;
-      const res = await fetch(url);
+      const res = await apiGetTree(this.apiBase, path);
       if (!res.ok) {
         throw new Error(`tree ${res.status}`);
       }
@@ -399,8 +422,7 @@ export class AppRoot extends LitElement {
   private async loadFile(path: string) {
     try {
       this.status = "Loading file...";
-      const url = `${this.apiBase}api/file?path=${encodeURIComponent(path)}`;
-      const res = await fetch(url);
+      const res = await apiGetFile(this.apiBase, path);
       if (!res.ok) {
         throw new Error(`file ${res.status}`);
       }
@@ -500,11 +522,7 @@ export class AppRoot extends LitElement {
         modified_text: this.content,
         mode: "saved",
       };
-      const res = await fetch(`${this.apiBase}api/diff`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await apiPostDiff(this.apiBase, payload);
       let data: any = null;
       try {
         data = await res.json();
@@ -779,10 +797,10 @@ export class AppRoot extends LitElement {
           : "";
     const destName = this.getCopyName(this.treeClipboard.path, this.treeClipboard.type);
     try {
-      const res = await fetch(`${this.apiBase}api/fs/copy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ src: this.treeClipboard.path, dest_dir: destDir, dest_name: destName }),
+      const res = await apiTreeCopy(this.apiBase, {
+        src: this.treeClipboard.path,
+        dest_dir: destDir,
+        dest_name: destName,
       });
       let payload: any = null;
       try {
@@ -824,11 +842,7 @@ export class AppRoot extends LitElement {
     const target = this.deleteTargetPath;
     const parent = target.includes("/") ? target.split("/").slice(0, -1).join("/") : "";
     try {
-      const res = await fetch(`${this.apiBase}api/fs/delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: target }),
-      });
+      const res = await apiTreeDelete(this.apiBase, { path: target });
       let payload: any = null;
       try {
         payload = await res.json();
@@ -1143,7 +1157,7 @@ export class AppRoot extends LitElement {
     if (cached) return cached;
     const requestId = ++this.mdiSuggestRequestId;
     try {
-      const res = await fetch(`${this.apiBase}api/mdi/search?query=${encodeURIComponent(key)}&limit=50`);
+      const res = await apiMdiSearch(this.apiBase, key, 50);
       let payload: any = null;
       try {
         payload = await res.json();
@@ -1243,7 +1257,7 @@ export class AppRoot extends LitElement {
 
   private async loadSnippets() {
     try {
-      const res = await fetch(`${this.apiBase}api/snippets`);
+      const res = await apiGetSnippets(this.apiBase);
       if (!res.ok) throw new Error(`snippets ${res.status}`);
       const data = await res.json();
       const items = Array.isArray(data?.items) ? (data.items as Snippet[]) : [];
@@ -1296,11 +1310,7 @@ export class AppRoot extends LitElement {
     try {
       const payload = { name, description, content };
       if (this.snippetEditingId) {
-        const res = await fetch(`${this.apiBase}api/snippets/${encodeURIComponent(this.snippetEditingId)}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        const res = await apiUpdateSnippet(this.apiBase, this.snippetEditingId, payload);
         if (!res.ok) throw new Error(`update snippet ${res.status}`);
         const data = await res.json();
         const item = data?.item as Snippet | undefined;
@@ -1309,11 +1319,7 @@ export class AppRoot extends LitElement {
         }
         this.showToast("Snippet aggiornato");
       } else {
-        const res = await fetch(`${this.apiBase}api/snippets`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        const res = await apiCreateSnippet(this.apiBase, payload);
         if (!res.ok) throw new Error(`save snippet ${res.status}`);
         const data = await res.json();
         const item = data?.item as Snippet | undefined;
@@ -1357,11 +1363,7 @@ export class AppRoot extends LitElement {
         max_matches_total: 5000,
         max_matches_per_file: 200,
       };
-      const res = await fetch(`${this.apiBase}api/search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await apiSearch(this.apiBase, payload);
       const data = await res.json();
       if (!res.ok || data?.ok !== true) {
         throw new Error(data?.detail || `search ${res.status}`);
@@ -1396,11 +1398,7 @@ export class AppRoot extends LitElement {
         scope: "files",
         files,
       };
-      const previewRes = await fetch(`${this.apiBase}api/search/replace/preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const previewRes = await apiSearchReplacePreview(this.apiBase, payload);
       let preview: any = null;
       try {
         preview = await previewRes.json();
@@ -1421,11 +1419,7 @@ export class AppRoot extends LitElement {
       const confirmed = window.confirm(`Sostituire ${replacements} occorrenze in ${toModify} file?`);
       if (!confirmed) return;
 
-      const applyRes = await fetch(`${this.apiBase}api/search/replace/apply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const applyRes = await apiSearchReplaceApply(this.apiBase, payload);
       let apply: any = null;
       try {
         apply = await applyRes.json();
@@ -1458,11 +1452,7 @@ export class AppRoot extends LitElement {
     this.systemActionLoading = true;
     this.systemActionPending = action;
     try {
-      const res = await fetch(`${this.apiBase}api/ha/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
+      const res = await apiPostHaAction(this.apiBase, action);
       let payload: any = null;
       try {
         payload = await res.json();
@@ -1535,7 +1525,7 @@ export class AppRoot extends LitElement {
         this.triggerBackupDownload();
         return;
       }
-      const res = await fetch(`${this.apiBase}api/backup`);
+      const res = await apiGetBackup(this.apiBase);
       if (!res.ok) {
         const text = await res.text().catch(() => "");
         const msg = text || `Errore backup (HTTP ${res.status})`;
@@ -1598,7 +1588,7 @@ export class AppRoot extends LitElement {
       return;
     }
     try {
-      const res = await fetch(`${this.apiBase}api/snippets/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const res = await apiDeleteSnippet(this.apiBase, id);
       if (!res.ok) throw new Error(`delete snippet ${res.status}`);
       this.snippets = this.snippets.filter((s) => s.id !== id);
       this.showToast("Snippet eliminato");
@@ -1614,11 +1604,7 @@ export class AppRoot extends LitElement {
     this.indenting = true;
     this.status = "Formatting YAML...";
     try {
-      const res = await fetch(`${this.apiBase}api/format/yaml`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: this.content }),
-      });
+      const res = await apiFormatYaml(this.apiBase, this.content);
       let payload: any = null;
       try {
         payload = await res.json();
@@ -1845,12 +1831,7 @@ export class AppRoot extends LitElement {
           this.status = "File already exist";
           return;
         }
-        const url = `${this.apiBase}api/file?path=${encodeURIComponent(target)}&create_only=1`;
-        const res = await fetch(url, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: "" }),
-        });
+        const res = await apiCreateFile(this.apiBase, target);
         if (!res.ok) {
           const detailJson = await res.json().catch(() => null);
           const detailText = !detailJson ? await res.text().catch(() => "") : "";
@@ -1892,8 +1873,7 @@ export class AppRoot extends LitElement {
       }
       const target = dir ? `${dir}/${base}` : base;
       try {
-        const url = `${this.apiBase}api/folder?path=${encodeURIComponent(target)}`;
-        const res = await fetch(url, { method: "POST" });
+        const res = await apiCreateFolder(this.apiBase, target);
         if (!res.ok) {
           const detailJson = await res.json().catch(() => null);
           const detailText = !detailJson ? await res.text().catch(() => "") : "";
@@ -1953,81 +1933,6 @@ export class AppRoot extends LitElement {
       this.cursorCol = 1;
       this.loadFile(path);
     }
-  }
-
-  private highlightLine(line: string) {
-    type Seg = { text: string; cls?: string };
-    const segments: Seg[] = [];
-    const pushWithStyles = (text: string) => {
-      const regex = /(".*?"|'.*?'|\btrue\b|\bfalse\b|\bnull\b|\b\d+(?:\.\d+)?\b)/g;
-      let last = 0;
-      let m: RegExpExecArray | null;
-      while ((m = regex.exec(text)) !== null) {
-        if (m.index > last) {
-          segments.push({ text: text.slice(last, m.index) });
-        }
-        const token = m[1];
-        if (token === "true" || token === "false" || token === "null") {
-          segments.push({ text: token, cls: "token-boolean" });
-        } else if (/^\d/.test(token)) {
-          segments.push({ text: token, cls: "token-number" });
-        } else {
-          segments.push({ text: token, cls: "token-string" });
-        }
-        last = m.index + token.length;
-      }
-      if (last < text.length) {
-        segments.push({ text: text.slice(last) });
-      }
-    };
-
-    const commentIdx = line.indexOf("#");
-    const contentPart = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
-    const commentPart = commentIdx >= 0 ? line.slice(commentIdx) : null;
-
-    const keyMatch = contentPart.match(/^(\s*-?\s*[^:\s#]+:)/);
-    if (keyMatch) {
-      const key = keyMatch[1];
-      segments.push({ text: key, cls: "token-key" });
-      const rest = contentPart.slice(key.length);
-      if (rest) pushWithStyles(rest);
-    } else {
-      pushWithStyles(contentPart);
-    }
-
-    if (commentPart) {
-      segments.push({ text: commentPart, cls: "token-comment" });
-    }
-    if (segments.length === 0) {
-      segments.push({ text: " " });
-    }
-    return segments;
-  }
-
-  private renderOverlayText(text: string) {
-    return text.replace(/\t/g, "  ").replace(/ /g, "\u00A0");
-  }
-
-  private renderHighlighted(text: string, diffMap?: Map<number, string>) {
-    const lines = text.split("\n");
-    return lines.map((line, idx) => {
-      const lineNo = idx + 1;
-      const diffClass = diffMap?.get(lineNo);
-      const cls = diffClass ? `codeLine ${diffClass}` : "codeLine";
-      const indentMatch = line.match(/^[\t ]+/);
-      const indentRaw = indentMatch ? indentMatch[0] : "";
-      const rest = indentRaw ? line.slice(indentRaw.length) : line;
-      const indentRendered = indentRaw
-        ? indentRaw.replace(/\t/g, "  ").replace(/ /g, "\u00A0")
-        : "";
-      const indentNode = indentRendered ? html`<span class="codeIndent">${indentRendered}</span>` : nothing;
-      const tokens = this.highlightLine(rest).map((seg) => {
-        const raw = seg.text && seg.text.length > 0 ? seg.text : " ";
-        const display = this.renderOverlayText(raw);
-        return html`<span class=${seg.cls ?? ""}>${display}</span>`;
-      });
-      return html`<div class=${cls} data-gutter-line=${lineNo}>${indentNode}${tokens}</div>`;
-    });
   }
 
   private renderMenu(label: string, name: string, items: { icon: string; label: string }[]) {
@@ -2183,11 +2088,7 @@ export class AppRoot extends LitElement {
       theme_mode: config.theme_mode ?? this.themeMode,
     };
     try {
-      const res = await fetch(`${this.apiBase}api/user-config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config: payload }),
-      });
+      const res = await apiPutUserConfig(this.apiBase, payload);
       let data: any = null;
       try {
         data = await res.json();
@@ -2202,7 +2103,7 @@ export class AppRoot extends LitElement {
 
   private async loadFontSettings() {
     try {
-      const res = await fetch(`${this.apiBase}api/user-config`);
+      const res = await apiGetUserConfig(this.apiBase);
       if (res.ok) {
         let payload: any = null;
         try {
@@ -2604,26 +2505,11 @@ export class AppRoot extends LitElement {
     </div>`;
   }
 
-  private renderLineNumbers() {
-    const count = Math.max(1, this.lineCount);
-    return Array.from({ length: count }, (_, i) => String(i + 1)).join("\n");
-  }
-
-  private renderLineNumbersFor(text: string) {
-    const count = Math.max(1, text.split("\n").length);
-    return Array.from({ length: count }, (_, i) => String(i + 1)).join("\n");
-  }
-
   private async save() {
     if (!this.activePath) return;
     this.status = "Saving...";
     try {
-      const url = `${this.apiBase}api/file?path=${encodeURIComponent(this.activePath)}`;
-      const res = await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: this.content }),
-      });
+      const res = await apiSaveFile(this.apiBase, this.activePath, this.content);
       if (!res.ok) {
         throw new Error(`save ${res.status}`);
       }
@@ -2789,9 +2675,9 @@ export class AppRoot extends LitElement {
                 ? html`<div class="splitWrap">
                     <div class="splitPane">
                       <div class="editorWrap">
-                        <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${this.renderLineNumbers()}</div>
+                        <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
                         <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted(this.content, diffMaps.left)}</div>
+                      <div class="code" ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content, diffMaps.left)}</div>
                       <textarea
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}
@@ -2814,9 +2700,9 @@ export class AppRoot extends LitElement {
                     </div>
                     <div class="splitPane">
                       <div class="editorWrap">
-                        <div class="gutter" ${ref((el) => (this.baseGutterRef = el))}>${this.renderLineNumbersFor(this.savedBaseText)}</div>
+                        <div class="gutter" ${ref((el) => (this.baseGutterRef = el))}>${renderLineNumbersFor(this.savedBaseText)}</div>
                         <div class="codeWrap">
-                          <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${this.renderHighlighted(this.savedBaseText, diffMaps.right)}</div>
+                          <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${renderHighlighted(this.savedBaseText, diffMaps.right)}</div>
                           <pre
                             class="basePre"
                             ${ref((el) => (this.basePreRef = el))}
@@ -2827,9 +2713,9 @@ export class AppRoot extends LitElement {
                     </div>
                   </div>`
                 : html`<div class="editorWrap">
-                    <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${this.renderLineNumbers()}</div>
+                    <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
                     <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted(this.content)}</div>
+                      <div class="code" ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content)}</div>
                       <textarea
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}

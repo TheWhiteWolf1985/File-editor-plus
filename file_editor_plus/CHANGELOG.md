@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.104
+
+- Refactor: helper overlay/gutter estratti in modulo dedicato (nessun cambio funzionale).
+
+## 0.1.103
+
+- Refactor: servizi API estratti in modulo dedicato (nessun cambio funzionale).
+
 ## 0.1.102
 
 - Refactor: stili estratti in modulo dedicato (nessun cambio funzionale).
