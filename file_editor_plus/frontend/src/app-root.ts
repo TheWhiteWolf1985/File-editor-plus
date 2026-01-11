@@ -5,6 +5,12 @@ import { HAClient, type HassState } from "./ha-client";
 import { appStyles } from "./styles/app-styles";
 import { renderHighlighted, renderLineNumbers, renderLineNumbersFor } from "./features/editor/overlay";
 import {
+  openSearchMatch as searchOpenSearchMatch,
+  performSearch as searchPerformSearch,
+  renderSearchResults as searchRenderSearchResults,
+  replaceAll as searchReplaceAll,
+} from "./features/search/search";
+import {
   cancelNewItem as treeCancelNewItem,
   closeTreeMenu as treeCloseTreeMenu,
   confirmTreeDelete as treeConfirmTreeDelete,
@@ -32,14 +38,11 @@ import {
   apiPostDiff,
   apiPostHaAction,
   apiSaveFile,
-  apiSearch,
-  apiSearchReplaceApply,
-  apiSearchReplacePreview,
   apiUpdateSnippet,
   apiPutUserConfig,
 } from "./services/api";
 import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS, THEME_MODES } from "./constants";
-import type { MdiIcon, SearchMatch, SearchResult, SearchSummary, Snippet, ThemeMode, UserConfig } from "./types/api";
+import type { MdiIcon, SearchResult, SearchSummary, Snippet, ThemeMode, UserConfig } from "./types/api";
 import type { DiffHunk, DiffSummary, SuggestItem, Tab, TreeItem } from "./types/editor";
 
 @customElement("app-root")
@@ -235,7 +238,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.105";
+  private readonly appVersion = "0.1.106";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -265,6 +268,10 @@ export class AppRoot extends LitElement {
   private createNewItem = treeCreateNewItem.bind(this);
   private cancelNewItem = treeCancelNewItem.bind(this);
   private renderTree = treeRenderTree.bind(this);
+  private performSearch = searchPerformSearch.bind(this);
+  private replaceAll = searchReplaceAll.bind(this);
+  private openSearchMatch = searchOpenSearchMatch.bind(this);
+  private renderSearchResults = searchRenderSearchResults.bind(this);
 
   constructor() {
     super();
@@ -1186,102 +1193,6 @@ export class AppRoot extends LitElement {
     el?.scrollIntoView({ block: "nearest" });
   }
 
-  private async performSearch() {
-    const query = this.searchQuery.trim();
-    if (!query) {
-      this.showToast("Inserisci un termine di ricerca", "error");
-      return;
-    }
-    this.searchTruncated = false;
-    this.searchLoading = true;
-    try {
-      const payload = {
-        query,
-        case_sensitive: this.searchCaseSensitive,
-        max_files: 200,
-        max_matches_total: 5000,
-        max_matches_per_file: 200,
-      };
-      const res = await apiSearch(this.apiBase, payload);
-      const data = await res.json();
-      if (!res.ok || data?.ok !== true) {
-        throw new Error(data?.detail || `search ${res.status}`);
-      }
-      this.searchResults = Array.isArray(data.results) ? (data.results as SearchResult[]) : [];
-      this.searchSummary = (data.summary as SearchSummary) || null;
-      this.searchTruncated = !!data.truncated;
-    } catch (e) {
-      this.showToast("Errore ricerca", "error");
-    } finally {
-      this.searchLoading = false;
-    }
-  }
-
-  private async replaceAll() {
-    const query = this.searchQuery.trim();
-    if (!query) {
-      this.showToast("Esegui prima una ricerca", "error");
-      return;
-    }
-    if (this.searchResults.length === 0) {
-      this.showToast("Nessun risultato da sostituire", "error");
-      return;
-    }
-    this.searchLoading = true;
-    try {
-      const files = this.searchResults.map((r) => ({ path: r.path, mtime: r.mtime }));
-      const payload = {
-        query,
-        replace: this.searchReplace,
-        case_sensitive: this.searchCaseSensitive,
-        scope: "files",
-        files,
-      };
-      const previewRes = await apiSearchReplacePreview(this.apiBase, payload);
-      let preview: any = null;
-      try {
-        preview = await previewRes.json();
-      } catch {
-        preview = null;
-      }
-      if (!previewRes.ok || preview?.ok !== true) {
-        const detail = preview?.detail || `replace preview ${previewRes.status}`;
-        throw new Error(detail);
-      }
-      const previewSummary = preview?.summary || {};
-      const replacements = previewSummary.replacements_total ?? 0;
-      const toModify = previewSummary.files_to_modify ?? files.length;
-      if (!replacements) {
-        this.showToast("Nessuna occorrenza da sostituire");
-        return;
-      }
-      const confirmed = window.confirm(`Sostituire ${replacements} occorrenze in ${toModify} file?`);
-      if (!confirmed) return;
-
-      const applyRes = await apiSearchReplaceApply(this.apiBase, payload);
-      let apply: any = null;
-      try {
-        apply = await applyRes.json();
-      } catch {
-        apply = null;
-      }
-      if (!applyRes.ok || apply?.ok !== true) {
-        const detail = apply?.detail || `replace apply ${applyRes.status}`;
-        throw new Error(detail);
-      }
-      const summary = apply?.summary || {};
-      const modified = summary.files_modified ?? summary.files_to_modify ?? 0;
-      const stale = summary.stale_files ?? 0;
-      const msg = `Replace completato: ${modified} file aggiornati${stale ? `, ${stale} stale` : ""}`;
-      this.showToast(msg);
-      await this.performSearch();
-    } catch (e) {
-      this.showToast("Errore replace", "error");
-    } finally {
-      this.searchLoading = false;
-    }
-  }
-
   private async runSystemAction(action: string, label: string, confirm: boolean) {
     if (this.systemActionLoading) return;
     if (confirm) {
@@ -1391,11 +1302,6 @@ export class AppRoot extends LitElement {
       this.backupLoading = false;
       this.backupMode = null;
     }
-  }
-
-  private openSearchMatch(res: SearchResult, match: SearchMatch) {
-    this.pendingJump = { path: res.path, line: match.line, col: match.column };
-    this.openFile(res.path);
   }
 
   private insertSnippet(snippet: Snippet) {
@@ -1964,34 +1870,6 @@ export class AppRoot extends LitElement {
       this.collapsedDomains = next;
     }
     this.lastDomains = domainSet;
-  }
-
-  private renderSearchResults() {
-    if (this.searchLoading && this.searchResults.length === 0) {
-      return html`<div class="searchStatus">Ricerca in corso...</div>`;
-    }
-    if (this.searchResults.length === 0) {
-      return html`<div class="searchStatus muted">Nessun risultato</div>`;
-    }
-    return html`<div class="searchResults">
-      ${this.searchResults.map(
-        (r) => html`<div class="searchFile">
-          <div class="searchFileHeader">
-            <div class="path">${r.path}</div>
-            <div class="hits">${r.matches_count} hit</div>
-          </div>
-          <div class="searchMatches">
-            ${r.matches.map(
-              (m) => html`<div class="searchMatch" @click=${() => this.openSearchMatch(r, m)}>
-                <span class="lineTag">L${m.line}</span>
-                <span class="preview">${m.preview}</span>
-              </div>`
-            )}
-          </div>
-        </div>`
-      )}
-      ${this.searchTruncated ? html`<div class="searchStatus muted">Risultati troncati dai limiti impostati</div>` : nothing}
-    </div>`;
   }
 
   private renderSidebarContent() {
