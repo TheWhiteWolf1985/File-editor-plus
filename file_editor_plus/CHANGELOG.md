@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.102
+
+- Refactor: stili estratti in modulo dedicato (nessun cambio funzionale).
+
 ## 0.1.101
 
 - Refactor: tipi e costanti estratti in moduli dedicati (nessun cambio funzionale).

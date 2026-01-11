@@ -337,6 +337,21 @@ decisions: []
 
 log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
+  - date: "2026-01-11"
+    actor: "codex"
+    version: "0.1.102"
+    change: "Refactor step 3: stili globali spostati in un modulo dedicato."
+    reason: "Ridurre ulteriormente app-root.ts mantenendo la UI invariata."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/styles/app-styles.ts"
+      - "file_editor_plus/CHANGELOG.md"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "rg -n \"appStyles\" file_editor_plus/frontend/src/app-root.ts"
+      - "rg -n \"appVersion\" file_editor_plus/frontend/src/app-root.ts"
+      - "rg -n \"version:\" file_editor_plus/config.yaml"
   - date: "2026-01-07"
     actor: "codex"
     version: "0.1.101"
