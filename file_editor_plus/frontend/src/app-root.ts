@@ -2,20 +2,9 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
 import { HAClient, type HassState } from "./ha-client";
-
-type TreeItem = { name: string; path: string; type: "dir" | "file"; children?: TreeItem[] };
-type Tab = { path: string; name: string; dirty: boolean };
-type Snippet = { id: string; name: string; description: string; content: string };
-type SearchMatch = { line: number; column: number; preview: string; match_len: number };
-type SearchResult = { path: string; mtime: number; size: number; matches: SearchMatch[]; matches_count: number };
-type SearchSummary = { files_scanned: number; files_with_matches: number; matches_total: number };
-type DiffHunk = { type: "insert" | "delete" | "replace" | "equal"; base_start: number; base_len: number; mod_start: number; mod_len: number };
-type DiffSummary = { added: number; removed: number; changed: number };
-type UserConfig = { font_base_rem?: number; theme_mode?: "auto" | "dark" | "light" };
-type MdiIcon = { name: string; codepoint: string };
-type SuggestItem =
-  | { type: "entity"; value: string }
-  | { type: "mdi"; value: string; codepoint: string };
+import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS, THEME_MODES } from "./constants";
+import type { MdiIcon, SearchMatch, SearchResult, SearchSummary, Snippet, ThemeMode, UserConfig } from "./types/api";
+import type { DiffHunk, DiffSummary, SuggestItem, Tab, TreeItem } from "./types/editor";
 
 @customElement("app-root")
 export class AppRoot extends LitElement {
@@ -1269,7 +1258,7 @@ export class AppRoot extends LitElement {
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
   declare contextMenuY: number;
-  declare themeMode: "auto" | "dark" | "light";
+  declare themeMode: ThemeMode;
   declare suggestOpen: boolean;
   declare suggestItems: SuggestItem[];
   declare suggestContext: "entity" | "mdi" | null;
@@ -1351,12 +1340,12 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly fontDefaults = { xs: 0.6875, sm: 0.75, md: 0.8125, base: 0.875, lg: 1 };
-  private readonly fontBaseMin = 0.75;
-  private readonly fontBaseMax = 1.125;
-  private readonly fontBaseStep = 0.0625;
+  private readonly fontDefaults = FONT_DEFAULTS;
+  private readonly fontBaseMin = FONT_BASE_MIN;
+  private readonly fontBaseMax = FONT_BASE_MAX;
+  private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.100";
+  private readonly appVersion = "0.1.101";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -3371,8 +3360,9 @@ export class AppRoot extends LitElement {
         if (!Number.isNaN(raw)) {
           this.fontBaseRem = this.clampFontBase(raw);
         }
-        if (cfg.theme_mode === "auto" || cfg.theme_mode === "dark" || cfg.theme_mode === "light") {
-          this.themeMode = cfg.theme_mode;
+        const mode = cfg.theme_mode;
+        if (THEME_MODES.includes(mode as ThemeMode)) {
+          this.themeMode = mode as ThemeMode;
         }
       }
     } catch {

@@ -339,6 +339,23 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-07"
     actor: "codex"
+    version: "0.1.101"
+    change: "Refactor step 2: spostati i tipi in files dedicati e centralizzate costanti font/theme."
+    reason: "Ridurre la dimensione del file monolitico senza cambiare la logica."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/types/editor.ts"
+      - "file_editor_plus/frontend/src/types/api.ts"
+      - "file_editor_plus/frontend/src/constants.ts"
+      - "file_editor_plus/CHANGELOG.md"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "App avvia e UI invariata"
+      - "grep -n 'appVersion' file_editor_plus/frontend/src/app-root.ts"
+      - "grep -n 'version:' file_editor_plus/config.yaml"
+  - date: "2026-01-07"
+    actor: "codex"
     version: "0.1.100"
     change: "Overlay code: rimossa la whitespace tra indentazione e token per riallineare le colonne dall'inizio riga."
     reason: "Dal secondo carattere le colonne risultavano shiftate di 1 per via di uno spazio HTML collassato."

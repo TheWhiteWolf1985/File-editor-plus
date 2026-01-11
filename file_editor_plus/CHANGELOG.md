@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.101
+
+- Refactor: tipi e costanti estratti in moduli dedicati (nessun cambio funzionale).
+
 ## 0.1.100
 
 - Overlay code: rimosso spazio "fantasma" tra indentazione e token per riallineare le colonne.
