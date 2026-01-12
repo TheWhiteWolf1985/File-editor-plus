@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.108
+
+- Refactor: logica Backup/System estratta in modulo dedicato (nessun cambio funzionale).
+
 ## 0.1.107
 
 - Refactor: logica Snippets estratta in modulo dedicato (nessun cambio funzionale).

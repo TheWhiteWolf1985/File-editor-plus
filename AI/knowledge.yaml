@@ -339,6 +339,22 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-11"
     actor: "codex"
+    version: "0.1.108"
+    change: "Refactor step 7: estratta la logica Backup/System in modulo dedicato."
+    reason: "Isolare le azioni di sistema e backup senza cambiare la UI."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/features/system/system.ts"
+      - "file_editor_plus/CHANGELOG.md"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "rg -n \"features/system/system\" file_editor_plus/frontend/src/app-root.ts"
+      - "rg -n \"runBackup\" file_editor_plus/frontend/src/features/system/system.ts"
+      - "rg -n \"appVersion\" file_editor_plus/frontend/src/app-root.ts"
+      - "rg -n \"version:\" file_editor_plus/config.yaml"
+  - date: "2026-01-11"
+    actor: "codex"
     version: "0.1.107"
     change: "Refactor step 6: estratta la logica Snippets in modulo dedicato."
     reason: "Isolare CRUD snippet e inserimento senza cambiare la UI."

@@ -18,6 +18,7 @@ import {
   openSnippetModal as snippetOpenSnippetModal,
   saveSnippet as snippetSaveSnippet,
 } from "./features/snippets/snippets";
+import { runBackup as systemRunBackup, runSystemAction as systemRunSystemAction } from "./features/system/system";
 import {
   cancelNewItem as treeCancelNewItem,
   closeTreeMenu as treeCloseTreeMenu,
@@ -36,12 +37,10 @@ import {
 } from "./features/tree/tree";
 import {
   apiFormatYaml,
-  apiGetBackup,
   apiGetFile,
   apiGetUserConfig,
   apiMdiSearch,
   apiPostDiff,
-  apiPostHaAction,
   apiSaveFile,
   apiPutUserConfig,
 } from "./services/api";
@@ -242,7 +241,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.107";
+  private readonly appVersion = "0.1.108";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -282,6 +281,8 @@ export class AppRoot extends LitElement {
   private saveSnippet = snippetSaveSnippet.bind(this);
   private insertSnippet = snippetInsertSnippet.bind(this);
   private deleteSnippet = snippetDeleteSnippet.bind(this);
+  private runSystemAction = systemRunSystemAction.bind(this);
+  private runBackup = systemRunBackup.bind(this);
 
   constructor() {
     super();
@@ -1117,117 +1118,6 @@ export class AppRoot extends LitElement {
     if (!items || items.length === 0) return;
     const el = items[this.suggestIndex] as HTMLElement | undefined;
     el?.scrollIntoView({ block: "nearest" });
-  }
-
-  private async runSystemAction(action: string, label: string, confirm: boolean) {
-    if (this.systemActionLoading) return;
-    if (confirm) {
-      const ok = window.confirm(`Confermi: ${label}?`);
-      if (!ok) return;
-    }
-    this.systemActionLoading = true;
-    this.systemActionPending = action;
-    try {
-      const res = await apiPostHaAction(this.apiBase, action);
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
-      if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.error?.message || payload?.detail || `Errore azione (HTTP ${res.status})`;
-        this.showToast(msg, "error");
-        return;
-      }
-      this.showToast(`${label} avviato`);
-    } catch {
-      this.showToast("Errore chiamata sistema", "error");
-    } finally {
-      this.systemActionLoading = false;
-      this.systemActionPending = null;
-    }
-  }
-
-  private getBackupFilenameFromHeader(res: Response) {
-    const header = res.headers.get("content-disposition") || "";
-    const utfMatch = header.match(/filename\*=UTF-8''([^;]+)/i);
-    if (utfMatch?.[1]) {
-      try {
-        return decodeURIComponent(utfMatch[1]);
-      } catch {
-        return utfMatch[1];
-      }
-    }
-    const match = header.match(/filename=\"?([^\";]+)\"?/i);
-    return match?.[1] || null;
-  }
-
-  private defaultBackupFilename() {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    return `config-backup-${stamp}.zip`;
-  }
-
-  private triggerBackupDownload() {
-    const url = `${this.apiBase}api/backup?ts=${Date.now()}`;
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "";
-    link.rel = "noopener";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  }
-
-  private async runBackup(mode: "download" | "saveas" | "cloud") {
-    if (this.backupLoading) return;
-    if (mode === "cloud") {
-      this.showToast("Backup cloud in arrivo", "info");
-      return;
-    }
-    this.backupLoading = true;
-    this.backupMode = mode;
-    try {
-      if (mode === "download") {
-        this.triggerBackupDownload();
-        this.showToast("Download backup avviato");
-        return;
-      }
-      const picker = (window as unknown as { showSaveFilePicker?: Function }).showSaveFilePicker;
-      if (!picker) {
-        this.showToast("Salvataggio non supportato, avvio download", "info");
-        this.triggerBackupDownload();
-        return;
-      }
-      const res = await apiGetBackup(this.apiBase);
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        const msg = text || `Errore backup (HTTP ${res.status})`;
-        this.showToast(msg, "error");
-        return;
-      }
-      const blob = await res.blob();
-      const filename = this.getBackupFilenameFromHeader(res) || this.defaultBackupFilename();
-      const handle = await picker({
-        suggestedName: filename,
-        types: [{ description: "Zip", accept: { "application/zip": [".zip"] } }],
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      this.showToast("Backup salvato");
-    } catch (e: any) {
-      if (e?.name === "AbortError") {
-        this.showToast("Salvataggio annullato", "info");
-      } else {
-        this.showToast("Errore backup", "error");
-      }
-    } finally {
-      this.backupLoading = false;
-      this.backupMode = null;
-    }
   }
 
   private async indentFile() {
