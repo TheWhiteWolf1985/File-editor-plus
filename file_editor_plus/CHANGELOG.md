@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.109
+
+- Refactor: logica Settings/Theme/Font estratta in modulo dedicato (nessun cambio funzionale).
+
 ## 0.1.108
 
 - Refactor: logica Backup/System estratta in modulo dedicato (nessun cambio funzionale).

@@ -339,6 +339,22 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-11"
     actor: "codex"
+    version: "0.1.109"
+    change: "Refactor step 8: estratta la logica Settings/Theme/Font in modulo dedicato."
+    reason: "Isolare preferenze UI e tema senza cambiare comportamento."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/features/settings/settings.ts"
+      - "file_editor_plus/CHANGELOG.md"
+      - "file_editor_plus/config.yaml"
+      - "AI/knowledge.yaml"
+    verification:
+      - "rg -n \"features/settings/settings\" file_editor_plus/frontend/src/app-root.ts"
+      - "rg -n \"applyTheme\" file_editor_plus/frontend/src/features/settings/settings.ts"
+      - "rg -n \"appVersion\" file_editor_plus/frontend/src/app-root.ts"
+      - "rg -n \"version:\" file_editor_plus/config.yaml"
+  - date: "2026-01-11"
+    actor: "codex"
     version: "0.1.108"
     change: "Refactor step 7: estratta la logica Backup/System in modulo dedicato."
     reason: "Isolare le azioni di sistema e backup senza cambiare la UI."

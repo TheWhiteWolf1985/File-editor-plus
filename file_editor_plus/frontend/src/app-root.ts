@@ -20,6 +20,17 @@ import {
 } from "./features/snippets/snippets";
 import { runBackup as systemRunBackup, runSystemAction as systemRunSystemAction } from "./features/system/system";
 import {
+  applySettingsModal as settingsApplySettingsModal,
+  applyTheme as settingsApplyTheme,
+  cancelSettingsModal as settingsCancelSettingsModal,
+  cycleTheme as settingsCycleTheme,
+  handleFontSizeInput as settingsHandleFontSizeInput,
+  handleThemeChange as settingsHandleThemeChange,
+  loadFontSettings as settingsLoadFontSettings,
+  openSettingsModal as settingsOpenSettingsModal,
+  persistUserConfig as settingsPersistUserConfig,
+} from "./features/settings/settings";
+import {
   cancelNewItem as treeCancelNewItem,
   closeTreeMenu as treeCloseTreeMenu,
   confirmTreeDelete as treeConfirmTreeDelete,
@@ -42,10 +53,9 @@ import {
   apiMdiSearch,
   apiPostDiff,
   apiSaveFile,
-  apiPutUserConfig,
 } from "./services/api";
-import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS, THEME_MODES } from "./constants";
-import type { MdiIcon, SearchResult, SearchSummary, Snippet, ThemeMode, UserConfig } from "./types/api";
+import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS } from "./constants";
+import type { MdiIcon, SearchResult, SearchSummary, Snippet, ThemeMode } from "./types/api";
 import type { DiffHunk, DiffSummary, SuggestItem, Tab, TreeItem } from "./types/editor";
 
 @customElement("app-root")
@@ -241,7 +251,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.108";
+  private readonly appVersion = "0.1.109";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -283,6 +293,15 @@ export class AppRoot extends LitElement {
   private deleteSnippet = snippetDeleteSnippet.bind(this);
   private runSystemAction = systemRunSystemAction.bind(this);
   private runBackup = systemRunBackup.bind(this);
+  private handleThemeChange = settingsHandleThemeChange.bind(this);
+  private cycleTheme = settingsCycleTheme.bind(this);
+  private applyTheme = settingsApplyTheme.bind(this);
+  private persistUserConfig = settingsPersistUserConfig.bind(this);
+  private loadFontSettings = settingsLoadFontSettings.bind(this);
+  private openSettingsModal = settingsOpenSettingsModal.bind(this);
+  private cancelSettingsModal = settingsCancelSettingsModal.bind(this);
+  private applySettingsModal = settingsApplySettingsModal.bind(this);
+  private handleFontSizeInput = settingsHandleFontSizeInput.bind(this);
 
   constructor() {
     super();
@@ -1412,186 +1431,6 @@ export class AppRoot extends LitElement {
       next.add(domain);
     }
     this.collapsedDomains = next;
-  }
-
-  private handleThemeChange = () => {
-    if (this.themeMode === "auto") {
-      this.applyTheme();
-    }
-  };
-
-  private async cycleTheme() {
-    const next = this.themeMode === "auto" ? "light" : this.themeMode === "light" ? "dark" : "auto";
-    this.themeMode = next;
-    this.applyTheme();
-    const ok = await this.persistUserConfig({ theme_mode: this.themeMode });
-    if (!ok) {
-      this.showToast("Errore salvataggio tema", "error");
-    }
-  }
-
-  private getEffectiveTheme(): "dark" | "light" {
-    if (this.themeMode === "auto") {
-      const prefersDark = this.themeMedia ? this.themeMedia.matches : true;
-      return prefersDark ? "dark" : "light";
-    }
-    return this.themeMode;
-  }
-
-  private applyTheme() {
-    const theme = this.getEffectiveTheme();
-    const palette =
-      theme === "dark"
-        ? {
-            "--bg-color": "#1e1e1e",
-            "--panel-color": "#252526",
-            "--panel-strong": "#2d2d2d",
-            "--border-color": "#2a2a2a",
-            "--hover-color": "#3a3a3a",
-            "--text-color": "#d4d4d4",
-            "--muted-color": "#c8c8c8",
-            "--activity-color": "#333333",
-            "--accent-color": "#0e639c",
-            "--accent-hover": "#1177bb",
-            "--card-color": "#1f1f1f",
-            "--input-bg": "#1e1e1e",
-            "--toast-bg": "#2d2d2d",
-            "--toast-border": "#3a3a3a",
-            "--error-bg": "#3a1f1f",
-            "--error-border": "#c74c4c",
-            "--status-bg": "#007acc",
-            "--gutter-bg": "#1a1a1a",
-            "--code-bg": "#1e1e1e",
-            "--tree-hover": "#2a2d2e",
-            "--tree-active": "#37373d",
-            "--entity-error-text": "#f6dada",
-          }
-        : {
-            "--bg-color": "#f5f6f8",
-            "--panel-color": "#ffffff",
-            "--panel-strong": "#f1f1f3",
-            "--border-color": "#d1d5db",
-            "--hover-color": "#e5e7eb",
-            "--text-color": "#1f2937",
-            "--muted-color": "#4b5563",
-            "--activity-color": "#f3f4f6",
-            "--accent-color": "#0d6efd",
-            "--accent-hover": "#0b5ed7",
-            "--card-color": "#ffffff",
-            "--input-bg": "#ffffff",
-            "--toast-bg": "#ffffff",
-            "--toast-border": "#d1d5db",
-            "--error-bg": "#ffecec",
-            "--error-border": "#d9534f",
-            "--status-bg": "#0d6efd",
-            "--gutter-bg": "#f3f4f6",
-            "--code-bg": "#ffffff",
-            "--tree-hover": "#e8eef8",
-            "--tree-active": "#d9e6fb",
-            "--entity-error-text": "#8b1f1f",
-          };
-    Object.entries(palette).forEach(([key, value]) => {
-      this.style.setProperty(key, value);
-    });
-  }
-
-  private clampFontBase(value: number) {
-    return Math.min(this.fontBaseMax, Math.max(this.fontBaseMin, value));
-  }
-
-  private applyFontScale(baseRem: number) {
-    const scale = baseRem / this.fontDefaults.base;
-    const toRem = (val: number) => `${(val * scale).toFixed(4)}rem`;
-    this.style.setProperty("--font-size-xs", toRem(this.fontDefaults.xs));
-    this.style.setProperty("--font-size-sm", toRem(this.fontDefaults.sm));
-    this.style.setProperty("--font-size-md", toRem(this.fontDefaults.md));
-    this.style.setProperty("--font-size-base", `${baseRem.toFixed(4)}rem`);
-    this.style.setProperty("--font-size-lg", toRem(this.fontDefaults.lg));
-  }
-
-  private async persistUserConfig(config: UserConfig) {
-    const payload = {
-      font_base_rem: config.font_base_rem ?? this.fontBaseRem,
-      theme_mode: config.theme_mode ?? this.themeMode,
-    };
-    try {
-      const res = await apiPutUserConfig(this.apiBase, payload);
-      let data: any = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
-      return res.ok && data?.ok === true;
-    } catch {
-      return false;
-    }
-  }
-
-  private async loadFontSettings() {
-    try {
-      const res = await apiGetUserConfig(this.apiBase);
-      if (res.ok) {
-        let payload: any = null;
-        try {
-          payload = await res.json();
-        } catch {
-          payload = null;
-        }
-        const cfg = (payload?.config ?? payload ?? {}) as UserConfig;
-        const raw = Number(cfg.font_base_rem);
-        if (!Number.isNaN(raw)) {
-          this.fontBaseRem = this.clampFontBase(raw);
-        }
-        const mode = cfg.theme_mode;
-        if (THEME_MODES.includes(mode as ThemeMode)) {
-          this.themeMode = mode as ThemeMode;
-        }
-      }
-    } catch {
-      /* ignore load errors */
-    }
-    this.settingsFontBaseRem = this.fontBaseRem;
-    this.applyFontScale(this.fontBaseRem);
-    this.applyTheme();
-  }
-
-  private openSettingsModal() {
-    this.settingsTab = "appearance";
-    this.settingsFontBaseRem = this.fontBaseRem;
-    this.showSettingsModal = true;
-  }
-
-  private cancelSettingsModal() {
-    this.applyFontScale(this.fontBaseRem);
-    this.settingsFontBaseRem = this.fontBaseRem;
-    this.showSettingsModal = false;
-  }
-
-  private async applySettingsModal() {
-    const next = this.settingsFontBaseRem;
-    try {
-      const ok = await this.persistUserConfig({ font_base_rem: next });
-      if (!ok) {
-        throw new Error("save-failed");
-      }
-    } catch {
-      this.applyFontScale(this.fontBaseRem);
-      this.settingsFontBaseRem = this.fontBaseRem;
-      this.showToast("Errore salvataggio impostazioni", "error");
-      return;
-    }
-    this.fontBaseRem = next;
-    this.applyFontScale(this.fontBaseRem);
-    this.showSettingsModal = false;
-    this.showToast("Impostazioni applicate");
-  }
-
-  private handleFontSizeInput(e: Event) {
-    const raw = Number((e.target as HTMLInputElement).value);
-    const next = this.clampFontBase(raw);
-    this.settingsFontBaseRem = next;
-    this.applyFontScale(next);
   }
 
   private openAboutModal() {
