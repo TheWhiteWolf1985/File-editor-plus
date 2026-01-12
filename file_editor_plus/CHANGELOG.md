@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.111
+
+- Fix: regex autocomplete entità (match su domain.entity_id) dopo refactor.
+
+## 0.1.110
+
+- Refactor: logica Entities/MDI suggestions estratta in modulo dedicato (nessun cambio funzionale).
+
 ## 0.1.109
 
 - Refactor: logica Settings/Theme/Font estratta in modulo dedicato (nessun cambio funzionale).

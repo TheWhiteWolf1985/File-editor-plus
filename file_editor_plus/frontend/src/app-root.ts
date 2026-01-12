@@ -1,7 +1,7 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
-import { HAClient, type HassState } from "./ha-client";
+import type { HAClient, HassState } from "./ha-client";
 import { appStyles } from "./styles/app-styles";
 import { renderHighlighted, renderLineNumbers, renderLineNumbersFor } from "./features/editor/overlay";
 import {
@@ -31,6 +31,22 @@ import {
   persistUserConfig as settingsPersistUserConfig,
 } from "./features/settings/settings";
 import {
+  applySuggestion as entitiesApplySuggestion,
+  closeSuggestions as entitiesCloseSuggestions,
+  fetchMdiSuggestions as entitiesFetchMdiSuggestions,
+  getSuggestCoords as entitiesGetSuggestCoords,
+  initEntities as entitiesInitEntities,
+  insertEntityId as entitiesInsertEntityId,
+  isSameSuggestItem as entitiesIsSameSuggestItem,
+  openSuggestions as entitiesOpenSuggestions,
+  renderEntityPane as entitiesRenderEntityPane,
+  renderMdiGlyph as entitiesRenderMdiGlyph,
+  scrollSuggestIntoView as entitiesScrollSuggestIntoView,
+  syncCollapsedDomains as entitiesSyncCollapsedDomains,
+  toggleDomain as entitiesToggleDomain,
+  updateSuggestions as entitiesUpdateSuggestions,
+} from "./features/entities/entities";
+import {
   cancelNewItem as treeCancelNewItem,
   closeTreeMenu as treeCloseTreeMenu,
   confirmTreeDelete as treeConfirmTreeDelete,
@@ -50,7 +66,6 @@ import {
   apiFormatYaml,
   apiGetFile,
   apiGetUserConfig,
-  apiMdiSearch,
   apiPostDiff,
   apiSaveFile,
 } from "./services/api";
@@ -251,7 +266,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.109";
+  private readonly appVersion = "0.1.111";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -302,6 +317,20 @@ export class AppRoot extends LitElement {
   private cancelSettingsModal = settingsCancelSettingsModal.bind(this);
   private applySettingsModal = settingsApplySettingsModal.bind(this);
   private handleFontSizeInput = settingsHandleFontSizeInput.bind(this);
+  private closeSuggestions = entitiesCloseSuggestions.bind(this);
+  private updateSuggestions = entitiesUpdateSuggestions.bind(this);
+  private openSuggestions = entitiesOpenSuggestions.bind(this);
+  private isSameSuggestItem = entitiesIsSameSuggestItem.bind(this);
+  private getSuggestCoords = entitiesGetSuggestCoords.bind(this);
+  private fetchMdiSuggestions = entitiesFetchMdiSuggestions.bind(this);
+  private renderMdiGlyph = entitiesRenderMdiGlyph.bind(this);
+  private applySuggestion = entitiesApplySuggestion.bind(this);
+  private scrollSuggestIntoView = entitiesScrollSuggestIntoView.bind(this);
+  private initEntities = entitiesInitEntities.bind(this);
+  private toggleDomain = entitiesToggleDomain.bind(this);
+  private insertEntityId = entitiesInsertEntityId.bind(this);
+  private syncCollapsedDomains = entitiesSyncCollapsedDomains.bind(this);
+  private renderEntityPane = entitiesRenderEntityPane.bind(this);
 
   constructor() {
     super();
@@ -878,124 +907,6 @@ export class AppRoot extends LitElement {
     this.showToast("Auto-indent completato");
   }
 
-  private closeSuggestions(block = false) {
-    if (this.suggestOpen) {
-      this.suggestOpen = false;
-      this.suggestItems = [];
-      this.suggestIndex = 0;
-    }
-    this.suggestContext = null;
-    this.suggestPlacement = "above";
-    this.suggestMaxHeight = 220;
-    if (block) {
-      this.suggestBlocked = true;
-    }
-  }
-
-  private async updateSuggestions() {
-    if (this.suggestBlocked) return;
-    if (!this.editorRef) {
-      this.closeSuggestions();
-      return;
-    }
-    const pos = this.editorRef.selectionStart ?? 0;
-    const before = this.content.slice(0, pos);
-    const mdiMatch = before.match(/mdi[:.]([a-zA-Z0-9_\\-]*)$/i);
-    if (mdiMatch) {
-      const query = mdiMatch[1] || "";
-      const icons = await this.fetchMdiSuggestions(query);
-      if (!icons.length) {
-        this.closeSuggestions();
-        return;
-      }
-      const items = icons.map((icon) => ({ type: "mdi", value: icon.name, codepoint: icon.codepoint }));
-      const coords = this.getSuggestCoords(before);
-      if (!coords) return;
-      this.openSuggestions(items, "mdi", coords.top, coords.left, coords.placement, coords.maxHeight);
-      return;
-    }
-
-    const match = before.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_\\-]*)$/);
-    if (!match) {
-      this.closeSuggestions();
-      return;
-    }
-    const domain = (match[1] || "").toLowerCase();
-    const query = match[2] || "";
-    const all = Object.keys(this.entities).sort();
-    const items =
-      domain === "state" || domain === "states"
-        ? all.filter((id) => id.includes(query))
-        : all.filter((id) => id.startsWith(`${domain}.`) && id.includes(query));
-    if (items.length === 0) {
-      this.closeSuggestions();
-      return;
-    }
-    const suggestItems = items.map((id) => ({ type: "entity", value: id }));
-    const coords = this.getSuggestCoords(before);
-    if (!coords) return;
-    this.openSuggestions(suggestItems, "entity", coords.top, coords.left, coords.placement, coords.maxHeight);
-  }
-
-  private isSameSuggestItem(a: SuggestItem, b: SuggestItem) {
-    if (a.type !== b.type || a.value !== b.value) return false;
-    if (a.type === "mdi" && b.type === "mdi") {
-      return a.codepoint === b.codepoint;
-    }
-    return true;
-  }
-
-  private openSuggestions(
-    items: SuggestItem[],
-    context: "entity" | "mdi",
-    top: number,
-    left: number,
-    placement: "above" | "below",
-    maxHeight: number
-  ) {
-    const sameItems =
-      this.suggestOpen &&
-      this.suggestContext === context &&
-      this.suggestItems.length === items.length &&
-      this.suggestItems.every((v, i) => this.isSameSuggestItem(v, items[i]));
-    this.suggestOpen = true;
-    this.suggestContext = context;
-    this.suggestItems = items;
-    this.suggestIndex = sameItems ? Math.min(this.suggestIndex, items.length - 1) : 0;
-    this.suggestTop = top;
-    this.suggestLeft = left;
-    this.suggestPlacement = placement;
-    this.suggestMaxHeight = maxHeight;
-    requestAnimationFrame(() => this.scrollSuggestIntoView());
-  }
-
-  private getSuggestCoords(before: string) {
-    if (!this.editorRef) return null;
-    const lines = before.split("\n");
-    const line = lines.length;
-    const col = lines[lines.length - 1].length;
-    const lineHeight = 18; // px approx (13px font * 1.4)
-    const taRect = this.editorRef.getBoundingClientRect();
-    const hostRect = this.getBoundingClientRect();
-    const padding = 12;
-    const charWidth = 8;
-    const anchorLeft = taRect.left - hostRect.left + padding + col * charWidth;
-    const anchorTop =
-      taRect.top - hostRect.top + padding + (line - 1) * lineHeight - (this.editorRef.scrollTop || 0) - 2;
-    const margin = 8;
-    const maxBoxHeight = 220;
-    const spaceAbove = Math.max(0, anchorTop - margin);
-    const spaceBelow = Math.max(0, hostRect.height - (anchorTop + lineHeight + margin));
-    const placement = spaceBelow >= spaceAbove ? "below" : "above";
-    const maxHeight = Math.min(maxBoxHeight, placement === "above" ? spaceAbove : spaceBelow);
-    const minLeft = margin;
-    const defaultWidth = 240;
-    const maxLeft = Math.max(minLeft, hostRect.width - defaultWidth);
-    const left = Math.min(Math.max(anchorLeft, minLeft), maxLeft);
-    const top = placement === "above" ? anchorTop : anchorTop + lineHeight;
-    return { top, left, placement, maxHeight };
-  }
-
   private startSidebarResize(e: MouseEvent) {
     e.preventDefault();
     this.sidebarResizing = true;
@@ -1026,118 +937,6 @@ export class AppRoot extends LitElement {
     window.removeEventListener("mousemove", this.handleSidebarResize);
     window.removeEventListener("mouseup", this.stopSidebarResize);
   };
-
-  private async fetchMdiSuggestions(query: string): Promise<MdiIcon[]> {
-    const key = query.toLowerCase();
-    const cached = this.mdiSuggestCache.get(key);
-    if (cached) return cached;
-    const requestId = ++this.mdiSuggestRequestId;
-    try {
-      const res = await apiMdiSearch(this.apiBase, key, 50);
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
-      if (requestId !== this.mdiSuggestRequestId) return [];
-      if (!res.ok || payload?.ok !== true) {
-        return [];
-      }
-      const items = Array.isArray(payload?.items) ? payload.items : [];
-      const icons = items
-        .map((it: any) => {
-          if (!it) return null;
-          if (typeof it === "string") {
-            return { name: it, codepoint: "" };
-          }
-          const name = typeof it.name === "string" ? it.name : null;
-          let codepoint = typeof it.codepoint === "string" ? it.codepoint : null;
-          if (typeof it.codepoint === "number") {
-            codepoint = it.codepoint.toString(16).toUpperCase();
-          }
-          if (!name) return null;
-          return { name, codepoint: codepoint ?? "" };
-        })
-        .filter((it: MdiIcon | null): it is MdiIcon => Boolean(it && it.name));
-      this.mdiSuggestCache.set(key, icons);
-      return icons;
-    } catch {
-      if (requestId === this.mdiSuggestRequestId) {
-        this.mdiSuggestCache.set(key, []);
-      }
-      return [];
-    }
-  }
-
-  private renderMdiGlyph(codepoint?: string) {
-    if (!codepoint) return "";
-    const normalized = codepoint.trim().replace(/^0x/i, "");
-    if (!normalized) return "";
-    const value = Number.parseInt(normalized, 16);
-    if (Number.isNaN(value)) return "";
-    return String.fromCodePoint(value);
-  }
-
-  private applySuggestion() {
-    if (!this.editorRef || !this.suggestOpen || this.suggestItems.length === 0) return;
-    const ta = this.editorRef;
-    const pos = ta.selectionStart ?? 0;
-    const before = this.content.slice(0, pos);
-    const current = this.suggestItems[this.suggestIndex];
-    if (!current) return;
-    if (current.type === "mdi") {
-      const match = before.match(/mdi[:.]([a-zA-Z0-9_\\-]*)$/i);
-      if (!match) {
-        this.closeSuggestions();
-        return;
-      }
-      const prefixLen = match[0].length;
-      const start = pos - prefixLen;
-      const end = ta.selectionEnd ?? pos;
-      const insert = `mdi:${current.value}`;
-      const next = `${this.content.slice(0, start)}${insert}${this.content.slice(end)}`;
-      this.markDirty(next);
-      const newPos = start + insert.length;
-      requestAnimationFrame(() => {
-        if (!this.editorRef) return;
-        this.editorRef.selectionStart = newPos;
-        this.editorRef.selectionEnd = newPos;
-        this.editorRef.focus();
-        this.updateCursorFromPos(newPos, this.content);
-      });
-      this.closeSuggestions();
-      return;
-    }
-    const match = before.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_\\-]*)$/);
-    if (!match) {
-      this.closeSuggestions();
-      return;
-    }
-    const prefixLen = match[0].length;
-    const start = pos - prefixLen;
-    const end = ta.selectionEnd ?? pos;
-    const insert = current.value;
-    const next = `${this.content.slice(0, start)}${insert}${this.content.slice(end)}`;
-    this.markDirty(next);
-    const newPos = start + insert.length;
-    requestAnimationFrame(() => {
-      if (!this.editorRef) return;
-      this.editorRef.selectionStart = newPos;
-      this.editorRef.selectionEnd = newPos;
-      this.editorRef.focus();
-      this.updateCursorFromPos(newPos, this.content);
-    });
-    this.closeSuggestions();
-  }
-
-  private scrollSuggestIntoView() {
-    if (!this.suggestOpen) return;
-    const items = this.shadowRoot?.querySelectorAll(".suggestItem");
-    if (!items || items.length === 0) return;
-    const el = items[this.suggestIndex] as HTMLElement | undefined;
-    el?.scrollIntoView({ block: "nearest" });
-  }
 
   private async indentFile() {
     if (!this.activePath || this.indenting) {
@@ -1249,34 +1048,6 @@ export class AppRoot extends LitElement {
       this.toastType = "info";
       this.toastTimer = null;
     }, 5000);
-  }
-
-  private async initEntities() {
-    try {
-      this.haClient = new HAClient(this.apiBase);
-      this.haClient.connect((ev) => {
-        const id = ev.event.data.entity_id;
-        const next = { ...this.entities };
-        if (ev.event.data.new_state) {
-          next[id] = ev.event.data.new_state;
-        } else {
-          delete next[id];
-        }
-        this.syncCollapsedDomains(Object.keys(next).map((k) => k.split(".")[0]));
-        this.entities = next;
-      });
-      const states = await this.haClient.getStates();
-      const next: Record<string, HassState> = {};
-      states.forEach((s) => {
-        next[s.entity_id] = s;
-      });
-      this.syncCollapsedDomains(states.map((s) => s.entity_id.split(".")[0]));
-      this.entities = next;
-      this.entityError = null;
-    } catch (e) {
-      this.entityError = "Errore caricamento entità";
-      this.showToast("Errore caricamento entità", "error");
-    }
   }
 
   private handleMenuAction(menu: string, action: string) {
@@ -1423,70 +1194,12 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private toggleDomain(domain: string) {
-    const next = new Set(this.collapsedDomains);
-    if (next.has(domain)) {
-      next.delete(domain);
-    } else {
-      next.add(domain);
-    }
-    this.collapsedDomains = next;
-  }
-
   private openAboutModal() {
     this.showAboutModal = true;
   }
 
   private closeAboutModal() {
     this.showAboutModal = false;
-  }
-
-  private insertEntityId(entityId: string) {
-    if (!this.activePath || !this.editorRef) {
-      this.showToast("Apri un file prima di inserire", "error");
-      return;
-    }
-    const ta = this.editorRef;
-    const start = ta.selectionStart ?? this.content.length;
-    const end = ta.selectionEnd ?? this.content.length;
-    const next = `${this.content.slice(0, start)}${entityId}${this.content.slice(end)}`;
-    this.markDirty(next);
-    const cursorPos = start + entityId.length;
-    requestAnimationFrame(() => {
-      if (!this.editorRef) return;
-      this.editorRef.selectionStart = cursorPos;
-      this.editorRef.selectionEnd = cursorPos;
-      this.editorRef.focus();
-      this.updateCursorFromPos(cursorPos, this.content);
-    });
-  }
-
-  private syncCollapsedDomains(domains: string[]) {
-    const domainSet = new Set(domains);
-    if (domainSet.size === 0) {
-      this.lastDomains = domainSet;
-      return;
-    }
-    if (this.collapsedDomains.size === 0 && this.lastDomains.size === 0) {
-      this.collapsedDomains = new Set(domainSet);
-      this.lastDomains = domainSet;
-      return;
-    }
-
-    const next = new Set<string>();
-    domainSet.forEach((d) => {
-      if (this.collapsedDomains.has(d)) {
-        next.add(d);
-      } else if (!this.lastDomains.has(d)) {
-        // nuovo dominio: chiuso di default
-        next.add(d);
-      }
-    });
-
-    if (next.size !== this.collapsedDomains.size || Array.from(next).some((d) => !this.collapsedDomains.has(d))) {
-      this.collapsedDomains = next;
-    }
-    this.lastDomains = domainSet;
   }
 
   private renderSidebarContent() {
@@ -1678,69 +1391,7 @@ export class AppRoot extends LitElement {
         </div>
       </div>`;
     }
-    // entity mock
-    const entries = Object.values(this.entities);
-    const filtered = entries
-      .filter((e) => {
-        const q = this.entityFilter.toLowerCase();
-        if (!q) return true;
-        return e.entity_id.toLowerCase().includes(q) || (e.attributes?.friendly_name || "").toLowerCase().includes(q);
-      })
-      .sort((a, b) => {
-        const da = a.entity_id.split(".")[0];
-        const db = b.entity_id.split(".")[0];
-        if (da === db) return a.entity_id.localeCompare(b.entity_id);
-        return da.localeCompare(db);
-      });
-    const grouped: Record<string, HassState[]> = {};
-    filtered.forEach((e) => {
-      const domain = e.entity_id.split(".")[0];
-      if (!grouped[domain]) grouped[domain] = [];
-      grouped[domain].push(e);
-    });
-    const domains = Object.keys(grouped).sort();
-    return html`<div class="sidebarContent entityPane">
-      <div class="entityHeader">Entities</div>
-      <input
-        class="entitySearch"
-        type="text"
-        .value=${this.entityFilter}
-        @input=${(e: Event) => (this.entityFilter = (e.target as HTMLInputElement).value)}
-        placeholder="Search entity id or name"
-      />
-      ${this.entityError
-        ? html`<div class="entityError">${this.entityError}</div>`
-        : html`<div class="entityList">
-            ${domains.length === 0
-              ? html`<div class="entityEmpty">No entities</div>`
-              : domains.map((domain) => {
-                  const items = grouped[domain];
-                  const isOpen = !this.collapsedDomains.has(domain);
-                  return html`<div class="entityGroup">
-                    <button class="entityGroupHeader" type="button" @click=${() => this.toggleDomain(domain)}>
-                      <span class="chevron">${isOpen ? "▾" : "▸"}</span>
-                      <span class="entityGroupTitle">${domain}</span>
-                      <span style="margin-left:auto; opacity:0.75; font-size:var(--font-size-sm);">${items.length}</span>
-                    </button>
-                    ${isOpen
-                      ? html`<div class="entityGroupBody">
-                          ${items.map((e) => {
-                            const name = (e.attributes?.friendly_name as string) || e.entity_id;
-                            return html`<div class="entityCard">
-                              <div class="entityName">${name}</div>
-                              <div class="entityId">${e.entity_id}</div>
-                              <div class="entityMeta">${domain} • State: ${e.state}</div>
-                              <button class="entityInsert" title="Insert.." @click=${(ev: Event) => { ev.stopPropagation(); this.insertEntityId(e.entity_id); }}>
-                                ➕ <span>Insert</span>
-                              </button>
-                            </div>`;
-                          })}
-                        </div>`
-                      : nothing}
-                  </div>`;
-                })}
-          </div>`}
-    </div>`;
+    return this.renderEntityPane();
   }
 
   private async save() {
