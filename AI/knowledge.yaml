@@ -339,6 +339,20 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-11"
     actor: "codex"
+    version: "0.2.2"
+    change: "Editor: Tab/Shift+Tab ora indenta/outdenta selezioni senza cancellare testo; mantiene selezione e sincronizza overlay."
+    reason: "Fix comportamento della textarea che cancellava il testo selezionato premendo Tab."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Seleziona più righe e premi Tab/Shift+Tab: il testo resta, le righe vanno in/outdent e la selezione resta attiva."
+      - "rg -n \"appVersion\" file_editor_plus/frontend/src/app-root.ts"
+      - "rg -n \"version:\" file_editor_plus/config.yaml"
+  - date: "2026-01-11"
+    actor: "codex"
     version: "0.2.1"
     change: "Bump release: raccolto il refactor frontend in moduli dedicati (stili, API, overlay, tree, search, snippets, system, settings, entities/MDI) e fix autocomplete entità/MDI."
     reason: "Stabilizzare il refactor e preparare il rilascio 0.2.x."
