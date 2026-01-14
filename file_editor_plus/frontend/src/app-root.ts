@@ -1,1171 +1,81 @@
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, html, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
-import { HAClient, type HassState } from "./ha-client";
-
-type TreeItem = { name: string; path: string; type: "dir" | "file"; children?: TreeItem[] };
-type Tab = { path: string; name: string; dirty: boolean };
-type Snippet = { id: string; name: string; description: string; content: string };
-type SearchMatch = { line: number; column: number; preview: string; match_len: number };
-type SearchResult = { path: string; mtime: number; size: number; matches: SearchMatch[]; matches_count: number };
-type SearchSummary = { files_scanned: number; files_with_matches: number; matches_total: number };
-type DiffHunk = { type: "insert" | "delete" | "replace" | "equal"; base_start: number; base_len: number; mod_start: number; mod_len: number };
-type DiffSummary = { added: number; removed: number; changed: number };
-type UserConfig = { font_base_rem?: number; theme_mode?: "auto" | "dark" | "light" };
-type MdiIcon = { name: string; codepoint: string };
-type SuggestItem =
-  | { type: "entity"; value: string }
-  | { type: "mdi"; value: string; codepoint: string };
+import type { HAClient, HassState } from "./ha-client";
+import { appStyles } from "./styles/app-styles";
+import { renderHighlighted, renderLineNumbers, renderLineNumbersFor } from "./features/editor/overlay";
+import {
+  openSearchMatch as searchOpenSearchMatch,
+  performSearch as searchPerformSearch,
+  renderSearchResults as searchRenderSearchResults,
+  replaceAll as searchReplaceAll,
+} from "./features/search/search";
+import {
+  closeSnippetModal as snippetCloseSnippetModal,
+  deleteSnippet as snippetDeleteSnippet,
+  insertSnippet as snippetInsertSnippet,
+  loadSnippets as snippetLoadSnippets,
+  openSnippetModal as snippetOpenSnippetModal,
+  saveSnippet as snippetSaveSnippet,
+} from "./features/snippets/snippets";
+import { runBackup as systemRunBackup, runSystemAction as systemRunSystemAction } from "./features/system/system";
+import {
+  applySettingsModal as settingsApplySettingsModal,
+  applyTheme as settingsApplyTheme,
+  cancelSettingsModal as settingsCancelSettingsModal,
+  cycleTheme as settingsCycleTheme,
+  handleFontSizeInput as settingsHandleFontSizeInput,
+  handleThemeChange as settingsHandleThemeChange,
+  loadFontSettings as settingsLoadFontSettings,
+  openSettingsModal as settingsOpenSettingsModal,
+  persistUserConfig as settingsPersistUserConfig,
+} from "./features/settings/settings";
+import {
+  applySuggestion as entitiesApplySuggestion,
+  closeSuggestions as entitiesCloseSuggestions,
+  fetchMdiSuggestions as entitiesFetchMdiSuggestions,
+  getSuggestCoords as entitiesGetSuggestCoords,
+  initEntities as entitiesInitEntities,
+  insertEntityId as entitiesInsertEntityId,
+  isSameSuggestItem as entitiesIsSameSuggestItem,
+  openSuggestions as entitiesOpenSuggestions,
+  renderEntityPane as entitiesRenderEntityPane,
+  renderMdiGlyph as entitiesRenderMdiGlyph,
+  scrollSuggestIntoView as entitiesScrollSuggestIntoView,
+  syncCollapsedDomains as entitiesSyncCollapsedDomains,
+  toggleDomain as entitiesToggleDomain,
+  updateSuggestions as entitiesUpdateSuggestions,
+} from "./features/entities/entities";
+import {
+  cancelNewItem as treeCancelNewItem,
+  closeTreeMenu as treeCloseTreeMenu,
+  confirmTreeDelete as treeConfirmTreeDelete,
+  copyTreeItem as treeCopyTreeItem,
+  createNewItem as treeCreateNewItem,
+  executeTreeDelete as treeExecuteTreeDelete,
+  handleTreeContextMenu as treeHandleTreeContextMenu,
+  loadTree as treeLoadTree,
+  pasteTreeItem as treePasteTreeItem,
+  reloadTree as treeReloadTree,
+  reloadTreePath as treeReloadTreePath,
+  renderTree as treeRenderTree,
+  toggleDir as treeToggleDir,
+  cancelTreeDelete as treeCancelTreeDelete,
+} from "./features/tree/tree";
+import {
+  apiFormatYaml,
+  apiGetFile,
+  apiGetUserConfig,
+  apiPostDiff,
+  apiSaveFile,
+} from "./services/api";
+import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS } from "./constants";
+import type { MdiIcon, SearchResult, SearchSummary, Snippet, ThemeMode } from "./types/api";
+import type { DiffHunk, DiffSummary, SuggestItem, Tab, TreeItem } from "./types/editor";
 
 @customElement("app-root")
 export class AppRoot extends LitElement {
-  static styles = css`
-    :host {
-      display: block;
-      height: 100%;
-      min-height: 100%;
-      width: 100%;
-      overflow: hidden;
-      position: relative;
-      color: var(--text-color);
-      font-family: Roboto, "Noto Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-      --font-size-xs: 0.6875rem;
-      --font-size-sm: 0.75rem;
-      --font-size-md: 0.8125rem;
-      --font-size-base: 0.875rem;
-      --font-size-lg: 1rem;
-      --sidebar-width: 280px;
-      font-size: var(--font-size-base);
-      background: var(--bg-color);
-      box-sizing: border-box;
-      --bg-color: #1e1e1e;
-      --panel-color: #252526;
-      --panel-strong: #2d2d2d;
-      --border-color: #2a2a2a;
-      --hover-color: #3a3a3a;
-      --text-color: #d4d4d4;
-      --muted-color: #c8c8c8;
-      --activity-color: #333333;
-      --accent-color: #0e639c;
-      --accent-hover: #1177bb;
-      --card-color: #1f1f1f;
-      --input-bg: #1e1e1e;
-      --toast-bg: #2d2d2d;
-      --toast-border: #3a3a3a;
-      --error-bg: #3a1f1f;
-      --error-border: #c74c4c;
-      --status-bg: #007acc;
-      --gutter-bg: #1a1a1a;
-      --code-bg: #1e1e1e;
-      --menu-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-      --toast-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-      --modal-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-      --tree-hover: #2a2d2e;
-      --tree-active: #37373d;
-      --entity-error-text: #f6dada;
-    }
-
-    /* Layout */
-    .shell {
-      height: 100%;
-      display: grid;
-      grid-template-rows: 34px 1fr 22px; /* titlebar, main, status */
-    }
-
-    /* Titlebar */
-    .titlebar {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 0 10px;
-      border-bottom: 1px solid var(--border-color);
-      background: var(--panel-strong);
-      user-select: none;
-      font-size: var(--font-size-sm);
-      position: relative;
-      overflow: visible;
-      z-index: 30;
-    }
-    .menus {
-      display: flex;
-      gap: 12px;
-      opacity: 0.9;
-      position: relative;
-    }
-    .menus span {
-      cursor: default;
-    }
-    .menuItem {
-      position: relative;
-      cursor: pointer;
-      padding: 6px 8px;
-      border-radius: 8px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .menuItem:hover,
-    .menuItem.open {
-      background: var(--hover-color);
-    }
-    .menuPopup {
-      position: absolute;
-      top: 30px;
-      left: 0;
-      background: var(--panel-strong);
-      border: 1px solid var(--border-color);
-      box-shadow: var(--menu-shadow);
-      border-radius: 8px;
-      min-width: 180px;
-      padding: 6px 0;
-      z-index: 20;
-      overflow: visible;
-    }
-    .menuItemRow {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 12px;
-      cursor: pointer;
-      font-size: var(--font-size-sm);
-    }
-    .menuItemRow:hover {
-      background: var(--hover-color);
-    }
-    .menuIcon {
-      width: 18px;
-      text-align: center;
-      opacity: 0.85;
-    }
-    .menuDivider {
-      height: 1px;
-      margin: 6px 0;
-      background: #3a3a3a;
-    }
-    .title {
-      margin-left: auto;
-      opacity: 0.7;
-    }
-
-    /* Main area */
-    .main {
-      display: grid;
-      grid-template-columns: 48px var(--sidebar-width) 1fr; /* activity, sidebar, editor */
-      height: 100%;
-      overflow: hidden;
-      position: relative;
-    }
-
-    /* Activity bar */
-    .activity {
-      background: var(--activity-color);
-      border-right: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 8px 0;
-      gap: 8px;
-    }
-    .activityGroup {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
-    .activityGroup.bottom {
-      margin-top: auto;
-      padding-bottom: 6px;
-    }
-    .mdiGlyph {
-      font-family: "Material Design Icons";
-      font-style: normal;
-      font-weight: normal;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .act {
-      width: 36px;
-      height: 36px;
-      border-radius: 10px;
-      display: grid;
-      place-items: center;
-      cursor: pointer;
-      opacity: 0.85;
-      font-size: 1.5em;
-    }
-    .act.active {
-      background: var(--panel-color);
-      outline: 1px solid var(--border-color);
-      opacity: 1;
-    }
-    .sidebarContent {
-      padding: 8px 6px 12px;
-      font-size: var(--font-size-md);
-      overflow-x: hidden;
-      overflow-y: auto;
-      flex: 1;
-      min-height: 0;
-      align-content: start;
-    }
-    .searchPane {
-      display: grid;
-      gap: 8px;
-    }
-    .searchRow {
-      display: flex;
-      gap: 8px;
-    }
-    .searchInput {
-      width: 100%;
-      padding: 8px;
-      border-radius: 8px;
-      border: 1px solid var(--border-color);
-      background: var(--input-bg);
-      color: var(--text-color);
-      box-sizing: border-box;
-    }
-    .searchControls {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .searchSummary {
-      font-size: var(--font-size-sm);
-      opacity: 0.8;
-    }
-    .searchResults {
-      display: grid;
-      gap: 8px;
-      max-height: calc(100vh - 220px);
-      overflow: auto;
-      padding-right: 4px;
-    }
-    .searchFile {
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      background: var(--card-color);
-      padding: 6px;
-    }
-    .searchFileHeader {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      font-weight: 600;
-      margin-bottom: 4px;
-      font-size: var(--font-size-sm);
-      word-break: break-all;
-    }
-    .searchMatches {
-      display: grid;
-      gap: 4px;
-    }
-    .searchMatch {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 8px;
-      padding: 6px;
-      border-radius: 6px;
-      background: var(--panel-color);
-      cursor: pointer;
-      border: 1px solid transparent;
-    }
-    .searchMatch:hover {
-      border-color: var(--border-color);
-      background: var(--hover-color);
-    }
-    .lineTag {
-      font-size: var(--font-size-xs);
-      opacity: 0.8;
-      color: var(--muted-color);
-    }
-    .searchMatch .preview {
-      word-break: break-word;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .searchStatus {
-      font-size: var(--font-size-sm);
-      opacity: 0.8;
-      padding: 6px;
-    }
-    .searchStatus.muted {
-      color: var(--muted-color);
-    }
-    .entityPane {
-      display: grid;
-      gap: 8px;
-    }
-    .entityHeader {
-      font-weight: 600;
-      margin-bottom: 2px;
-    }
-    .entitySearch {
-      width: 100%;
-      margin-bottom: 2px;
-      padding: 8px;
-      border-radius: 8px;
-      border: 1px solid var(--border-color);
-      background: var(--input-bg);
-      color: var(--text-color);
-      box-sizing: border-box;
-    }
-    .entityList {
-      overflow: visible;
-      display: grid;
-      gap: 6px;
-      padding-right: 0;
-    }
-    .entityCard {
-      padding: 8px;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      background: var(--card-color);
-      box-sizing: border-box;
-      position: relative;
-      padding-bottom: 22px;
-    }
-    .entityName {
-      font-weight: 600;
-      overflow-wrap: anywhere;
-    }
-    .entityId {
-      font-size: var(--font-size-sm);
-      opacity: 0.8;
-      overflow-wrap: anywhere;
-    }
-    .entityMeta {
-      font-size: var(--font-size-sm);
-      margin-top: 4px;
-      overflow-wrap: anywhere;
-    }
-    .entityInsert {
-      position: absolute;
-      right: 6px;
-      bottom: 6px;
-      border: 1px solid var(--border-color);
-      background: var(--panel-color);
-      color: var(--text-color);
-      border-radius: 8px;
-      padding: 4px 6px;
-      cursor: pointer;
-      font-size: var(--font-size-xs);
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      opacity: 0.9;
-    }
-    .entityInsert:hover {
-      background: var(--hover-color);
-    }
-    .entityError {
-      color: var(--entity-error-text);
-      background: var(--error-bg);
-      padding: 8px;
-      border-radius: 8px;
-      font-size: var(--font-size-sm);
-      box-sizing: border-box;
-    }
-    .entityGroup {
-      border: 1px solid #2a2a2a;
-      border-radius: 8px;
-      overflow: hidden;
-      background: #222;
-    }
-    .entityGroup + .entityGroup {
-      margin-top: 6px;
-    }
-    .entityGroupHeader {
-      width: 100%;
-      border: none;
-      background: #252526;
-      color: #d4d4d4;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 10px;
-      cursor: pointer;
-      text-align: left;
-      box-sizing: border-box;
-      font-size: var(--font-size-md);
-    }
-    .entityGroupHeader:hover {
-      background: #2d2d2d;
-    }
-    .entityGroupTitle {
-      font-weight: 600;
-      text-transform: lowercase;
-    }
-    .entityGroupBody {
-      padding: 6px;
-      display: grid;
-      gap: 6px;
-    }
-    .entityEmpty {
-      padding: 8px;
-      font-size: var(--font-size-sm);
-      opacity: 0.75;
-    }
-
-    /* Sidebar */
-    .sidebar {
-      background: var(--panel-color);
-      border-right: 1px solid var(--border-color);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      position: relative;
-    }
-    .sidebarHeader {
-      height: 34px;
-      display: flex;
-      align-items: center;
-      padding: 0 10px;
-      border-bottom: 1px solid var(--border-color);
-      font-size: var(--font-size-sm);
-      letter-spacing: 0.04em;
-      color: var(--muted-color);
-    }
-    .explorerTitle {
-      font-weight: 600;
-      text-transform: uppercase;
-      opacity: 0.9;
-    }
-    .sidebarClose {
-      display: none;
-      margin-left: auto;
-      border: none;
-      background: transparent;
-      color: var(--muted-color);
-      cursor: pointer;
-      font-size: var(--font-size-base);
-      padding: 0 6px;
-    }
-    .sidebarClose:hover {
-      color: var(--text-color);
-    }
-    .sidebarBackdrop {
-      display: none;
-    }
-    .sidebarResizer {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 6px;
-      height: 100%;
-      cursor: col-resize;
-      background: transparent;
-      z-index: 5;
-    }
-    .sidebarResizer:hover,
-    .sidebarResizer.active {
-      background: rgba(255, 255, 255, 0.08);
-    }
-
-    .tree {
-      padding: 8px 6px 12px;
-      font-size: var(--font-size-md);
-      overflow-y: auto;
-      flex: 1;
-      min-height: 0;
-    }
-    .treeRow {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 8px;
-      border-radius: 8px;
-      cursor: pointer;
-      color: var(--text-color);
-    }
-    .treeRow:hover {
-      background: var(--tree-hover);
-    }
-    .treeRow.active {
-      background: var(--tree-active);
-    }
-    .indent {
-      width: 14px;
-      flex: 0 0 14px;
-    }
-    .twisty {
-      width: 14px;
-      flex: 0 0 14px;
-      opacity: 0.9;
-    }
-    .muted {
-      opacity: 0.8;
-    }
-
-    /* Editor */
-    .editor {
-      display: grid;
-      grid-template-rows: 34px 1fr; /* tabs, content */
-      overflow: hidden;
-      background: var(--bg-color);
-    }
-
-    .tabs {
-      display: flex;
-      align-items: end;
-      gap: 1px;
-      padding: 0 8px;
-      background: var(--panel-color);
-      border-bottom: 1px solid var(--border-color);
-      overflow: auto;
-      white-space: nowrap;
-    }
-    .tab {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      height: 30px;
-      padding: 0 10px;
-      margin-top: 4px;
-      border-radius: 10px 10px 0 0;
-      background: var(--panel-strong);
-      color: var(--muted-color);
-      cursor: pointer;
-      font-size: var(--font-size-sm);
-    }
-    .tab.active {
-      background: var(--bg-color);
-      color: var(--text-color);
-      outline: 1px solid var(--border-color);
-      outline-offset: -1px;
-    }
-    .tabClose {
-      background: transparent;
-      border: none;
-      color: inherit;
-      cursor: pointer;
-      padding: 0;
-      margin: 0;
-      opacity: 0.65;
-      font-size: var(--font-size-sm);
-      display: grid;
-      place-items: center;
-      line-height: 1;
-    }
-    .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 99px;
-      background: #d4d4d4;
-      opacity: 0.65;
-    }
-
-    .content {
-      display: grid;
-      grid-template-rows: auto 1fr auto;
-      gap: 8px;
-      padding: 12px;
-      overflow: hidden;
-    }
-
-    .crumbs {
-      font-size: var(--font-size-sm);
-      opacity: 0.75;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .btn {
-      background: var(--btn-bg, var(--panel-strong));
-      color: var(--text-color);
-      border: 1px solid var(--btn-border, var(--border-color));
-      border-radius: 10px;
-      padding: 8px 12px;
-      cursor: pointer;
-      font-size: var(--font-size-sm);
-    }
-    .btn:hover {
-      background: var(--btn-hover, var(--hover-color));
-    }
-    .btn.primary {
-      background: var(--accent-color);
-      border-color: var(--accent-color);
-      color: white;
-    }
-    .btn.primary:hover {
-      background: var(--accent-hover);
-    }
-    .btn.danger {
-      background: #b93a3a;
-      border-color: #b93a3a;
-      color: white;
-    }
-    .btn.danger:hover {
-      background: #a13232;
-    }
-
-    .editorWrap {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      align-items: stretch;
-      gap: 0;
-      height: 100%;
-      overflow: hidden;
-      position: relative;
-    }
-    .splitWrap {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      height: 100%;
-      overflow: hidden;
-    }
-    .splitPane {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .gutter {
-      width: 52px;
-      padding: 12px 8px;
-      background: var(--gutter-bg);
-      color: #7c7c7c;
-      border: 1px solid var(--border-color);
-      border-right: none;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: var(--font-size-md);
-      line-height: 1.4;
-      text-align: right;
-      white-space: pre;
-      box-sizing: border-box;
-      overflow: hidden;
-      height: fit-content;
-      border-radius: 12px 0 0 12px;
-    }
-    .codeWrap {
-      position: relative;
-      --editor-pad: 12px;
-      --editor-pad-right: 28px;
-      height: 100%;
-      overflow: hidden;
-      border: 1px solid var(--border-color);
-      border-left: none;
-      border-radius: 0 12px 12px 0;
-      background: var(--code-bg);
-    }
-    .code {
-      position: absolute;
-      top: 0;
-      left: 0;
-      padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: var(--font-size-md);
-      line-height: 1.4;
-      white-space: pre;
-      word-wrap: normal;
-      color: var(--text-color);
-      pointer-events: none;
-      user-select: none;
-      -webkit-user-select: none;
-      overflow: hidden;
-      min-width: 100%;
-      width: max-content;
-      min-height: 100%;
-      box-sizing: border-box;
-    }
-    .codeLine {
-      white-space: normal;
-      min-height: 1.4em;
-      line-height: 1.4;
-      user-select: none;
-      -webkit-user-select: none;
-    }
-    .codeIndent {
-      white-space: pre;
-    }
-    .codeLine.diff-insert {
-      background: rgba(46, 160, 67, 0.2);
-    }
-    .codeLine.diff-delete {
-      background: rgba(248, 81, 73, 0.2);
-    }
-    .codeLine.diff-replace {
-      background: rgba(255, 211, 61, 0.2);
-    }
-    .token-key {
-      color: #9cdcfe;
-    }
-    .token-string {
-      color: #ce9178;
-    }
-    .token-number {
-      color: #b5cea8;
-    }
-    .token-boolean {
-      color: #4ec9b0;
-    }
-    .token-comment {
-      color: #6a9955;
-    }
-    textarea {
-      width: 100%;
-      height: 100%;
-      resize: none;
-      border-radius: 0 12px 12px 0;
-      border: none;
-      border-left: none;
-      background: transparent;
-      color: transparent;
-      caret-color: #d4d4d4;
-      padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: var(--font-size-md);
-      line-height: 1.4;
-      outline: none;
-      box-sizing: border-box;
-      overflow: auto;
-      white-space: pre;
-      word-wrap: normal;
-      scrollbar-gutter: stable;
-    }
-    textarea:focus {
-      border-color: #3a3a3a;
-    }
-    .basePre {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      border: none;
-      background: transparent;
-      color: transparent;
-      caret-color: transparent;
-      padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: var(--font-size-md);
-      line-height: 1.4;
-      outline: none;
-      box-sizing: border-box;
-      overflow: auto;
-      white-space: pre;
-      word-wrap: normal;
-      scrollbar-gutter: stable;
-    }
-
-    /* Status bar */
-    .statusbar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 0 10px;
-      font-size: var(--font-size-sm);
-      background: var(--status-bg);
-      color: white;
-      user-select: none;
-    }
-    .statusbar .right {
-      margin-left: auto;
-      opacity: 0.95;
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-    .statusToggle {
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      background: transparent;
-      color: inherit;
-      border-radius: 8px;
-      padding: 2px 8px;
-      cursor: pointer;
-      font-size: var(--font-size-xs);
-    }
-    .statusToggle:hover {
-      background: rgba(255, 255, 255, 0.12);
-    }
-    .snippetGrid {
-      display: grid;
-      gap: 10px;
-      padding: 8px 6px 12px;
-      width: 90%;
-      box-sizing: border-box;
-      overflow-x: hidden;
-    }
-    .snippetCard {
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 10px;
-      background: var(--card-color);
-      display: grid;
-      gap: 6px;
-      box-shadow: var(--menu-shadow);
-      width: 100%;
-      box-sizing: border-box;
-      min-width: 0;
-    }
-    .snippetHeader {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    .snippetActions {
-      display: flex;
-      gap: 6px;
-      flex: 0 0 auto;
-    }
-    .systemPane {
-      display: grid;
-      gap: 12px;
-    }
-    .systemGrid {
-      display: grid;
-      gap: 10px;
-    }
-    .systemCard {
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      padding: 10px;
-      background: var(--card-color);
-      display: grid;
-      gap: 6px;
-      text-align: left;
-      color: var(--text-color);
-      cursor: pointer;
-      box-shadow: var(--menu-shadow);
-    }
-    .systemCard:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-    .systemCardTitle {
-      font-weight: 700;
-      font-size: var(--font-size-md);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .systemCardDesc {
-      font-size: var(--font-size-sm);
-      color: var(--muted-color);
-    }
-    @media (max-width: 900px) {
-      .main {
-        grid-template-columns: 48px 0 1fr;
-      }
-      .sidebar {
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 48px;
-        width: min(80vw, 320px);
-        transform: translateX(-110%);
-        transition: transform 0.2s ease;
-        z-index: 40;
-        box-shadow: var(--menu-shadow);
-      }
-      .sidebar.open {
-        transform: translateX(0);
-      }
-      .sidebarBackdrop {
-        display: block;
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        left: 48px;
-        right: 0;
-        background: rgba(0, 0, 0, 0.3);
-        opacity: 0;
-        pointer-events: none;
-        transition: opacity 0.2s ease;
-        z-index: 30;
-      }
-      .sidebarBackdrop.open {
-        opacity: 1;
-        pointer-events: auto;
-      }
-      .sidebarClose {
-        display: inline-flex;
-      }
-      .sidebarResizer {
-        display: none;
-      }
-    }
-    .snippetTitle {
-      font-weight: 700;
-      min-width: 0;
-      flex: 1;
-      overflow-wrap: anywhere;
-    }
-    .snippetDesc {
-      font-size: var(--font-size-sm);
-      color: var(--muted-color);
-      overflow-wrap: anywhere;
-    }
-    .contextMenu {
-      position: fixed;
-      background: var(--panel-strong);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      box-shadow: var(--menu-shadow);
-      padding: 6px 0;
-      z-index: 400;
-      min-width: 160px;
-      color: var(--text-color);
-    }
-    .contextMenuItem {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 12px;
-      cursor: pointer;
-      font-size: var(--font-size-md);
-      background: transparent;
-      border: none;
-      width: 100%;
-      text-align: left;
-      color: inherit;
-      font: inherit;
-    }
-    .contextMenuItem:hover {
-      background: var(--hover-color);
-    }
-    .contextMenuItem.disabled {
-      opacity: 0.5;
-      pointer-events: none;
-    }
-    .suggestBox {
-      position: absolute;
-      background: var(--panel-strong);
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      box-shadow: var(--menu-shadow);
-      min-width: 220px;
-      max-height: var(--suggest-max-height, 220px);
-      overflow: auto;
-      z-index: 350;
-      color: var(--text-color);
-      transform: translateY(0);
-    }
-    .suggestBox.above {
-      transform: translateY(-4px) translateY(-100%);
-    }
-    .suggestBox.below {
-      transform: translateY(4px);
-    }
-    .suggestItem {
-      padding: 8px 12px;
-      cursor: pointer;
-      font-size: var(--font-size-sm);
-      display: flex;
-      gap: 6px;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .suggestItemLabel {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .suggestItemIcon {
-      font-family: "Material Design Icons";
-      font-style: normal;
-      font-weight: normal;
-      font-size: 2.2em;
-      opacity: 0.9;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 2.4em;
-    }
-    .suggestItem:hover,
-    .suggestItem.active {
-      background: var(--hover-color);
-    }
-    .statusbar .version {
-      margin-left: 10px;
-      opacity: 0.85;
-      font-weight: 600;
-    }
-
-    /* Modal */
-    .modalBackdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.45);
-      display: grid;
-      place-items: center;
-      z-index: 200;
-    }
-    .modal {
-      background: var(--panel-strong);
-      border: 1px solid var(--border-color);
-      border-radius: 12px;
-      padding: 16px;
-      width: 360px;
-      box-shadow: var(--modal-shadow);
-      display: grid;
-      gap: 12px;
-    }
-    .modal h3 {
-      margin: 0;
-      font-size: var(--font-size-lg);
-    }
-    .modal label {
-      font-size: var(--font-size-sm);
-      color: #c8c8c8;
-      display: grid;
-      gap: 6px;
-    }
-    .modal input {
-      background: var(--input-bg);
-      border: 1px solid var(--border-color);
-      color: var(--text-color);
-      padding: 8px;
-      border-radius: 8px;
-      font-size: var(--font-size-md);
-    }
-    .modal .actions {
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-    .aboutModal {
-      width: 420px;
-      height: 360px;
-      box-sizing: border-box;
-    }
-    .aboutHeader {
-      display: grid;
-      gap: 8px;
-      justify-items: center;
-      text-align: center;
-    }
-    .aboutLogo {
-      width: 72px;
-      height: 72px;
-      border-radius: 12px;
-      background: var(--panel-color);
-      border: 1px solid var(--border-color);
-      object-fit: cover;
-    }
-    .aboutBody {
-      display: grid;
-      gap: 8px;
-      align-content: start;
-    }
-    .aboutRow {
-      display: grid;
-      grid-template-columns: 140px 1fr;
-      gap: 10px;
-      align-items: center;
-      font-size: var(--font-size-sm);
-    }
-    .aboutLabel {
-      opacity: 0.75;
-    }
-    .aboutValue a {
-      color: var(--accent-color);
-      text-decoration: none;
-    }
-    .aboutValue a:hover {
-      text-decoration: underline;
-    }
-    .settingsTabs {
-      display: flex;
-      gap: 8px;
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 8px;
-    }
-    .settingsTab {
-      border: 1px solid transparent;
-      background: transparent;
-      color: var(--text-color);
-      padding: 6px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: var(--font-size-sm);
-    }
-    .settingsTab.active {
-      background: var(--hover-color);
-      border-color: var(--border-color);
-    }
-    .settingsBody {
-      display: grid;
-      gap: 10px;
-    }
-    .settingsRow {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-    .settingsLabel {
-      font-weight: 600;
-    }
-    .settingsHint {
-      font-size: var(--font-size-sm);
-      opacity: 0.75;
-    }
-    .settingsValue {
-      font-size: var(--font-size-sm);
-      font-weight: 600;
-    }
-    .settingsRange {
-      width: 100%;
-    }
-
-    /* Toast */
-    .toastContainer {
-      position: fixed;
-      top: 112px;
-      right: 12px;
-      display: grid;
-      gap: 8px;
-      z-index: 300;
-    }
-    .toast {
-      min-width: 275px;
-      background: var(--toast-bg);
-      color: var(--text-color);
-      border: 1px solid var(--toast-border);
-      border-radius: 10px;
-      padding: 12px 16px;
-      box-shadow: var(--toast-shadow);
-      font-size: var(--font-size-base);
-      transform: translateX(120%);
-      animation: slide-in 180ms ease-out forwards, slide-out 180ms ease-in forwards;
-      animation-delay: 0s, 4.8s;
-    }
-    .toast.error {
-      border-color: var(--error-border);
-      background: var(--error-bg);
-      color: var(--entity-error-text);
-    }
-    @keyframes slide-in {
-      from {
-        transform: translateX(120%);
-        opacity: 0;
-      }
-      to {
-        transform: translateX(0%);
-        opacity: 1;
-      }
-    }
-    @keyframes slide-out {
-      from {
-        transform: translateX(0%);
-        opacity: 1;
-      }
-      to {
-        transform: translateX(120%);
-        opacity: 0;
-      }
-    }
-  `;
+  static styles = appStyles;
 
   private apiBase = (() => {
     const base = new URL("./", window.location.href).pathname;
@@ -1269,7 +179,7 @@ export class AppRoot extends LitElement {
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
   declare contextMenuY: number;
-  declare themeMode: "auto" | "dark" | "light";
+  declare themeMode: ThemeMode;
   declare suggestOpen: boolean;
   declare suggestItems: SuggestItem[];
   declare suggestContext: "entity" | "mdi" | null;
@@ -1351,12 +261,12 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
-  private readonly fontDefaults = { xs: 0.6875, sm: 0.75, md: 0.8125, base: 0.875, lg: 1 };
-  private readonly fontBaseMin = 0.75;
-  private readonly fontBaseMax = 1.125;
-  private readonly fontBaseStep = 0.0625;
+  private readonly fontDefaults = FONT_DEFAULTS;
+  private readonly fontBaseMin = FONT_BASE_MIN;
+  private readonly fontBaseMax = FONT_BASE_MAX;
+  private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.1.100";
+  private readonly appVersion = "0.2.1";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -1372,6 +282,55 @@ export class AppRoot extends LitElement {
     if (active !== this.editorRef) return;
     this.updateCursorFromPos(this.editorRef.selectionStart ?? 0, this.editorRef.value);
   };
+  private loadTree = treeLoadTree.bind(this);
+  private reloadTree = treeReloadTree.bind(this);
+  private toggleDir = treeToggleDir.bind(this);
+  private handleTreeContextMenu = treeHandleTreeContextMenu.bind(this);
+  private closeTreeMenu = treeCloseTreeMenu.bind(this);
+  private copyTreeItem = treeCopyTreeItem.bind(this);
+  private pasteTreeItem = treePasteTreeItem.bind(this);
+  private confirmTreeDelete = treeConfirmTreeDelete.bind(this);
+  private cancelTreeDelete = treeCancelTreeDelete.bind(this);
+  private executeTreeDelete = treeExecuteTreeDelete.bind(this);
+  private reloadTreePath = treeReloadTreePath.bind(this);
+  private createNewItem = treeCreateNewItem.bind(this);
+  private cancelNewItem = treeCancelNewItem.bind(this);
+  private renderTree = treeRenderTree.bind(this);
+  private performSearch = searchPerformSearch.bind(this);
+  private replaceAll = searchReplaceAll.bind(this);
+  private openSearchMatch = searchOpenSearchMatch.bind(this);
+  private renderSearchResults = searchRenderSearchResults.bind(this);
+  private loadSnippets = snippetLoadSnippets.bind(this);
+  private openSnippetModal = snippetOpenSnippetModal.bind(this);
+  private closeSnippetModal = snippetCloseSnippetModal.bind(this);
+  private saveSnippet = snippetSaveSnippet.bind(this);
+  private insertSnippet = snippetInsertSnippet.bind(this);
+  private deleteSnippet = snippetDeleteSnippet.bind(this);
+  private runSystemAction = systemRunSystemAction.bind(this);
+  private runBackup = systemRunBackup.bind(this);
+  private handleThemeChange = settingsHandleThemeChange.bind(this);
+  private cycleTheme = settingsCycleTheme.bind(this);
+  private applyTheme = settingsApplyTheme.bind(this);
+  private persistUserConfig = settingsPersistUserConfig.bind(this);
+  private loadFontSettings = settingsLoadFontSettings.bind(this);
+  private openSettingsModal = settingsOpenSettingsModal.bind(this);
+  private cancelSettingsModal = settingsCancelSettingsModal.bind(this);
+  private applySettingsModal = settingsApplySettingsModal.bind(this);
+  private handleFontSizeInput = settingsHandleFontSizeInput.bind(this);
+  private closeSuggestions = entitiesCloseSuggestions.bind(this);
+  private updateSuggestions = entitiesUpdateSuggestions.bind(this);
+  private openSuggestions = entitiesOpenSuggestions.bind(this);
+  private isSameSuggestItem = entitiesIsSameSuggestItem.bind(this);
+  private getSuggestCoords = entitiesGetSuggestCoords.bind(this);
+  private fetchMdiSuggestions = entitiesFetchMdiSuggestions.bind(this);
+  private renderMdiGlyph = entitiesRenderMdiGlyph.bind(this);
+  private applySuggestion = entitiesApplySuggestion.bind(this);
+  private scrollSuggestIntoView = entitiesScrollSuggestIntoView.bind(this);
+  private initEntities = entitiesInitEntities.bind(this);
+  private toggleDomain = entitiesToggleDomain.bind(this);
+  private insertEntityId = entitiesInsertEntityId.bind(this);
+  private syncCollapsedDomains = entitiesSyncCollapsedDomains.bind(this);
+  private renderEntityPane = entitiesRenderEntityPane.bind(this);
 
   constructor() {
     super();
@@ -1484,59 +443,6 @@ export class AppRoot extends LitElement {
     super.disconnectedCallback();
   }
 
-  private async loadTree(path: string, force = false) {
-    if ((!force && this.loadedPaths.has(path)) || this.loadingPaths.has(path)) {
-      return;
-    }
-    this.loadingPaths.add(path);
-
-    try {
-      this.status = "Loading tree...";
-      const url = `${this.apiBase}api/tree${path ? `?path=${encodeURIComponent(path)}` : ""}`;
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`tree ${res.status}`);
-      }
-      const data = await res.json();
-      const key = (data && typeof data.path === "string" ? data.path : path) || "";
-      const items = Array.isArray(data?.items) ? (data.items as TreeItem[]) : [];
-      if (key === "") {
-        this.rootItems = items;
-      }
-      this.treeData = { ...this.treeData, [key]: items };
-      this.status = items.length === 0 ? "Nessun file" : "Ready";
-    } catch (e) {
-      this.status = "Errore caricamento tree";
-    } finally {
-      this.loadingPaths.delete(path);
-      this.loadedPaths.add(path);
-    }
-  }
-
-  private async reloadTree() {
-    const expandedPaths = Array.from(this.expanded).filter((p) => p !== "");
-    this.loadedPaths.clear();
-    this.loadingPaths.clear();
-    this.treeData = {};
-    this.rootItems = [];
-    await this.loadTree("", true);
-    for (const p of expandedPaths) {
-      await this.loadTree(p, true);
-    }
-    this.showToast("Tree ricaricato");
-  }
-
-  private async toggleDir(path: string) {
-    const s = new Set(this.expanded);
-    const willExpand = !s.has(path);
-    willExpand ? s.add(path) : s.delete(path);
-    this.expanded = s;
-
-    if (willExpand && !this.treeData[path]) {
-      await this.loadTree(path);
-    }
-  }
-
   private openFile(path: string) {
     const name = path.split("/").pop() || path;
     const existing = this.tabs.find((t) => t.path === path);
@@ -1555,8 +461,7 @@ export class AppRoot extends LitElement {
   private async loadFile(path: string) {
     try {
       this.status = "Loading file...";
-      const url = `${this.apiBase}api/file?path=${encodeURIComponent(path)}`;
-      const res = await fetch(url);
+      const res = await apiGetFile(this.apiBase, path);
       if (!res.ok) {
         throw new Error(`file ${res.status}`);
       }
@@ -1656,11 +561,7 @@ export class AppRoot extends LitElement {
         modified_text: this.content,
         mode: "saved",
       };
-      const res = await fetch(`${this.apiBase}api/diff`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await apiPostDiff(this.apiBase, payload);
       let data: any = null;
       try {
         data = await res.json();
@@ -1885,144 +786,6 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private handleTreeContextMenu(e: MouseEvent, item: TreeItem) {
-    e.preventDefault();
-    e.stopPropagation();
-    this.treeMenuOpen = true;
-    this.treeMenuX = e.clientX;
-    this.treeMenuY = e.clientY;
-    this.treeMenuPath = item.path;
-    this.treeMenuType = item.type;
-    this.contextMenuOpen = false;
-    this.openMenu = null;
-    this.closeSuggestions();
-  }
-
-  private closeTreeMenu() {
-    if (this.treeMenuOpen) {
-      this.treeMenuOpen = false;
-    }
-  }
-
-  private copyTreeItem() {
-    if (!this.treeMenuPath || !this.treeMenuType) return;
-    this.treeClipboard = { path: this.treeMenuPath, type: this.treeMenuType };
-    this.showToast(`Copiato: ${this.treeMenuPath}`);
-    this.closeTreeMenu();
-  }
-
-  private getCopyName(path: string, type: "file" | "dir") {
-    const name = path.split("/").pop() || path;
-    if (type === "dir") {
-      return `${name}_copy`;
-    }
-    const dot = name.lastIndexOf(".");
-    if (dot > 0) {
-      const base = name.slice(0, dot);
-      const ext = name.slice(dot);
-      return `${base}_copy${ext}`;
-    }
-    return `${name}_copy`;
-  }
-
-  private async pasteTreeItem() {
-    if (!this.treeClipboard || !this.treeMenuPath || !this.treeMenuType) return;
-    const destDir =
-      this.treeMenuType === "dir"
-        ? this.treeMenuPath
-        : this.treeMenuPath.includes("/")
-          ? this.treeMenuPath.split("/").slice(0, -1).join("/")
-          : "";
-    const destName = this.getCopyName(this.treeClipboard.path, this.treeClipboard.type);
-    try {
-      const res = await fetch(`${this.apiBase}api/fs/copy`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ src: this.treeClipboard.path, dest_dir: destDir, dest_name: destName }),
-      });
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
-      if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.detail || payload?.error?.message || `Errore copia (HTTP ${res.status})`;
-        this.showToast(msg, "error");
-        return;
-      }
-      const destPath = payload?.dest ? String(payload.dest) : destName;
-      this.showToast(`Incollato: ${destPath}`);
-      await this.reloadTreePath(destDir);
-    } catch {
-      this.showToast("Errore copia", "error");
-    } finally {
-      this.closeTreeMenu();
-    }
-  }
-
-  private confirmTreeDelete() {
-    if (!this.treeMenuPath || !this.treeMenuType) return;
-    this.deleteTargetPath = this.treeMenuPath;
-    this.deleteTargetType = this.treeMenuType;
-    this.showTreeDeleteModal = true;
-    this.closeTreeMenu();
-  }
-
-  private cancelTreeDelete() {
-    this.showTreeDeleteModal = false;
-    this.deleteTargetPath = null;
-    this.deleteTargetType = null;
-  }
-
-  private async executeTreeDelete() {
-    if (!this.deleteTargetPath || !this.deleteTargetType) return;
-    const target = this.deleteTargetPath;
-    const parent = target.includes("/") ? target.split("/").slice(0, -1).join("/") : "";
-    try {
-      const res = await fetch(`${this.apiBase}api/fs/delete`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path: target }),
-      });
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
-      if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.detail || payload?.error?.message || `Errore eliminazione (HTTP ${res.status})`;
-        this.showToast(msg, "error");
-        return;
-      }
-      this.closeTabsForDeletedPath(target, this.deleteTargetType);
-      this.showToast("Elemento eliminato");
-      await this.reloadTreePath(parent);
-    } catch {
-      this.showToast("Errore eliminazione", "error");
-    } finally {
-      this.cancelTreeDelete();
-    }
-  }
-
-  private closeTabsForDeletedPath(path: string, type: "file" | "dir") {
-    if (type === "file") {
-      this.closeTab(path);
-      return;
-    }
-    const prefix = path.endsWith("/") ? path : `${path}/`;
-    const affected = this.tabs.filter((t) => t.path === path || t.path.startsWith(prefix));
-    if (affected.length === 0) return;
-    affected.forEach((t) => this.closeTab(t.path));
-  }
-
-  private async reloadTreePath(path: string) {
-    this.loadedPaths.delete(path);
-    await this.loadTree(path, true);
-    this.expanded = new Set(this.expanded).add(path);
-  }
-
   private async handleCopyCut(action: "copy" | "cut") {
     if (!this.editorRef) return;
     const ta = this.editorRef;
@@ -2144,124 +907,6 @@ export class AppRoot extends LitElement {
     this.showToast("Auto-indent completato");
   }
 
-  private closeSuggestions(block = false) {
-    if (this.suggestOpen) {
-      this.suggestOpen = false;
-      this.suggestItems = [];
-      this.suggestIndex = 0;
-    }
-    this.suggestContext = null;
-    this.suggestPlacement = "above";
-    this.suggestMaxHeight = 220;
-    if (block) {
-      this.suggestBlocked = true;
-    }
-  }
-
-  private async updateSuggestions() {
-    if (this.suggestBlocked) return;
-    if (!this.editorRef) {
-      this.closeSuggestions();
-      return;
-    }
-    const pos = this.editorRef.selectionStart ?? 0;
-    const before = this.content.slice(0, pos);
-    const mdiMatch = before.match(/mdi[:.]([a-zA-Z0-9_\\-]*)$/i);
-    if (mdiMatch) {
-      const query = mdiMatch[1] || "";
-      const icons = await this.fetchMdiSuggestions(query);
-      if (!icons.length) {
-        this.closeSuggestions();
-        return;
-      }
-      const items = icons.map((icon) => ({ type: "mdi", value: icon.name, codepoint: icon.codepoint }));
-      const coords = this.getSuggestCoords(before);
-      if (!coords) return;
-      this.openSuggestions(items, "mdi", coords.top, coords.left, coords.placement, coords.maxHeight);
-      return;
-    }
-
-    const match = before.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_\\-]*)$/);
-    if (!match) {
-      this.closeSuggestions();
-      return;
-    }
-    const domain = (match[1] || "").toLowerCase();
-    const query = match[2] || "";
-    const all = Object.keys(this.entities).sort();
-    const items =
-      domain === "state" || domain === "states"
-        ? all.filter((id) => id.includes(query))
-        : all.filter((id) => id.startsWith(`${domain}.`) && id.includes(query));
-    if (items.length === 0) {
-      this.closeSuggestions();
-      return;
-    }
-    const suggestItems = items.map((id) => ({ type: "entity", value: id }));
-    const coords = this.getSuggestCoords(before);
-    if (!coords) return;
-    this.openSuggestions(suggestItems, "entity", coords.top, coords.left, coords.placement, coords.maxHeight);
-  }
-
-  private isSameSuggestItem(a: SuggestItem, b: SuggestItem) {
-    if (a.type !== b.type || a.value !== b.value) return false;
-    if (a.type === "mdi" && b.type === "mdi") {
-      return a.codepoint === b.codepoint;
-    }
-    return true;
-  }
-
-  private openSuggestions(
-    items: SuggestItem[],
-    context: "entity" | "mdi",
-    top: number,
-    left: number,
-    placement: "above" | "below",
-    maxHeight: number
-  ) {
-    const sameItems =
-      this.suggestOpen &&
-      this.suggestContext === context &&
-      this.suggestItems.length === items.length &&
-      this.suggestItems.every((v, i) => this.isSameSuggestItem(v, items[i]));
-    this.suggestOpen = true;
-    this.suggestContext = context;
-    this.suggestItems = items;
-    this.suggestIndex = sameItems ? Math.min(this.suggestIndex, items.length - 1) : 0;
-    this.suggestTop = top;
-    this.suggestLeft = left;
-    this.suggestPlacement = placement;
-    this.suggestMaxHeight = maxHeight;
-    requestAnimationFrame(() => this.scrollSuggestIntoView());
-  }
-
-  private getSuggestCoords(before: string) {
-    if (!this.editorRef) return null;
-    const lines = before.split("\n");
-    const line = lines.length;
-    const col = lines[lines.length - 1].length;
-    const lineHeight = 18; // px approx (13px font * 1.4)
-    const taRect = this.editorRef.getBoundingClientRect();
-    const hostRect = this.getBoundingClientRect();
-    const padding = 12;
-    const charWidth = 8;
-    const anchorLeft = taRect.left - hostRect.left + padding + col * charWidth;
-    const anchorTop =
-      taRect.top - hostRect.top + padding + (line - 1) * lineHeight - (this.editorRef.scrollTop || 0) - 2;
-    const margin = 8;
-    const maxBoxHeight = 220;
-    const spaceAbove = Math.max(0, anchorTop - margin);
-    const spaceBelow = Math.max(0, hostRect.height - (anchorTop + lineHeight + margin));
-    const placement = spaceBelow >= spaceAbove ? "below" : "above";
-    const maxHeight = Math.min(maxBoxHeight, placement === "above" ? spaceAbove : spaceBelow);
-    const minLeft = margin;
-    const defaultWidth = 240;
-    const maxLeft = Math.max(minLeft, hostRect.width - defaultWidth);
-    const left = Math.min(Math.max(anchorLeft, minLeft), maxLeft);
-    const top = placement === "above" ? anchorTop : anchorTop + lineHeight;
-    return { top, left, placement, maxHeight };
-  }
-
   private startSidebarResize(e: MouseEvent) {
     e.preventDefault();
     this.sidebarResizing = true;
@@ -2293,476 +938,6 @@ export class AppRoot extends LitElement {
     window.removeEventListener("mouseup", this.stopSidebarResize);
   };
 
-  private async fetchMdiSuggestions(query: string): Promise<MdiIcon[]> {
-    const key = query.toLowerCase();
-    const cached = this.mdiSuggestCache.get(key);
-    if (cached) return cached;
-    const requestId = ++this.mdiSuggestRequestId;
-    try {
-      const res = await fetch(`${this.apiBase}api/mdi/search?query=${encodeURIComponent(key)}&limit=50`);
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
-      if (requestId !== this.mdiSuggestRequestId) return [];
-      if (!res.ok || payload?.ok !== true) {
-        return [];
-      }
-      const items = Array.isArray(payload?.items) ? payload.items : [];
-      const icons = items
-        .map((it: any) => {
-          if (!it) return null;
-          if (typeof it === "string") {
-            return { name: it, codepoint: "" };
-          }
-          const name = typeof it.name === "string" ? it.name : null;
-          let codepoint = typeof it.codepoint === "string" ? it.codepoint : null;
-          if (typeof it.codepoint === "number") {
-            codepoint = it.codepoint.toString(16).toUpperCase();
-          }
-          if (!name) return null;
-          return { name, codepoint: codepoint ?? "" };
-        })
-        .filter((it: MdiIcon | null): it is MdiIcon => Boolean(it && it.name));
-      this.mdiSuggestCache.set(key, icons);
-      return icons;
-    } catch {
-      if (requestId === this.mdiSuggestRequestId) {
-        this.mdiSuggestCache.set(key, []);
-      }
-      return [];
-    }
-  }
-
-  private renderMdiGlyph(codepoint?: string) {
-    if (!codepoint) return "";
-    const normalized = codepoint.trim().replace(/^0x/i, "");
-    if (!normalized) return "";
-    const value = Number.parseInt(normalized, 16);
-    if (Number.isNaN(value)) return "";
-    return String.fromCodePoint(value);
-  }
-
-  private applySuggestion() {
-    if (!this.editorRef || !this.suggestOpen || this.suggestItems.length === 0) return;
-    const ta = this.editorRef;
-    const pos = ta.selectionStart ?? 0;
-    const before = this.content.slice(0, pos);
-    const current = this.suggestItems[this.suggestIndex];
-    if (!current) return;
-    if (current.type === "mdi") {
-      const match = before.match(/mdi[:.]([a-zA-Z0-9_\\-]*)$/i);
-      if (!match) {
-        this.closeSuggestions();
-        return;
-      }
-      const prefixLen = match[0].length;
-      const start = pos - prefixLen;
-      const end = ta.selectionEnd ?? pos;
-      const insert = `mdi:${current.value}`;
-      const next = `${this.content.slice(0, start)}${insert}${this.content.slice(end)}`;
-      this.markDirty(next);
-      const newPos = start + insert.length;
-      requestAnimationFrame(() => {
-        if (!this.editorRef) return;
-        this.editorRef.selectionStart = newPos;
-        this.editorRef.selectionEnd = newPos;
-        this.editorRef.focus();
-        this.updateCursorFromPos(newPos, this.content);
-      });
-      this.closeSuggestions();
-      return;
-    }
-    const match = before.match(/([a-zA-Z0-9_]+)\.([a-zA-Z0-9_\\-]*)$/);
-    if (!match) {
-      this.closeSuggestions();
-      return;
-    }
-    const prefixLen = match[0].length;
-    const start = pos - prefixLen;
-    const end = ta.selectionEnd ?? pos;
-    const insert = current.value;
-    const next = `${this.content.slice(0, start)}${insert}${this.content.slice(end)}`;
-    this.markDirty(next);
-    const newPos = start + insert.length;
-    requestAnimationFrame(() => {
-      if (!this.editorRef) return;
-      this.editorRef.selectionStart = newPos;
-      this.editorRef.selectionEnd = newPos;
-      this.editorRef.focus();
-      this.updateCursorFromPos(newPos, this.content);
-    });
-    this.closeSuggestions();
-  }
-
-  private async loadSnippets() {
-    try {
-      const res = await fetch(`${this.apiBase}api/snippets`);
-      if (!res.ok) throw new Error(`snippets ${res.status}`);
-      const data = await res.json();
-      const items = Array.isArray(data?.items) ? (data.items as Snippet[]) : [];
-      this.snippets = items.length > 0 ? items : this.snippetMocks;
-    } catch (e) {
-      this.snippets = this.snippetMocks;
-      this.showToast("Snippet offline (mock)", "error");
-    }
-  }
-
-  private openSnippetModal(existing?: Snippet) {
-    this.showSnippetModal = true;
-    if (existing) {
-      this.snippetEditingId = existing.id;
-      this.snippetName = existing.name;
-      this.snippetDescription = existing.description;
-      this.snippetContent = existing.content;
-    } else {
-      this.snippetEditingId = null;
-      this.snippetName = "";
-      this.snippetDescription = "";
-      this.snippetContent = "";
-    }
-  }
-
-  private closeSnippetModal() {
-    if (this.snippetSaving) return;
-    this.showSnippetModal = false;
-    this.snippetEditingId = null;
-  }
-
-  private async saveSnippet() {
-    if (this.snippetSaving) return;
-    const name = this.snippetName.trim();
-    const description = this.snippetDescription.trim();
-    const content = this.snippetContent;
-    if (!name || !description || !content) {
-      this.showToast("Compila tutti i campi", "error");
-      return;
-    }
-    if (name.length > 100) {
-      this.showToast("Titolo troppo lungo (max 100)", "error");
-      return;
-    }
-    if (description.length > 250) {
-      this.showToast("Descrizione troppo lunga (max 250)", "error");
-      return;
-    }
-    this.snippetSaving = true;
-    try {
-      const payload = { name, description, content };
-      if (this.snippetEditingId) {
-        const res = await fetch(`${this.apiBase}api/snippets/${encodeURIComponent(this.snippetEditingId)}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error(`update snippet ${res.status}`);
-        const data = await res.json();
-        const item = data?.item as Snippet | undefined;
-        if (item && item.id) {
-          this.snippets = this.snippets.map((s) => (s.id === item.id ? item : s));
-        }
-        this.showToast("Snippet aggiornato");
-      } else {
-        const res = await fetch(`${this.apiBase}api/snippets`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error(`save snippet ${res.status}`);
-        const data = await res.json();
-        const item = data?.item as Snippet | undefined;
-        if (item && item.id) {
-          this.snippets = [...this.snippets, item];
-        } else {
-          this.snippets = [...this.snippets, { id: `tmp-${Date.now()}`, name, description, content }];
-        }
-        this.showToast("Snippet salvato");
-      }
-      this.showSnippetModal = false;
-      this.snippetEditingId = null;
-    } catch (e) {
-      this.showToast("Errore salvataggio snippet", "error");
-    } finally {
-      this.snippetSaving = false;
-    }
-  }
-
-  private scrollSuggestIntoView() {
-    if (!this.suggestOpen) return;
-    const items = this.shadowRoot?.querySelectorAll(".suggestItem");
-    if (!items || items.length === 0) return;
-    const el = items[this.suggestIndex] as HTMLElement | undefined;
-    el?.scrollIntoView({ block: "nearest" });
-  }
-
-  private async performSearch() {
-    const query = this.searchQuery.trim();
-    if (!query) {
-      this.showToast("Inserisci un termine di ricerca", "error");
-      return;
-    }
-    this.searchTruncated = false;
-    this.searchLoading = true;
-    try {
-      const payload = {
-        query,
-        case_sensitive: this.searchCaseSensitive,
-        max_files: 200,
-        max_matches_total: 5000,
-        max_matches_per_file: 200,
-      };
-      const res = await fetch(`${this.apiBase}api/search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json();
-      if (!res.ok || data?.ok !== true) {
-        throw new Error(data?.detail || `search ${res.status}`);
-      }
-      this.searchResults = Array.isArray(data.results) ? (data.results as SearchResult[]) : [];
-      this.searchSummary = (data.summary as SearchSummary) || null;
-      this.searchTruncated = !!data.truncated;
-    } catch (e) {
-      this.showToast("Errore ricerca", "error");
-    } finally {
-      this.searchLoading = false;
-    }
-  }
-
-  private async replaceAll() {
-    const query = this.searchQuery.trim();
-    if (!query) {
-      this.showToast("Esegui prima una ricerca", "error");
-      return;
-    }
-    if (this.searchResults.length === 0) {
-      this.showToast("Nessun risultato da sostituire", "error");
-      return;
-    }
-    this.searchLoading = true;
-    try {
-      const files = this.searchResults.map((r) => ({ path: r.path, mtime: r.mtime }));
-      const payload = {
-        query,
-        replace: this.searchReplace,
-        case_sensitive: this.searchCaseSensitive,
-        scope: "files",
-        files,
-      };
-      const previewRes = await fetch(`${this.apiBase}api/search/replace/preview`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      let preview: any = null;
-      try {
-        preview = await previewRes.json();
-      } catch {
-        preview = null;
-      }
-      if (!previewRes.ok || preview?.ok !== true) {
-        const detail = preview?.detail || `replace preview ${previewRes.status}`;
-        throw new Error(detail);
-      }
-      const previewSummary = preview?.summary || {};
-      const replacements = previewSummary.replacements_total ?? 0;
-      const toModify = previewSummary.files_to_modify ?? files.length;
-      if (!replacements) {
-        this.showToast("Nessuna occorrenza da sostituire");
-        return;
-      }
-      const confirmed = window.confirm(`Sostituire ${replacements} occorrenze in ${toModify} file?`);
-      if (!confirmed) return;
-
-      const applyRes = await fetch(`${this.apiBase}api/search/replace/apply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      let apply: any = null;
-      try {
-        apply = await applyRes.json();
-      } catch {
-        apply = null;
-      }
-      if (!applyRes.ok || apply?.ok !== true) {
-        const detail = apply?.detail || `replace apply ${applyRes.status}`;
-        throw new Error(detail);
-      }
-      const summary = apply?.summary || {};
-      const modified = summary.files_modified ?? summary.files_to_modify ?? 0;
-      const stale = summary.stale_files ?? 0;
-      const msg = `Replace completato: ${modified} file aggiornati${stale ? `, ${stale} stale` : ""}`;
-      this.showToast(msg);
-      await this.performSearch();
-    } catch (e) {
-      this.showToast("Errore replace", "error");
-    } finally {
-      this.searchLoading = false;
-    }
-  }
-
-  private async runSystemAction(action: string, label: string, confirm: boolean) {
-    if (this.systemActionLoading) return;
-    if (confirm) {
-      const ok = window.confirm(`Confermi: ${label}?`);
-      if (!ok) return;
-    }
-    this.systemActionLoading = true;
-    this.systemActionPending = action;
-    try {
-      const res = await fetch(`${this.apiBase}api/ha/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
-      }
-      if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.error?.message || payload?.detail || `Errore azione (HTTP ${res.status})`;
-        this.showToast(msg, "error");
-        return;
-      }
-      this.showToast(`${label} avviato`);
-    } catch {
-      this.showToast("Errore chiamata sistema", "error");
-    } finally {
-      this.systemActionLoading = false;
-      this.systemActionPending = null;
-    }
-  }
-
-  private getBackupFilenameFromHeader(res: Response) {
-    const header = res.headers.get("content-disposition") || "";
-    const utfMatch = header.match(/filename\*=UTF-8''([^;]+)/i);
-    if (utfMatch?.[1]) {
-      try {
-        return decodeURIComponent(utfMatch[1]);
-      } catch {
-        return utfMatch[1];
-      }
-    }
-    const match = header.match(/filename=\"?([^\";]+)\"?/i);
-    return match?.[1] || null;
-  }
-
-  private defaultBackupFilename() {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    return `config-backup-${stamp}.zip`;
-  }
-
-  private triggerBackupDownload() {
-    const url = `${this.apiBase}api/backup?ts=${Date.now()}`;
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "";
-    link.rel = "noopener";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  }
-
-  private async runBackup(mode: "download" | "saveas" | "cloud") {
-    if (this.backupLoading) return;
-    if (mode === "cloud") {
-      this.showToast("Backup cloud in arrivo", "info");
-      return;
-    }
-    this.backupLoading = true;
-    this.backupMode = mode;
-    try {
-      if (mode === "download") {
-        this.triggerBackupDownload();
-        this.showToast("Download backup avviato");
-        return;
-      }
-      const picker = (window as unknown as { showSaveFilePicker?: Function }).showSaveFilePicker;
-      if (!picker) {
-        this.showToast("Salvataggio non supportato, avvio download", "info");
-        this.triggerBackupDownload();
-        return;
-      }
-      const res = await fetch(`${this.apiBase}api/backup`);
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        const msg = text || `Errore backup (HTTP ${res.status})`;
-        this.showToast(msg, "error");
-        return;
-      }
-      const blob = await res.blob();
-      const filename = this.getBackupFilenameFromHeader(res) || this.defaultBackupFilename();
-      const handle = await picker({
-        suggestedName: filename,
-        types: [{ description: "Zip", accept: { "application/zip": [".zip"] } }],
-      });
-      const writable = await handle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      this.showToast("Backup salvato");
-    } catch (e: any) {
-      if (e?.name === "AbortError") {
-        this.showToast("Salvataggio annullato", "info");
-      } else {
-        this.showToast("Errore backup", "error");
-      }
-    } finally {
-      this.backupLoading = false;
-      this.backupMode = null;
-    }
-  }
-
-  private openSearchMatch(res: SearchResult, match: SearchMatch) {
-    this.pendingJump = { path: res.path, line: match.line, col: match.column };
-    this.openFile(res.path);
-  }
-
-  private insertSnippet(snippet: Snippet) {
-    if (!this.editorRef || !this.activePath) {
-      this.showToast("Apri un file prima di inserire", "error");
-      return;
-    }
-    const ta = this.editorRef;
-    const start = ta.selectionStart ?? this.content.length;
-    const end = ta.selectionEnd ?? start;
-    const insert = snippet.content || "";
-    const next = `${this.content.slice(0, start)}${insert}${this.content.slice(end)}`;
-    this.markDirty(next);
-    const pos = start + insert.length;
-    requestAnimationFrame(() => {
-      if (!this.editorRef) return;
-      this.editorRef.selectionStart = pos;
-      this.editorRef.selectionEnd = pos;
-      this.editorRef.focus();
-      this.updateCursorFromPos(pos, this.content);
-    });
-    this.showToast(`Snippet inserito: ${snippet.name}`);
-  }
-
-  private async deleteSnippet(snippet: Snippet) {
-    const id = snippet.id;
-    if (!id) {
-      this.showToast("ID snippet mancante", "error");
-      return;
-    }
-    try {
-      const res = await fetch(`${this.apiBase}api/snippets/${encodeURIComponent(id)}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(`delete snippet ${res.status}`);
-      this.snippets = this.snippets.filter((s) => s.id !== id);
-      this.showToast("Snippet eliminato");
-    } catch (e) {
-      this.showToast("Errore eliminazione snippet", "error");
-    }
-  }
-
   private async indentFile() {
     if (!this.activePath || this.indenting) {
       return;
@@ -2770,11 +945,7 @@ export class AppRoot extends LitElement {
     this.indenting = true;
     this.status = "Formatting YAML...";
     try {
-      const res = await fetch(`${this.apiBase}api/format/yaml`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: this.content }),
-      });
+      const res = await apiFormatYaml(this.apiBase, this.content);
       let payload: any = null;
       try {
         payload = await res.json();
@@ -2879,34 +1050,6 @@ export class AppRoot extends LitElement {
     }, 5000);
   }
 
-  private async initEntities() {
-    try {
-      this.haClient = new HAClient(this.apiBase);
-      this.haClient.connect((ev) => {
-        const id = ev.event.data.entity_id;
-        const next = { ...this.entities };
-        if (ev.event.data.new_state) {
-          next[id] = ev.event.data.new_state;
-        } else {
-          delete next[id];
-        }
-        this.syncCollapsedDomains(Object.keys(next).map((k) => k.split(".")[0]));
-        this.entities = next;
-      });
-      const states = await this.haClient.getStates();
-      const next: Record<string, HassState> = {};
-      states.forEach((s) => {
-        next[s.entity_id] = s;
-      });
-      this.syncCollapsedDomains(states.map((s) => s.entity_id.split(".")[0]));
-      this.entities = next;
-      this.entityError = null;
-    } catch (e) {
-      this.entityError = "Errore caricamento entità";
-      this.showToast("Errore caricamento entità", "error");
-    }
-  }
-
   private handleMenuAction(menu: string, action: string) {
     this.openMenu = null;
     if (menu === "file") {
@@ -2976,108 +1119,6 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private async createNewItem() {
-    if (!this.newItemKind) return;
-    const dir = this.activePath && this.activePath.includes("/") ? this.activePath.split("/").slice(0, -1).join("/") : "";
-    if (this.newItemKind === "file") {
-      const base = this.newItemName.trim();
-      const ext = this.newItemExt.trim();
-      if (!base) {
-        this.status = "Nome file richiesto";
-        this.showToast("Nome file richiesto", "error");
-        return;
-      }
-      const filename = ext ? `${base}.${ext.replace(/^\./, "")}` : base;
-      const target = dir ? `${dir}/${filename}` : filename;
-      try {
-        const parentItems =
-          dir && dir !== ""
-            ? this.treeData[dir] ?? []
-            : this.rootItems.length > 0
-              ? this.rootItems
-              : this.treeData[""] ?? [];
-        if (parentItems.some((it) => it.name === filename && it.type === "file")) {
-          this.showToast("File already exist", "error");
-          this.status = "File already exist";
-          return;
-        }
-        const url = `${this.apiBase}api/file?path=${encodeURIComponent(target)}&create_only=1`;
-        const res = await fetch(url, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: "" }),
-        });
-        if (!res.ok) {
-          const detailJson = await res.json().catch(() => null);
-          const detailText = !detailJson ? await res.text().catch(() => "") : "";
-          const msg =
-            (detailJson && (detailJson.detail || detailJson.message)) ||
-            detailText ||
-            (res.status === 400 ? "File already exist" : "Errore creazione file");
-          this.showToast(msg, "error");
-          this.status = msg;
-          return;
-        }
-        this.newItemKind = null;
-        this.loadedPaths.delete(dir);
-        await this.loadTree(dir, true);
-        this.expanded = new Set(this.expanded).add(dir);
-        this.openFile(target);
-      } catch (e) {
-        this.status = "Errore creazione file";
-        this.showToast("Errore creazione file", "error");
-      }
-    } else if (this.newItemKind === "folder") {
-      const base = this.newItemName.trim();
-      if (!base) {
-        this.status = "Nome cartella richiesto";
-        this.showToast("Nome cartella richiesta", "error");
-        return;
-      }
-      const parentItems =
-        dir && dir !== ""
-          ? this.treeData[dir] ?? []
-          : this.rootItems.length > 0
-            ? this.rootItems
-            : this.treeData[""] ?? [];
-      if (parentItems.some((it) => it.name === base && it.type === "dir")) {
-        const msg = "Folder already exist";
-        this.showToast(msg, "error");
-        this.status = msg;
-        return;
-      }
-      const target = dir ? `${dir}/${base}` : base;
-      try {
-        const url = `${this.apiBase}api/folder?path=${encodeURIComponent(target)}`;
-        const res = await fetch(url, { method: "POST" });
-        if (!res.ok) {
-          const detailJson = await res.json().catch(() => null);
-          const detailText = !detailJson ? await res.text().catch(() => "") : "";
-          const msg =
-            (detailJson && (detailJson.detail || detailJson.message)) ||
-            detailText ||
-            (res.status === 400 ? "Folder already exist" : "Cartella esiste già o errore");
-          this.showToast(msg, "error");
-          this.status = msg;
-          return;
-        }
-        this.newItemKind = null;
-        this.loadedPaths.delete(dir);
-        await this.loadTree(dir, true);
-        this.expanded = new Set(this.expanded).add(target);
-      } catch (e) {
-        this.status = "Errore creazione cartella";
-        this.showToast("Errore creazione cartella", "error");
-      }
-    }
-  }
-
-  private cancelNewItem() {
-    this.newItemKind = null;
-    this.newItemName = "";
-    this.newItemExt = "";
-  }
-
   private handleCloseTab(e: Event, path: string) {
     e.stopPropagation();
     e.preventDefault();
@@ -3109,81 +1150,6 @@ export class AppRoot extends LitElement {
       this.cursorCol = 1;
       this.loadFile(path);
     }
-  }
-
-  private highlightLine(line: string) {
-    type Seg = { text: string; cls?: string };
-    const segments: Seg[] = [];
-    const pushWithStyles = (text: string) => {
-      const regex = /(".*?"|'.*?'|\btrue\b|\bfalse\b|\bnull\b|\b\d+(?:\.\d+)?\b)/g;
-      let last = 0;
-      let m: RegExpExecArray | null;
-      while ((m = regex.exec(text)) !== null) {
-        if (m.index > last) {
-          segments.push({ text: text.slice(last, m.index) });
-        }
-        const token = m[1];
-        if (token === "true" || token === "false" || token === "null") {
-          segments.push({ text: token, cls: "token-boolean" });
-        } else if (/^\d/.test(token)) {
-          segments.push({ text: token, cls: "token-number" });
-        } else {
-          segments.push({ text: token, cls: "token-string" });
-        }
-        last = m.index + token.length;
-      }
-      if (last < text.length) {
-        segments.push({ text: text.slice(last) });
-      }
-    };
-
-    const commentIdx = line.indexOf("#");
-    const contentPart = commentIdx >= 0 ? line.slice(0, commentIdx) : line;
-    const commentPart = commentIdx >= 0 ? line.slice(commentIdx) : null;
-
-    const keyMatch = contentPart.match(/^(\s*-?\s*[^:\s#]+:)/);
-    if (keyMatch) {
-      const key = keyMatch[1];
-      segments.push({ text: key, cls: "token-key" });
-      const rest = contentPart.slice(key.length);
-      if (rest) pushWithStyles(rest);
-    } else {
-      pushWithStyles(contentPart);
-    }
-
-    if (commentPart) {
-      segments.push({ text: commentPart, cls: "token-comment" });
-    }
-    if (segments.length === 0) {
-      segments.push({ text: " " });
-    }
-    return segments;
-  }
-
-  private renderOverlayText(text: string) {
-    return text.replace(/\t/g, "  ").replace(/ /g, "\u00A0");
-  }
-
-  private renderHighlighted(text: string, diffMap?: Map<number, string>) {
-    const lines = text.split("\n");
-    return lines.map((line, idx) => {
-      const lineNo = idx + 1;
-      const diffClass = diffMap?.get(lineNo);
-      const cls = diffClass ? `codeLine ${diffClass}` : "codeLine";
-      const indentMatch = line.match(/^[\t ]+/);
-      const indentRaw = indentMatch ? indentMatch[0] : "";
-      const rest = indentRaw ? line.slice(indentRaw.length) : line;
-      const indentRendered = indentRaw
-        ? indentRaw.replace(/\t/g, "  ").replace(/ /g, "\u00A0")
-        : "";
-      const indentNode = indentRendered ? html`<span class="codeIndent">${indentRendered}</span>` : nothing;
-      const tokens = this.highlightLine(rest).map((seg) => {
-        const raw = seg.text && seg.text.length > 0 ? seg.text : " ";
-        const display = this.renderOverlayText(raw);
-        return html`<span class=${seg.cls ?? ""}>${display}</span>`;
-      });
-      return html`<div class=${cls} data-gutter-line=${lineNo}>${indentNode}${tokens}</div>`;
-    });
   }
 
   private renderMenu(label: string, name: string, items: { icon: string; label: string }[]) {
@@ -3228,281 +1194,12 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private toggleDomain(domain: string) {
-    const next = new Set(this.collapsedDomains);
-    if (next.has(domain)) {
-      next.delete(domain);
-    } else {
-      next.add(domain);
-    }
-    this.collapsedDomains = next;
-  }
-
-  private handleThemeChange = () => {
-    if (this.themeMode === "auto") {
-      this.applyTheme();
-    }
-  };
-
-  private async cycleTheme() {
-    const next = this.themeMode === "auto" ? "light" : this.themeMode === "light" ? "dark" : "auto";
-    this.themeMode = next;
-    this.applyTheme();
-    const ok = await this.persistUserConfig({ theme_mode: this.themeMode });
-    if (!ok) {
-      this.showToast("Errore salvataggio tema", "error");
-    }
-  }
-
-  private getEffectiveTheme(): "dark" | "light" {
-    if (this.themeMode === "auto") {
-      const prefersDark = this.themeMedia ? this.themeMedia.matches : true;
-      return prefersDark ? "dark" : "light";
-    }
-    return this.themeMode;
-  }
-
-  private applyTheme() {
-    const theme = this.getEffectiveTheme();
-    const palette =
-      theme === "dark"
-        ? {
-            "--bg-color": "#1e1e1e",
-            "--panel-color": "#252526",
-            "--panel-strong": "#2d2d2d",
-            "--border-color": "#2a2a2a",
-            "--hover-color": "#3a3a3a",
-            "--text-color": "#d4d4d4",
-            "--muted-color": "#c8c8c8",
-            "--activity-color": "#333333",
-            "--accent-color": "#0e639c",
-            "--accent-hover": "#1177bb",
-            "--card-color": "#1f1f1f",
-            "--input-bg": "#1e1e1e",
-            "--toast-bg": "#2d2d2d",
-            "--toast-border": "#3a3a3a",
-            "--error-bg": "#3a1f1f",
-            "--error-border": "#c74c4c",
-            "--status-bg": "#007acc",
-            "--gutter-bg": "#1a1a1a",
-            "--code-bg": "#1e1e1e",
-            "--tree-hover": "#2a2d2e",
-            "--tree-active": "#37373d",
-            "--entity-error-text": "#f6dada",
-          }
-        : {
-            "--bg-color": "#f5f6f8",
-            "--panel-color": "#ffffff",
-            "--panel-strong": "#f1f1f3",
-            "--border-color": "#d1d5db",
-            "--hover-color": "#e5e7eb",
-            "--text-color": "#1f2937",
-            "--muted-color": "#4b5563",
-            "--activity-color": "#f3f4f6",
-            "--accent-color": "#0d6efd",
-            "--accent-hover": "#0b5ed7",
-            "--card-color": "#ffffff",
-            "--input-bg": "#ffffff",
-            "--toast-bg": "#ffffff",
-            "--toast-border": "#d1d5db",
-            "--error-bg": "#ffecec",
-            "--error-border": "#d9534f",
-            "--status-bg": "#0d6efd",
-            "--gutter-bg": "#f3f4f6",
-            "--code-bg": "#ffffff",
-            "--tree-hover": "#e8eef8",
-            "--tree-active": "#d9e6fb",
-            "--entity-error-text": "#8b1f1f",
-          };
-    Object.entries(palette).forEach(([key, value]) => {
-      this.style.setProperty(key, value);
-    });
-  }
-
-  private clampFontBase(value: number) {
-    return Math.min(this.fontBaseMax, Math.max(this.fontBaseMin, value));
-  }
-
-  private applyFontScale(baseRem: number) {
-    const scale = baseRem / this.fontDefaults.base;
-    const toRem = (val: number) => `${(val * scale).toFixed(4)}rem`;
-    this.style.setProperty("--font-size-xs", toRem(this.fontDefaults.xs));
-    this.style.setProperty("--font-size-sm", toRem(this.fontDefaults.sm));
-    this.style.setProperty("--font-size-md", toRem(this.fontDefaults.md));
-    this.style.setProperty("--font-size-base", `${baseRem.toFixed(4)}rem`);
-    this.style.setProperty("--font-size-lg", toRem(this.fontDefaults.lg));
-  }
-
-  private async persistUserConfig(config: UserConfig) {
-    const payload = {
-      font_base_rem: config.font_base_rem ?? this.fontBaseRem,
-      theme_mode: config.theme_mode ?? this.themeMode,
-    };
-    try {
-      const res = await fetch(`${this.apiBase}api/user-config`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config: payload }),
-      });
-      let data: any = null;
-      try {
-        data = await res.json();
-      } catch {
-        data = null;
-      }
-      return res.ok && data?.ok === true;
-    } catch {
-      return false;
-    }
-  }
-
-  private async loadFontSettings() {
-    try {
-      const res = await fetch(`${this.apiBase}api/user-config`);
-      if (res.ok) {
-        let payload: any = null;
-        try {
-          payload = await res.json();
-        } catch {
-          payload = null;
-        }
-        const cfg = (payload?.config ?? payload ?? {}) as UserConfig;
-        const raw = Number(cfg.font_base_rem);
-        if (!Number.isNaN(raw)) {
-          this.fontBaseRem = this.clampFontBase(raw);
-        }
-        if (cfg.theme_mode === "auto" || cfg.theme_mode === "dark" || cfg.theme_mode === "light") {
-          this.themeMode = cfg.theme_mode;
-        }
-      }
-    } catch {
-      /* ignore load errors */
-    }
-    this.settingsFontBaseRem = this.fontBaseRem;
-    this.applyFontScale(this.fontBaseRem);
-    this.applyTheme();
-  }
-
-  private openSettingsModal() {
-    this.settingsTab = "appearance";
-    this.settingsFontBaseRem = this.fontBaseRem;
-    this.showSettingsModal = true;
-  }
-
-  private cancelSettingsModal() {
-    this.applyFontScale(this.fontBaseRem);
-    this.settingsFontBaseRem = this.fontBaseRem;
-    this.showSettingsModal = false;
-  }
-
-  private async applySettingsModal() {
-    const next = this.settingsFontBaseRem;
-    try {
-      const ok = await this.persistUserConfig({ font_base_rem: next });
-      if (!ok) {
-        throw new Error("save-failed");
-      }
-    } catch {
-      this.applyFontScale(this.fontBaseRem);
-      this.settingsFontBaseRem = this.fontBaseRem;
-      this.showToast("Errore salvataggio impostazioni", "error");
-      return;
-    }
-    this.fontBaseRem = next;
-    this.applyFontScale(this.fontBaseRem);
-    this.showSettingsModal = false;
-    this.showToast("Impostazioni applicate");
-  }
-
-  private handleFontSizeInput(e: Event) {
-    const raw = Number((e.target as HTMLInputElement).value);
-    const next = this.clampFontBase(raw);
-    this.settingsFontBaseRem = next;
-    this.applyFontScale(next);
-  }
-
   private openAboutModal() {
     this.showAboutModal = true;
   }
 
   private closeAboutModal() {
     this.showAboutModal = false;
-  }
-
-  private insertEntityId(entityId: string) {
-    if (!this.activePath || !this.editorRef) {
-      this.showToast("Apri un file prima di inserire", "error");
-      return;
-    }
-    const ta = this.editorRef;
-    const start = ta.selectionStart ?? this.content.length;
-    const end = ta.selectionEnd ?? this.content.length;
-    const next = `${this.content.slice(0, start)}${entityId}${this.content.slice(end)}`;
-    this.markDirty(next);
-    const cursorPos = start + entityId.length;
-    requestAnimationFrame(() => {
-      if (!this.editorRef) return;
-      this.editorRef.selectionStart = cursorPos;
-      this.editorRef.selectionEnd = cursorPos;
-      this.editorRef.focus();
-      this.updateCursorFromPos(cursorPos, this.content);
-    });
-  }
-
-  private syncCollapsedDomains(domains: string[]) {
-    const domainSet = new Set(domains);
-    if (domainSet.size === 0) {
-      this.lastDomains = domainSet;
-      return;
-    }
-    if (this.collapsedDomains.size === 0 && this.lastDomains.size === 0) {
-      this.collapsedDomains = new Set(domainSet);
-      this.lastDomains = domainSet;
-      return;
-    }
-
-    const next = new Set<string>();
-    domainSet.forEach((d) => {
-      if (this.collapsedDomains.has(d)) {
-        next.add(d);
-      } else if (!this.lastDomains.has(d)) {
-        // nuovo dominio: chiuso di default
-        next.add(d);
-      }
-    });
-
-    if (next.size !== this.collapsedDomains.size || Array.from(next).some((d) => !this.collapsedDomains.has(d))) {
-      this.collapsedDomains = next;
-    }
-    this.lastDomains = domainSet;
-  }
-
-  private renderSearchResults() {
-    if (this.searchLoading && this.searchResults.length === 0) {
-      return html`<div class="searchStatus">Ricerca in corso...</div>`;
-    }
-    if (this.searchResults.length === 0) {
-      return html`<div class="searchStatus muted">Nessun risultato</div>`;
-    }
-    return html`<div class="searchResults">
-      ${this.searchResults.map(
-        (r) => html`<div class="searchFile">
-          <div class="searchFileHeader">
-            <div class="path">${r.path}</div>
-            <div class="hits">${r.matches_count} hit</div>
-          </div>
-          <div class="searchMatches">
-            ${r.matches.map(
-              (m) => html`<div class="searchMatch" @click=${() => this.openSearchMatch(r, m)}>
-                <span class="lineTag">L${m.line}</span>
-                <span class="preview">${m.preview}</span>
-              </div>`
-            )}
-          </div>
-        </div>`
-      )}
-      ${this.searchTruncated ? html`<div class="searchStatus muted">Risultati troncati dai limiti impostati</div>` : nothing}
-    </div>`;
   }
 
   private renderSidebarContent() {
@@ -3694,91 +1391,14 @@ export class AppRoot extends LitElement {
         </div>
       </div>`;
     }
-    // entity mock
-    const entries = Object.values(this.entities);
-    const filtered = entries
-      .filter((e) => {
-        const q = this.entityFilter.toLowerCase();
-        if (!q) return true;
-        return e.entity_id.toLowerCase().includes(q) || (e.attributes?.friendly_name || "").toLowerCase().includes(q);
-      })
-      .sort((a, b) => {
-        const da = a.entity_id.split(".")[0];
-        const db = b.entity_id.split(".")[0];
-        if (da === db) return a.entity_id.localeCompare(b.entity_id);
-        return da.localeCompare(db);
-      });
-    const grouped: Record<string, HassState[]> = {};
-    filtered.forEach((e) => {
-      const domain = e.entity_id.split(".")[0];
-      if (!grouped[domain]) grouped[domain] = [];
-      grouped[domain].push(e);
-    });
-    const domains = Object.keys(grouped).sort();
-    return html`<div class="sidebarContent entityPane">
-      <div class="entityHeader">Entities</div>
-      <input
-        class="entitySearch"
-        type="text"
-        .value=${this.entityFilter}
-        @input=${(e: Event) => (this.entityFilter = (e.target as HTMLInputElement).value)}
-        placeholder="Search entity id or name"
-      />
-      ${this.entityError
-        ? html`<div class="entityError">${this.entityError}</div>`
-        : html`<div class="entityList">
-            ${domains.length === 0
-              ? html`<div class="entityEmpty">No entities</div>`
-              : domains.map((domain) => {
-                  const items = grouped[domain];
-                  const isOpen = !this.collapsedDomains.has(domain);
-                  return html`<div class="entityGroup">
-                    <button class="entityGroupHeader" type="button" @click=${() => this.toggleDomain(domain)}>
-                      <span class="chevron">${isOpen ? "▾" : "▸"}</span>
-                      <span class="entityGroupTitle">${domain}</span>
-                      <span style="margin-left:auto; opacity:0.75; font-size:var(--font-size-sm);">${items.length}</span>
-                    </button>
-                    ${isOpen
-                      ? html`<div class="entityGroupBody">
-                          ${items.map((e) => {
-                            const name = (e.attributes?.friendly_name as string) || e.entity_id;
-                            return html`<div class="entityCard">
-                              <div class="entityName">${name}</div>
-                              <div class="entityId">${e.entity_id}</div>
-                              <div class="entityMeta">${domain} • State: ${e.state}</div>
-                              <button class="entityInsert" title="Insert.." @click=${(ev: Event) => { ev.stopPropagation(); this.insertEntityId(e.entity_id); }}>
-                                ➕ <span>Insert</span>
-                              </button>
-                            </div>`;
-                          })}
-                        </div>`
-                      : nothing}
-                  </div>`;
-                })}
-          </div>`}
-    </div>`;
-  }
-
-  private renderLineNumbers() {
-    const count = Math.max(1, this.lineCount);
-    return Array.from({ length: count }, (_, i) => String(i + 1)).join("\n");
-  }
-
-  private renderLineNumbersFor(text: string) {
-    const count = Math.max(1, text.split("\n").length);
-    return Array.from({ length: count }, (_, i) => String(i + 1)).join("\n");
+    return this.renderEntityPane();
   }
 
   private async save() {
     if (!this.activePath) return;
     this.status = "Saving...";
     try {
-      const url = `${this.apiBase}api/file?path=${encodeURIComponent(this.activePath)}`;
-      const res = await fetch(url, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: this.content }),
-      });
+      const res = await apiSaveFile(this.apiBase, this.activePath, this.content);
       if (!res.ok) {
         throw new Error(`save ${res.status}`);
       }
@@ -3795,40 +1415,6 @@ export class AppRoot extends LitElement {
     } catch (e) {
       this.status = "Errore salvataggio";
     }
-  }
-
-  private renderTree(path: string, depth = 0) {
-    const items =
-      path === ""
-        ? this.rootItems.length > 0
-          ? this.rootItems
-          : this.treeData[""] ?? []
-        : this.treeData[path] ?? [];
-    return items.map((it) => {
-      const isDir = it.type === "dir";
-      const isExpanded = isDir && this.expanded.has(it.path);
-      const active = this.activePath === it.path;
-
-      return html`
-        <div
-          class="treeRow ${active ? "active" : ""}"
-          style="padding-left:${8 + depth * 14}px"
-          @click=${() => {
-            if (isDir) this.toggleDir(it.path);
-            else this.openFile(it.path);
-          }}
-          @contextmenu=${(e: MouseEvent) => this.handleTreeContextMenu(e, it)}
-        >
-          <span class="twisty">${isDir ? (isExpanded ? "▾" : "▸") : ""}</span>
-          <span>${isDir ? "📁" : "📄"}</span>
-          <span class=${isDir ? "" : "muted"}>${it.name}</span>
-        </div>
-
-        ${isDir && isExpanded
-          ? html`<div>${this.renderTree(it.path, depth + 1)}</div>`
-          : nothing}
-      `;
-    });
   }
 
   render() {
@@ -3944,9 +1530,9 @@ export class AppRoot extends LitElement {
                 ? html`<div class="splitWrap">
                     <div class="splitPane">
                       <div class="editorWrap">
-                        <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${this.renderLineNumbers()}</div>
+                        <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
                         <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted(this.content, diffMaps.left)}</div>
+                      <div class="code" ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content, diffMaps.left)}</div>
                       <textarea
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}
@@ -3969,9 +1555,9 @@ export class AppRoot extends LitElement {
                     </div>
                     <div class="splitPane">
                       <div class="editorWrap">
-                        <div class="gutter" ${ref((el) => (this.baseGutterRef = el))}>${this.renderLineNumbersFor(this.savedBaseText)}</div>
+                        <div class="gutter" ${ref((el) => (this.baseGutterRef = el))}>${renderLineNumbersFor(this.savedBaseText)}</div>
                         <div class="codeWrap">
-                          <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${this.renderHighlighted(this.savedBaseText, diffMaps.right)}</div>
+                          <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${renderHighlighted(this.savedBaseText, diffMaps.right)}</div>
                           <pre
                             class="basePre"
                             ${ref((el) => (this.basePreRef = el))}
@@ -3982,9 +1568,9 @@ export class AppRoot extends LitElement {
                     </div>
                   </div>`
                 : html`<div class="editorWrap">
-                    <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${this.renderLineNumbers()}</div>
+                    <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
                     <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.codeRef = el))}>${this.renderHighlighted(this.content)}</div>
+                      <div class="code" ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content)}</div>
                       <textarea
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}
