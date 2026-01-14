@@ -339,6 +339,20 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-01-11"
     actor: "codex"
+    version: "0.2.1"
+    change: "Bump release: raccolto il refactor frontend in moduli dedicati (stili, API, overlay, tree, search, snippets, system, settings, entities/MDI) e fix autocomplete entità/MDI."
+    reason: "Stabilizzare il refactor e preparare il rilascio 0.2.x."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "rg -n \"appVersion\" file_editor_plus/frontend/src/app-root.ts"
+      - "rg -n \"version:\" file_editor_plus/config.yaml"
+      - "head -n 20 file_editor_plus/CHANGELOG.md"
+  - date: "2026-01-11"
+    actor: "codex"
     version: "0.1.111"
     change: "Fix: corretto il regex per autocomplete entità (match domain.entity_id) nel modulo entities."
     reason: "Il pattern con escape eccessivo non matchava i token, quindi i suggerimenti entità non comparivano."
