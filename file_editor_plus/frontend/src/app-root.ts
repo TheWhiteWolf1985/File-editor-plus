@@ -266,7 +266,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.1";
+  private readonly appVersion = "0.2.4";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -704,15 +704,16 @@ export class AppRoot extends LitElement {
         return;
       }
     }
+    if (e.key === "Tab") {
+      const handled = this.insertTabSpaces(e);
+      if (handled) return;
+    }
     if (!this.autoIndentEnabled) {
       this.handleCursorMove(e);
       return;
     }
     if (e.key === "Enter") {
       const handled = this.applyAutoIndent(e);
-      if (handled) return;
-    } else if (e.key === "Tab") {
-      const handled = this.insertTabSpaces(e);
       if (handled) return;
     }
     this.handleCursorMove(e);
@@ -722,18 +723,71 @@ export class AppRoot extends LitElement {
     if (!this.editorRef) return false;
     e.preventDefault();
     const ta = this.editorRef;
+    const value = this.content;
+    const indent = "  ";
     const start = ta.selectionStart ?? 0;
     const end = ta.selectionEnd ?? start;
-    const tab = "  ";
-    const next = `${this.content.slice(0, start)}${tab}${this.content.slice(end)}`;
-    this.markDirty(next);
-    const pos = start + tab.length;
+    const newlineMatch = value.match(/\r\n/);
+    const newline = newlineMatch ? "\r\n" : "\n";
+    const blockStart = (() => {
+      const nl = value.lastIndexOf("\n", start - 1);
+      return nl === -1 ? 0 : nl + 1;
+    })();
+    const endLineBreak = (() => {
+      const nl = value.indexOf("\n", end);
+      return nl === -1 ? value.length : nl;
+    })();
+    const block = value.slice(blockStart, endLineBreak);
+    const lines = block.split(/\r?\n/);
+
+    if (!e.shiftKey) {
+      const indented = lines.map((line) => `${indent}${line}`);
+      const newBlock = indented.join(newline);
+      const newValue = `${value.slice(0, blockStart)}${newBlock}${value.slice(endLineBreak)}`;
+      const newStart = start + indent.length;
+      const newEnd = end + indent.length * lines.length;
+      this.markDirty(newValue);
+      requestAnimationFrame(() => {
+        if (!this.editorRef) return;
+        this.editorRef.selectionStart = newStart;
+        this.editorRef.selectionEnd = newEnd;
+        this.editorRef.focus();
+        this.updateCursorFromTextarea();
+      });
+      return true;
+    }
+
+    let removedFirst = 0;
+    let totalRemoved = 0;
+    const outdented = lines.map((line, idx) => {
+      let removed = 0;
+      if (line.startsWith(indent)) {
+        line = line.slice(indent.length);
+        removed = indent.length;
+      } else if (line.startsWith("\t")) {
+        line = line.slice(1);
+        removed = 1;
+      } else if (line.startsWith(" ")) {
+        const match = line.match(/^ +/);
+        const count = Math.min(indent.length, match ? match[0].length : 0);
+        line = line.slice(count);
+        removed = count;
+      }
+      if (idx === 0) removedFirst = removed;
+      totalRemoved += removed;
+      return line;
+    });
+    const newBlock = outdented.join(newline);
+    const newValue = `${value.slice(0, blockStart)}${newBlock}${value.slice(endLineBreak)}`;
+    const newStart = Math.max(blockStart, start - removedFirst);
+    const newEnd = Math.max(newStart, end - totalRemoved);
+    this.markDirty(newValue);
     requestAnimationFrame(() => {
       if (!this.editorRef) return;
-      this.editorRef.selectionStart = pos;
-      this.editorRef.selectionEnd = pos;
+      this.editorRef.selectionStart = newStart;
+      this.editorRef.selectionEnd = newEnd;
       this.editorRef.focus();
-      this.updateCursorFromPos(pos, this.content);
+      this.updateCursorFromTextarea();
     });
     return true;
   }

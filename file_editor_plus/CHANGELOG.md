@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.1
+## 0.2.4
 
-- 🧩 Refactor frontend: app-root scomposto in moduli dedicati (stili, API, overlay, tree, search, snippets, system, settings, entities/MDI autocomplete) per manutenzione più semplice.
-- 🧠 Autocomplete: suggerimenti entità/MDI riallineati e regex corrette dopo il refactor.
+- Risolta Issue GitHub ref. [#7](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/7)
+- Risolta Issue GitHub ref. [#8](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/8)

@@ -674,7 +674,7 @@ export const appStyles = css`
       background: rgba(255, 211, 61, 0.2);
     }
     .token-key {
-      color: #9cdcfe;
+      color: var(--token-key-color, #9cdcfe);
     }
     .token-string {
       color: #ce9178;
@@ -697,7 +697,7 @@ export const appStyles = css`
       border-left: none;
       background: transparent;
       color: transparent;
-      caret-color: #d4d4d4;
+      caret-color: var(--editor-caret);
       padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: var(--font-size-md);
@@ -708,6 +708,12 @@ export const appStyles = css`
       white-space: pre;
       word-wrap: normal;
       scrollbar-gutter: stable;
+    }
+    textarea::selection {
+      background: var(--editor-selection-bg);
+    }
+    textarea::-moz-selection {
+      background: var(--editor-selection-bg);
     }
     textarea:focus {
       border-color: #3a3a3a;

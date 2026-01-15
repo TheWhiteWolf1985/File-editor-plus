@@ -65,6 +65,9 @@ export function applyTheme(this: any) {
           "--tree-hover": "#2a2d2e",
           "--tree-active": "#37373d",
           "--entity-error-text": "#f6dada",
+          "--editor-caret": "#d4d4d4",
+          "--editor-selection-bg": "rgba(80, 140, 255, 0.35)",
+          "--token-key-color": "#9cdcfe",
         }
       : {
           "--bg-color": "#f5f6f8",
@@ -89,6 +92,9 @@ export function applyTheme(this: any) {
           "--tree-hover": "#e8eef8",
           "--tree-active": "#d9e6fb",
           "--entity-error-text": "#8b1f1f",
+          "--editor-caret": "#222222",
+          "--editor-selection-bg": "rgba(120, 180, 255, 0.35)",
+          "--token-key-color": "rgb(28 47 193)",
         };
   Object.entries(palette).forEach(([key, value]) => {
     this.style.setProperty(key, value);
