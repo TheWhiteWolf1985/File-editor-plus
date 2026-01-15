@@ -44,21 +44,26 @@ export const appStyles = css`
       --tree-hover: #2a2d2e;
       --tree-active: #37373d;
       --entity-error-text: #f6dada;
+      --indent-size: 2;
+      --indent-width: calc(var(--indent-size) * 1ch);
+      --indent-guide: rgba(255, 255, 255, 0.06);
+      --indent-guide-active: rgba(255, 255, 255, 0.12);
     }
 
     /* Layout */
     .shell {
       height: 100%;
       display: grid;
-      grid-template-rows: 34px 1fr 22px; /* titlebar, main, status */
+      grid-template-rows: auto 1fr 22px; /* titlebar (+ toolbar), main, status */
     }
 
     /* Titlebar */
     .titlebar {
       display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 0 10px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 6px 10px 8px;
       border-bottom: 1px solid var(--border-color);
       background: var(--panel-strong);
       user-select: none;
@@ -70,7 +75,6 @@ export const appStyles = css`
     .menus {
       display: flex;
       gap: 12px;
-      opacity: 0.9;
       position: relative;
     }
     .menus span {
@@ -117,6 +121,32 @@ export const appStyles = css`
       width: 18px;
       text-align: center;
       opacity: 0.85;
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 2px 0;
+    }
+    .toolBtn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: var(--panel-color);
+      color: var(--text-color);
+      cursor: pointer;
+      font-size: var(--font-size-sm);
+    }
+    .toolBtn:hover {
+      background: var(--hover-color);
+    }
+    .toolBtn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
     .menuDivider {
       height: 1px;
@@ -642,7 +672,7 @@ export const appStyles = css`
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: var(--font-size-md);
       line-height: 1.4;
-      white-space: pre;
+      white-space: normal;
       word-wrap: normal;
       color: var(--text-color);
       pointer-events: none;
@@ -655,11 +685,48 @@ export const appStyles = css`
       box-sizing: border-box;
     }
     .codeLine {
-      white-space: normal;
+      position: relative;
+      white-space: pre;
       min-height: 1.4em;
       line-height: 1.4;
       user-select: none;
       -webkit-user-select: none;
+      display: block;
+      margin: 0;
+      padding: 0;
+    }
+    .codeLine.hasGuides::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: calc(var(--line-indent-level, 0) * var(--indent-width));
+      background-image: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(var(--indent-width) - 1px),
+        var(--indent-guide) calc(var(--indent-width) - 1px),
+        var(--indent-guide) calc(var(--indent-width)),
+        transparent calc(var(--indent-width))
+      );
+      background-repeat: no-repeat;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .codeLine.hasGuides.is-active::before {
+      background-image: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(var(--indent-width) - 1px),
+        var(--indent-guide-active) calc(var(--indent-width) - 1px),
+        var(--indent-guide-active) calc(var(--indent-width)),
+        transparent calc(var(--indent-width))
+      );
+    }
+    .codeLine.hasGuides > * {
+      position: relative;
+      z-index: 1;
     }
     .codeIndent {
       white-space: pre;

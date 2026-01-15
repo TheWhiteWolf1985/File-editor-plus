@@ -68,6 +68,8 @@ export function applyTheme(this: any) {
           "--editor-caret": "#d4d4d4",
           "--editor-selection-bg": "rgba(80, 140, 255, 0.35)",
           "--token-key-color": "#9cdcfe",
+          "--indent-guide": "rgba(255, 255, 255, 0.2)",
+          "--indent-guide-active": "rgba(255, 255, 255, 0.4)",
         }
       : {
           "--bg-color": "#f5f6f8",
@@ -95,6 +97,8 @@ export function applyTheme(this: any) {
           "--editor-caret": "#222222",
           "--editor-selection-bg": "rgba(120, 180, 255, 0.35)",
           "--token-key-color": "rgb(28 47 193)",
+          "--indent-guide": "rgba(0, 0, 0, 0.06)",
+          "--indent-guide-active": "rgba(0, 0, 0, 0.16)",
         };
   Object.entries(palette).forEach(([key, value]) => {
     this.style.setProperty(key, value);
@@ -105,6 +109,8 @@ export async function persistUserConfig(this: any, config: UserConfig) {
   const payload = {
     font_base_rem: config.font_base_rem ?? this.fontBaseRem,
     theme_mode: config.theme_mode ?? this.themeMode,
+    toolbar_visible: config.toolbar_visible ?? this.toolbarVisible,
+    show_indent_guides: config.show_indent_guides ?? this.showIndentGuides,
   };
   try {
     const res = await apiPutUserConfig(this.apiBase, payload);
@@ -138,6 +144,12 @@ export async function loadFontSettings(this: any) {
       const mode = cfg.theme_mode;
       if (THEME_MODES.includes(mode as ThemeMode)) {
         this.themeMode = mode as ThemeMode;
+      }
+      if (typeof cfg.toolbar_visible === "boolean") {
+        this.toolbarVisible = cfg.toolbar_visible;
+      }
+      if (typeof cfg.show_indent_guides === "boolean") {
+        this.showIndentGuides = cfg.show_indent_guides;
       }
     }
   } catch {

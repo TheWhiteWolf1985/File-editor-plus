@@ -3,7 +3,12 @@ import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
 import type { HAClient, HassState } from "./ha-client";
 import { appStyles } from "./styles/app-styles";
-import { renderHighlighted, renderLineNumbers, renderLineNumbersFor } from "./features/editor/overlay";
+import {
+  computeIndentSegments,
+  renderHighlighted,
+  renderLineNumbers,
+  renderLineNumbersFor,
+} from "./features/editor/overlay";
 import {
   openSearchMatch as searchOpenSearchMatch,
   performSearch as searchPerformSearch,
@@ -157,6 +162,10 @@ export class AppRoot extends LitElement {
     diffHunks: { state: true },
     diffSummary: { state: true },
     diffLoading: { state: true },
+    toolbarVisible: { state: true },
+    showIndentGuides: { state: true },
+    activeIndentSegmentId: { state: true },
+    showUnsavedModal: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -176,6 +185,10 @@ export class AppRoot extends LitElement {
   declare entityError: string | null;
   declare collapsedDomains: Set<string>;
   declare autoIndentEnabled: boolean;
+  declare toolbarVisible: boolean;
+  declare showIndentGuides: boolean;
+  declare activeIndentSegmentId: string | null;
+  declare showUnsavedModal: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
   declare contextMenuY: number;
@@ -266,7 +279,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.4";
+  private readonly appVersion = "0.2.12";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -275,7 +288,14 @@ export class AppRoot extends LitElement {
   private mdiSuggestCache = new Map<string, MdiIcon[]>();
   private mdiSuggestRequestId = 0;
   private pendingJump: { path: string; line: number; col: number } | null = null;
+  private pendingUnsavedAction: { type: "open" | "close"; path: string } | null = null;
   private treeClipboard: { path: string; type: "file" | "dir" } | null = null;
+  private beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+    if (this.isActiveDirty()) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  };
   private selectionListener = () => {
     if (!this.editorRef) return;
     const active = this.shadowRoot?.activeElement || document.activeElement;
@@ -351,6 +371,10 @@ export class AppRoot extends LitElement {
     this.entityError = null;
     this.collapsedDomains = new Set<string>();
     this.autoIndentEnabled = true;
+    this.toolbarVisible = true;
+    this.showIndentGuides = false;
+    this.activeIndentSegmentId = null;
+    this.showUnsavedModal = false;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -423,6 +447,7 @@ export class AppRoot extends LitElement {
     void this.loadFontSettings();
     document.addEventListener("selectionchange", this.selectionListener);
     document.addEventListener("click", this.handleGlobalClick, true);
+    window.addEventListener("beforeunload", this.beforeUnloadHandler);
     this.loadSnippets();
     this.initEntities();
   }
@@ -430,6 +455,7 @@ export class AppRoot extends LitElement {
   disconnectedCallback(): void {
     document.removeEventListener("selectionchange", this.selectionListener);
     document.removeEventListener("click", this.handleGlobalClick, true);
+    window.removeEventListener("beforeunload", this.beforeUnloadHandler);
     this.stopSidebarResize();
     if (this.themeMedia) {
       this.themeMedia.removeEventListener("change", this.handleThemeChange);
@@ -441,6 +467,21 @@ export class AppRoot extends LitElement {
       this.haClient = null;
     }
     super.disconnectedCallback();
+  }
+
+  private requestOpenFile(path: string) {
+    if (this.activePath === path) {
+      if (!this.tabs.find((t) => t.path === path)) {
+        this.openFile(path);
+      }
+      return;
+    }
+    if (this.isActiveDirty()) {
+      this.pendingUnsavedAction = { type: "open", path };
+      this.showUnsavedModal = true;
+      return;
+    }
+    this.openFile(path);
   }
 
   private openFile(path: string) {
@@ -456,6 +497,42 @@ export class AppRoot extends LitElement {
     this.diffHunks = [];
     this.diffSummary = null;
     this.loadFile(path);
+  }
+
+  private async confirmUnsavedSave() {
+    const action = this.pendingUnsavedAction;
+    await this.save();
+    if (this.isActiveDirty()) {
+      this.showToast("Errore salvataggio", "error");
+      return;
+    }
+    this.showUnsavedModal = false;
+    this.pendingUnsavedAction = null;
+    if (action) {
+      if (action.type === "open") {
+        this.openFile(action.path);
+      } else if (action.type === "close") {
+        this.closeTab(action.path, true);
+      }
+    }
+  }
+
+  private confirmUnsavedDiscard() {
+    const action = this.pendingUnsavedAction;
+    this.showUnsavedModal = false;
+    this.pendingUnsavedAction = null;
+    if (action) {
+      if (action.type === "open") {
+        this.openFile(action.path);
+      } else if (action.type === "close") {
+        this.closeTab(action.path, true);
+      }
+    }
+  }
+
+  private cancelUnsavedModal() {
+    this.showUnsavedModal = false;
+    this.pendingUnsavedAction = null;
   }
 
   private async loadFile(path: string) {
@@ -492,7 +569,12 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private closeTab(path: string) {
+  private closeTab(path: string, skipPrompt = false) {
+    if (!skipPrompt && path === this.activePath && this.isActiveDirty()) {
+      this.pendingUnsavedAction = { type: "close", path };
+      this.showUnsavedModal = true;
+      return;
+    }
     const idx = this.tabs.findIndex((t) => t.path === path);
     if (idx < 0) {
       console.debug("[app-root] closeTab: tab not found", path);
@@ -523,6 +605,12 @@ export class AppRoot extends LitElement {
       t.path === this.activePath ? { ...t, dirty: true } : t
     );
     this.scheduleDiff();
+  }
+
+  private isActiveDirty() {
+    if (!this.activePath) return false;
+    const tab = this.tabs.find((t) => t.path === this.activePath);
+    return Boolean(tab?.dirty);
   }
 
   private scheduleDiff() {
@@ -624,6 +712,7 @@ export class AppRoot extends LitElement {
       this.lastCursorCol = nextCol;
       console.debug("[app-root] cursor", { pos, line: nextLine, col: nextCol });
     }
+    this.updateActiveIndentSegment(pos, source);
   }
 
   private updateCursorFromTextarea() {
@@ -1084,6 +1173,37 @@ export class AppRoot extends LitElement {
     }
   };
 
+  private openSearchTab(focus: "search" | "replace" = "search") {
+    this.setActivity("search");
+    requestAnimationFrame(() => {
+      if (!this.shadowRoot) return;
+      const selector = focus === "search" ? 'input.searchInput[placeholder="Search..."]' : 'input.searchInput[placeholder="Replace..."]';
+      const el = this.shadowRoot.querySelector(selector) as HTMLInputElement | null;
+      el?.focus();
+    });
+  }
+
+  private updateActiveIndentSegment(pos: number, value?: string) {
+    const source = value ?? this.content;
+    const lines = source.split("\n");
+    const lineIdx = Math.min(Math.max(this.cursorLine - 1, 0), lines.length - 1);
+    const line = lines[lineIdx] ?? "";
+    const indentMatch = line.match(/^[\t ]+/);
+    const indentRaw = indentMatch ? indentMatch[0] : "";
+    const indentSize = 2;
+    const indentSpaces = indentRaw
+      ? indentRaw.split("").reduce((acc, ch) => acc + (ch === "\t" ? indentSize : 1), 0)
+      : 0;
+    const level = Math.max(0, Math.floor(indentSpaces / indentSize));
+    if (level === 0) {
+      this.activeIndentSegmentId = null;
+      return;
+    }
+    const segments = computeIndentSegments(source, indentSize, true);
+    const seg = segments.find((s) => s.level === level && s.start <= this.cursorLine && s.end >= this.cursorLine);
+    this.activeIndentSegmentId = seg ? seg.id : null;
+  }
+
   private toggleMenu(e: Event, name: string) {
     e.preventDefault();
     e.stopPropagation();
@@ -1163,6 +1283,14 @@ export class AppRoot extends LitElement {
         } else {
           this.scheduleDiff();
         }
+      } else if (action === "Menù strumenti") {
+        const next = !this.toolbarVisible;
+        this.toolbarVisible = next;
+        void this.persistUserConfig({ toolbar_visible: next });
+      } else if (action === "Indent guides") {
+        const next = !this.showIndentGuides;
+        this.showIndentGuides = next;
+        void this.persistUserConfig({ show_indent_guides: next });
       }
     } else if (menu === "help") {
       if (action === "About") {
@@ -1496,6 +1624,8 @@ export class AppRoot extends LitElement {
               { icon: "📥", label: "Paste" },
             ])}
             ${this.renderMenu("View", "view", [
+              { icon: this.toolbarVisible ? "☑️" : "⬜️", label: "Menù strumenti" },
+              { icon: this.showIndentGuides ? "☑️" : "⬜️", label: "Indent guides" },
               { icon: "🔄", label: "Reload tree" },
               { icon: "🪟", label: "Split view" },
               { icon: "🧭", label: "Compare…" },
@@ -1505,6 +1635,49 @@ export class AppRoot extends LitElement {
               { icon: "❓", label: "About" },
             ])}
           </div>
+          ${this.toolbarVisible
+            ? html`<div class="toolbar">
+                <button class="toolBtn" title="Save" aria-label="Save" ?disabled=${!this.activePath} @click=${() => this.save()}>
+                  💾 <span>Save</span>
+                </button>
+                <button class="toolBtn" title="Save all" aria-label="Save all" ?disabled=${!this.activePath} @click=${() => this.save()}>
+                  🧩 <span>Save all</span>
+                </button>
+                <button class="toolBtn" title="Undo" aria-label="Undo" @click=${() => this.handleUndoRedo("undo")}>
+                  ↩️ <span>Undo</span>
+                </button>
+                <button class="toolBtn" title="Redo" aria-label="Redo" @click=${() => this.handleUndoRedo("redo")}>
+                  ↪️ <span>Redo</span>
+                </button>
+                <button class="toolBtn" title="Search" aria-label="Search" @click=${() => this.openSearchTab("search")}>
+                  🔎 <span>Search</span>
+                </button>
+                <button class="toolBtn" title="Replace" aria-label="Replace" @click=${() => this.openSearchTab("replace")}>
+                  🪄 <span>Replace</span>
+                </button>
+                <button
+                  class="toolBtn"
+                  title="Indent file"
+                  aria-label="Indent file"
+                  ?disabled=${!this.activePath || this.indenting}
+                  @click=${() => this.indentFile()}
+                >
+                  🧹 <span>Indent file</span>
+                </button>
+                <button class="toolBtn" title="Split view" aria-label="Split view" @click=${() => this.handleMenuAction("view", "Split view")}>
+                  🪟 <span>Split</span>
+                </button>
+                <button
+                  class="toolBtn"
+                  title="Compare"
+                  aria-label="Compare"
+                  ?disabled=${!this.splitViewEnabled || !this.activePath}
+                  @click=${() => this.handleMenuAction("view", "Compare…")}
+                >
+                  🧭 <span>Compare</span>
+                </button>
+              </div>`
+            : nothing}
         </div>
 
         <div class="main" ${ref((el) => (this.mainRef = el))}>
@@ -1571,13 +1744,15 @@ export class AppRoot extends LitElement {
             <div class="content">
               <div class="crumbs">
                 <div>${activeTab ? `/config/${activeTab.path}` : "Apri un file dall’Explorer"}</div>
-                <div style="display:flex; gap:8px;">
-                  <button class="btn" ?disabled=${!this.activePath} @click=${this.save}>Save</button>
-                  <button class="btn primary" ?disabled=${!this.activePath} @click=${this.save}>Save All</button>
-                  <button class="btn" ?disabled=${!this.activePath || this.indenting} @click=${() => this.indentFile()}>
-                    ${this.indenting ? "Formatting..." : "Indent file…"}
-                  </button>
-                </div>
+                ${this.toolbarVisible
+                  ? nothing
+                  : html`<div style="display:flex; gap:8px;">
+                      <button class="btn" ?disabled=${!this.activePath} @click=${this.save}>Save</button>
+                      <button class="btn primary" ?disabled=${!this.activePath} @click=${this.save}>Save All</button>
+                      <button class="btn" ?disabled=${!this.activePath || this.indenting} @click=${() => this.indentFile()}>
+                        ${this.indenting ? "Formatting..." : "Indent file…"}
+                      </button>
+                    </div>`}
               </div>
 
               ${this.splitViewEnabled
@@ -1585,8 +1760,19 @@ export class AppRoot extends LitElement {
                     <div class="splitPane">
                       <div class="editorWrap">
                         <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
-                        <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content, diffMaps.left)}</div>
+                    <div class="codeWrap">
+                      <div
+                        class="code ${this.showIndentGuides ? "showGuides" : ""}"
+                        ${ref((el) => (this.codeRef = el))}
+                      >
+                        ${renderHighlighted(this.content, {
+                          diffMap: diffMaps.left,
+                          showGuides: this.showIndentGuides,
+                          indentSize: 2,
+                          skipCommentGuides: true,
+                          activeSegmentId: this.activeIndentSegmentId,
+                        })}
+                      </div>
                       <textarea
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}
@@ -1610,21 +1796,27 @@ export class AppRoot extends LitElement {
                     <div class="splitPane">
                       <div class="editorWrap">
                         <div class="gutter" ${ref((el) => (this.baseGutterRef = el))}>${renderLineNumbersFor(this.savedBaseText)}</div>
-                        <div class="codeWrap">
-                          <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${renderHighlighted(this.savedBaseText, diffMaps.right)}</div>
-                          <pre
-                            class="basePre"
-                            ${ref((el) => (this.basePreRef = el))}
-                            @scroll=${this.syncBaseScroll}
-                          >${this.savedBaseText}</pre>
-                        </div>
+                    <div class="codeWrap">
+                      <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${renderHighlighted(this.savedBaseText, { diffMap: diffMaps.right })}</div>
+                      <pre class="basePre" ${ref((el) => (this.basePreRef = el))} @scroll=${this.syncBaseScroll}>${this.savedBaseText}</pre>
+                    </div>
                       </div>
                     </div>
                   </div>`
                 : html`<div class="editorWrap">
                     <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
                     <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content)}</div>
+                      <div
+                        class="code ${this.showIndentGuides ? "showGuides" : ""}"
+                        ${ref((el) => (this.codeRef = el))}
+                      >
+                        ${renderHighlighted(this.content, {
+                          showGuides: this.showIndentGuides,
+                          indentSize: 2,
+                          skipCommentGuides: true,
+                          activeSegmentId: this.activeIndentSegmentId,
+                        })}
+                      </div>
                       <textarea
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}
@@ -1901,6 +2093,22 @@ export class AppRoot extends LitElement {
                 </div>
               </div>
             `
+          : nothing}
+
+        ${this.showUnsavedModal
+          ? html`<div class="modalBackdrop" @click=${() => this.cancelUnsavedModal()}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:480px;">
+                <h3>Modifiche non salvate</h3>
+                <p style="margin-top:8px; color:var(--muted-color);">
+                  Hai modifiche non salvate su ${this.activePath ?? "file corrente"}.
+                </p>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.cancelUnsavedModal()}>Annulla</button>
+                  <button class="btn" @click=${() => this.confirmUnsavedDiscard()}>Non salvare</button>
+                  <button class="btn primary" @click=${() => this.confirmUnsavedSave()}>Salva</button>
+                </div>
+              </div>
+            </div>`
           : nothing}
 
         <div class="statusbar">

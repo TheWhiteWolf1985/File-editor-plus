@@ -302,7 +302,7 @@ export function renderTree(this: any, path: string, depth = 0) {
         style="padding-left:${8 + depth * 14}px"
         @click=${() => {
           if (isDir) this.toggleDir(it.path);
-          else this.openFile(it.path);
+          else this.requestOpenFile(it.path);
         }}
         @contextmenu=${(e: MouseEvent) => this.handleTreeContextMenu(e, it)}
       >
