@@ -157,6 +157,7 @@ export class AppRoot extends LitElement {
     diffHunks: { state: true },
     diffSummary: { state: true },
     diffLoading: { state: true },
+    toolbarVisible: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -176,6 +177,7 @@ export class AppRoot extends LitElement {
   declare entityError: string | null;
   declare collapsedDomains: Set<string>;
   declare autoIndentEnabled: boolean;
+  declare toolbarVisible: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
   declare contextMenuY: number;
@@ -266,7 +268,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.4";
+  private readonly appVersion = "0.2.5";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -351,6 +353,7 @@ export class AppRoot extends LitElement {
     this.entityError = null;
     this.collapsedDomains = new Set<string>();
     this.autoIndentEnabled = true;
+    this.toolbarVisible = true;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -1084,6 +1087,16 @@ export class AppRoot extends LitElement {
     }
   };
 
+  private openSearchTab(focus: "search" | "replace" = "search") {
+    this.setActivity("search");
+    requestAnimationFrame(() => {
+      if (!this.shadowRoot) return;
+      const selector = focus === "search" ? 'input.searchInput[placeholder="Search..."]' : 'input.searchInput[placeholder="Replace..."]';
+      const el = this.shadowRoot.querySelector(selector) as HTMLInputElement | null;
+      el?.focus();
+    });
+  }
+
   private toggleMenu(e: Event, name: string) {
     e.preventDefault();
     e.stopPropagation();
@@ -1163,6 +1176,10 @@ export class AppRoot extends LitElement {
         } else {
           this.scheduleDiff();
         }
+      } else if (action === "Menù strumenti") {
+        const next = !this.toolbarVisible;
+        this.toolbarVisible = next;
+        void this.persistUserConfig({ toolbar_visible: next });
       }
     } else if (menu === "help") {
       if (action === "About") {
@@ -1496,6 +1513,7 @@ export class AppRoot extends LitElement {
               { icon: "📥", label: "Paste" },
             ])}
             ${this.renderMenu("View", "view", [
+              { icon: this.toolbarVisible ? "☑️" : "⬜️", label: "Menù strumenti" },
               { icon: "🔄", label: "Reload tree" },
               { icon: "🪟", label: "Split view" },
               { icon: "🧭", label: "Compare…" },
@@ -1505,6 +1523,49 @@ export class AppRoot extends LitElement {
               { icon: "❓", label: "About" },
             ])}
           </div>
+          ${this.toolbarVisible
+            ? html`<div class="toolbar">
+                <button class="toolBtn" title="Save" aria-label="Save" ?disabled=${!this.activePath} @click=${() => this.save()}>
+                  💾 <span>Save</span>
+                </button>
+                <button class="toolBtn" title="Save all" aria-label="Save all" ?disabled=${!this.activePath} @click=${() => this.save()}>
+                  🧩 <span>Save all</span>
+                </button>
+                <button class="toolBtn" title="Undo" aria-label="Undo" @click=${() => this.handleUndoRedo("undo")}>
+                  ↩️ <span>Undo</span>
+                </button>
+                <button class="toolBtn" title="Redo" aria-label="Redo" @click=${() => this.handleUndoRedo("redo")}>
+                  ↪️ <span>Redo</span>
+                </button>
+                <button class="toolBtn" title="Search" aria-label="Search" @click=${() => this.openSearchTab("search")}>
+                  🔎 <span>Search</span>
+                </button>
+                <button class="toolBtn" title="Replace" aria-label="Replace" @click=${() => this.openSearchTab("replace")}>
+                  🪄 <span>Replace</span>
+                </button>
+                <button
+                  class="toolBtn"
+                  title="Indent file"
+                  aria-label="Indent file"
+                  ?disabled=${!this.activePath || this.indenting}
+                  @click=${() => this.indentFile()}
+                >
+                  🧹 <span>Indent file</span>
+                </button>
+                <button class="toolBtn" title="Split view" aria-label="Split view" @click=${() => this.handleMenuAction("view", "Split view")}>
+                  🪟 <span>Split</span>
+                </button>
+                <button
+                  class="toolBtn"
+                  title="Compare"
+                  aria-label="Compare"
+                  ?disabled=${!this.splitViewEnabled || !this.activePath}
+                  @click=${() => this.handleMenuAction("view", "Compare…")}
+                >
+                  🧭 <span>Compare</span>
+                </button>
+              </div>`
+            : nothing}
         </div>
 
         <div class="main" ${ref((el) => (this.mainRef = el))}>
@@ -1571,13 +1632,15 @@ export class AppRoot extends LitElement {
             <div class="content">
               <div class="crumbs">
                 <div>${activeTab ? `/config/${activeTab.path}` : "Apri un file dall’Explorer"}</div>
-                <div style="display:flex; gap:8px;">
-                  <button class="btn" ?disabled=${!this.activePath} @click=${this.save}>Save</button>
-                  <button class="btn primary" ?disabled=${!this.activePath} @click=${this.save}>Save All</button>
-                  <button class="btn" ?disabled=${!this.activePath || this.indenting} @click=${() => this.indentFile()}>
-                    ${this.indenting ? "Formatting..." : "Indent file…"}
-                  </button>
-                </div>
+                ${this.toolbarVisible
+                  ? nothing
+                  : html`<div style="display:flex; gap:8px;">
+                      <button class="btn" ?disabled=${!this.activePath} @click=${this.save}>Save</button>
+                      <button class="btn primary" ?disabled=${!this.activePath} @click=${this.save}>Save All</button>
+                      <button class="btn" ?disabled=${!this.activePath || this.indenting} @click=${() => this.indentFile()}>
+                        ${this.indenting ? "Formatting..." : "Indent file…"}
+                      </button>
+                    </div>`}
               </div>
 
               ${this.splitViewEnabled

@@ -105,6 +105,7 @@ export async function persistUserConfig(this: any, config: UserConfig) {
   const payload = {
     font_base_rem: config.font_base_rem ?? this.fontBaseRem,
     theme_mode: config.theme_mode ?? this.themeMode,
+    toolbar_visible: config.toolbar_visible ?? this.toolbarVisible,
   };
   try {
     const res = await apiPutUserConfig(this.apiBase, payload);
@@ -138,6 +139,9 @@ export async function loadFontSettings(this: any) {
       const mode = cfg.theme_mode;
       if (THEME_MODES.includes(mode as ThemeMode)) {
         this.themeMode = mode as ThemeMode;
+      }
+      if (typeof cfg.toolbar_visible === "boolean") {
+        this.toolbarVisible = cfg.toolbar_visible;
       }
     }
   } catch {

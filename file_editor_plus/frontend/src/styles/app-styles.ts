@@ -50,15 +50,16 @@ export const appStyles = css`
     .shell {
       height: 100%;
       display: grid;
-      grid-template-rows: 34px 1fr 22px; /* titlebar, main, status */
+      grid-template-rows: auto 1fr 22px; /* titlebar (+ toolbar), main, status */
     }
 
     /* Titlebar */
     .titlebar {
       display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 0 10px;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      padding: 6px 10px 8px;
       border-bottom: 1px solid var(--border-color);
       background: var(--panel-strong);
       user-select: none;
@@ -70,7 +71,6 @@ export const appStyles = css`
     .menus {
       display: flex;
       gap: 12px;
-      opacity: 0.9;
       position: relative;
     }
     .menus span {
@@ -117,6 +117,32 @@ export const appStyles = css`
       width: 18px;
       text-align: center;
       opacity: 0.85;
+    }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 2px 0;
+    }
+    .toolBtn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: var(--panel-color);
+      color: var(--text-color);
+      cursor: pointer;
+      font-size: var(--font-size-sm);
+    }
+    .toolBtn:hover {
+      background: var(--hover-color);
+    }
+    .toolBtn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
     }
     .menuDivider {
       height: 1px;
