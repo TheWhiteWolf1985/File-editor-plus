@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.10
+
+- ✨ Indent guides segmentate: guida attiva solo sul blocco (livello con start/end), niente highlight full-height; overlay senza righe vuote.
+
 ## 0.2.9
 
 - 🪢 Fix overlay: impostato `.code` a `white-space: normal` per eliminare righe vuote dal template e riallineare gutter/textarea con le indent guides per-riga.

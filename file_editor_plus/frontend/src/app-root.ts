@@ -3,7 +3,12 @@ import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
 import type { HAClient, HassState } from "./ha-client";
 import { appStyles } from "./styles/app-styles";
-import { renderHighlighted, renderLineNumbers, renderLineNumbersFor } from "./features/editor/overlay";
+import {
+  computeIndentSegments,
+  renderHighlighted,
+  renderLineNumbers,
+  renderLineNumbersFor,
+} from "./features/editor/overlay";
 import {
   openSearchMatch as searchOpenSearchMatch,
   performSearch as searchPerformSearch,
@@ -181,7 +186,7 @@ export class AppRoot extends LitElement {
   declare autoIndentEnabled: boolean;
   declare toolbarVisible: boolean;
   declare showIndentGuides: boolean;
-  declare activeIndentLevel: number;
+  declare activeIndentSegmentId: string | null;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
   declare contextMenuY: number;
@@ -272,7 +277,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.9";
+  private readonly appVersion = "0.2.10";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -359,7 +364,7 @@ export class AppRoot extends LitElement {
     this.autoIndentEnabled = true;
     this.toolbarVisible = true;
     this.showIndentGuides = false;
-    this.activeIndentLevel = 0;
+    this.activeIndentSegmentId = null;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -633,7 +638,7 @@ export class AppRoot extends LitElement {
       this.lastCursorCol = nextCol;
       console.debug("[app-root] cursor", { pos, line: nextLine, col: nextCol });
     }
-    this.updateActiveIndentLevel(pos, source);
+    this.updateActiveIndentSegment(pos, source);
   }
 
   private updateCursorFromTextarea() {
@@ -1104,17 +1109,25 @@ export class AppRoot extends LitElement {
     });
   }
 
-  private updateActiveIndentLevel(pos: number, value?: string) {
+  private updateActiveIndentSegment(pos: number, value?: string) {
     const source = value ?? this.content;
     const lines = source.split("\n");
     const lineIdx = Math.min(Math.max(this.cursorLine - 1, 0), lines.length - 1);
     const line = lines[lineIdx] ?? "";
-    const leading = line.match(/^ +/)?.[0].length ?? 0;
+    const indentMatch = line.match(/^[\t ]+/);
+    const indentRaw = indentMatch ? indentMatch[0] : "";
     const indentSize = 2;
-    const level = Math.floor(leading / indentSize);
-    if (level !== this.activeIndentLevel) {
-      this.activeIndentLevel = level;
+    const indentSpaces = indentRaw
+      ? indentRaw.split("").reduce((acc, ch) => acc + (ch === "\t" ? indentSize : 1), 0)
+      : 0;
+    const level = Math.max(0, Math.floor(indentSpaces / indentSize));
+    if (level === 0) {
+      this.activeIndentSegmentId = null;
+      return;
     }
+    const segments = computeIndentSegments(source, indentSize, true);
+    const seg = segments.find((s) => s.level === level && s.start <= this.cursorLine && s.end >= this.cursorLine);
+    this.activeIndentSegmentId = seg ? seg.id : null;
   }
 
   private toggleMenu(e: Event, name: string) {
@@ -1676,7 +1689,6 @@ export class AppRoot extends LitElement {
                     <div class="codeWrap">
                       <div
                         class="code ${this.showIndentGuides ? "showGuides" : ""}"
-                        style=${this.showIndentGuides ? `--active-indent-level:${this.activeIndentLevel};` : ""}
                         ${ref((el) => (this.codeRef = el))}
                       >
                         ${renderHighlighted(this.content, {
@@ -1684,6 +1696,7 @@ export class AppRoot extends LitElement {
                           showGuides: this.showIndentGuides,
                           indentSize: 2,
                           skipCommentGuides: true,
+                          activeSegmentId: this.activeIndentSegmentId,
                         })}
                       </div>
                       <textarea
@@ -1721,13 +1734,13 @@ export class AppRoot extends LitElement {
                     <div class="codeWrap">
                       <div
                         class="code ${this.showIndentGuides ? "showGuides" : ""}"
-                        style=${this.showIndentGuides ? `--active-indent-level:${this.activeIndentLevel};` : ""}
                         ${ref((el) => (this.codeRef = el))}
                       >
                         ${renderHighlighted(this.content, {
                           showGuides: this.showIndentGuides,
                           indentSize: 2,
                           skipCommentGuides: true,
+                          activeSegmentId: this.activeIndentSegmentId,
                         })}
                       </div>
                       <textarea

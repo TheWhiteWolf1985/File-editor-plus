@@ -683,17 +683,6 @@ export const appStyles = css`
       width: max-content;
       min-height: 100%;
       box-sizing: border-box;
-      --active-indent-level: 0;
-    }
-    .code.showGuides::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: calc(var(--editor-pad) + var(--active-indent-level) * var(--indent-width));
-      width: 1px;
-      background: var(--indent-guide-active);
-      pointer-events: none;
     }
     .codeLine {
       position: relative;
@@ -724,6 +713,16 @@ export const appStyles = css`
       background-repeat: no-repeat;
       pointer-events: none;
       z-index: 0;
+    }
+    .codeLine.hasGuides.is-active::before {
+      background-image: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(var(--indent-width) - 1px),
+        var(--indent-guide-active) calc(var(--indent-width) - 1px),
+        var(--indent-guide-active) calc(var(--indent-width)),
+        transparent calc(var(--indent-width))
+      );
     }
     .codeLine.hasGuides > * {
       position: relative;
