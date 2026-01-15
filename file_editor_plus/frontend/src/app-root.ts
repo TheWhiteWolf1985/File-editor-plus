@@ -158,6 +158,8 @@ export class AppRoot extends LitElement {
     diffSummary: { state: true },
     diffLoading: { state: true },
     toolbarVisible: { state: true },
+    showIndentGuides: { state: true },
+    activeIndentLevel: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -178,6 +180,8 @@ export class AppRoot extends LitElement {
   declare collapsedDomains: Set<string>;
   declare autoIndentEnabled: boolean;
   declare toolbarVisible: boolean;
+  declare showIndentGuides: boolean;
+  declare activeIndentLevel: number;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
   declare contextMenuY: number;
@@ -268,7 +272,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.5";
+  private readonly appVersion = "0.2.7";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -354,6 +358,8 @@ export class AppRoot extends LitElement {
     this.collapsedDomains = new Set<string>();
     this.autoIndentEnabled = true;
     this.toolbarVisible = true;
+    this.showIndentGuides = false;
+    this.activeIndentLevel = 0;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -627,6 +633,7 @@ export class AppRoot extends LitElement {
       this.lastCursorCol = nextCol;
       console.debug("[app-root] cursor", { pos, line: nextLine, col: nextCol });
     }
+    this.updateActiveIndentLevel(pos, source);
   }
 
   private updateCursorFromTextarea() {
@@ -1097,6 +1104,19 @@ export class AppRoot extends LitElement {
     });
   }
 
+  private updateActiveIndentLevel(pos: number, value?: string) {
+    const source = value ?? this.content;
+    const lines = source.split("\n");
+    const lineIdx = Math.min(Math.max(this.cursorLine - 1, 0), lines.length - 1);
+    const line = lines[lineIdx] ?? "";
+    const leading = line.match(/^ +/)?.[0].length ?? 0;
+    const indentSize = 2;
+    const level = Math.floor(leading / indentSize);
+    if (level !== this.activeIndentLevel) {
+      this.activeIndentLevel = level;
+    }
+  }
+
   private toggleMenu(e: Event, name: string) {
     e.preventDefault();
     e.stopPropagation();
@@ -1180,6 +1200,10 @@ export class AppRoot extends LitElement {
         const next = !this.toolbarVisible;
         this.toolbarVisible = next;
         void this.persistUserConfig({ toolbar_visible: next });
+      } else if (action === "Indent guides") {
+        const next = !this.showIndentGuides;
+        this.showIndentGuides = next;
+        void this.persistUserConfig({ show_indent_guides: next });
       }
     } else if (menu === "help") {
       if (action === "About") {
@@ -1514,6 +1538,7 @@ export class AppRoot extends LitElement {
             ])}
             ${this.renderMenu("View", "view", [
               { icon: this.toolbarVisible ? "☑️" : "⬜️", label: "Menù strumenti" },
+              { icon: this.showIndentGuides ? "☑️" : "⬜️", label: "Indent guides" },
               { icon: "🔄", label: "Reload tree" },
               { icon: "🪟", label: "Split view" },
               { icon: "🧭", label: "Compare…" },
@@ -1648,8 +1673,8 @@ export class AppRoot extends LitElement {
                     <div class="splitPane">
                       <div class="editorWrap">
                         <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
-                        <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content, diffMaps.left)}</div>
+                    <div class="codeWrap">
+                      <div class="code ${this.showIndentGuides ? "showGuides" : ""}" style=${this.showIndentGuides ? `--active-indent-level:${this.activeIndentLevel};` : ""} ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content, diffMaps.left)}</div>
                       <textarea
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}
@@ -1673,21 +1698,17 @@ export class AppRoot extends LitElement {
                     <div class="splitPane">
                       <div class="editorWrap">
                         <div class="gutter" ${ref((el) => (this.baseGutterRef = el))}>${renderLineNumbersFor(this.savedBaseText)}</div>
-                        <div class="codeWrap">
-                          <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${renderHighlighted(this.savedBaseText, diffMaps.right)}</div>
-                          <pre
-                            class="basePre"
-                            ${ref((el) => (this.basePreRef = el))}
-                            @scroll=${this.syncBaseScroll}
-                          >${this.savedBaseText}</pre>
-                        </div>
+                    <div class="codeWrap">
+                      <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${renderHighlighted(this.savedBaseText, diffMaps.right)}</div>
+                      <pre class="basePre" ${ref((el) => (this.basePreRef = el))} @scroll=${this.syncBaseScroll}>${this.savedBaseText}</pre>
+                    </div>
                       </div>
                     </div>
                   </div>`
                 : html`<div class="editorWrap">
                     <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
                     <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content)}</div>
+                      <div class="code ${this.showIndentGuides ? "showGuides" : ""}" style=${this.showIndentGuides ? `--active-indent-level:${this.activeIndentLevel};` : ""} ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content)}</div>
                       <textarea
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}

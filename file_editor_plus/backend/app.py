@@ -52,7 +52,12 @@ SEARCH_SKIP_DIRS = {
     "dist",
     "build",
 }
-DEFAULT_USER_CONFIG = {"font_base_rem": 0.875, "theme_mode": "auto", "toolbar_visible": True}
+DEFAULT_USER_CONFIG = {
+    "font_base_rem": 0.875,
+    "theme_mode": "auto",
+    "toolbar_visible": True,
+    "show_indent_guides": False,
+}
 HA_ACTIONS = {
     "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_core_config"},
     "restart_core": {"type": "service", "domain": "homeassistant", "service": "restart"},

@@ -44,6 +44,10 @@ export const appStyles = css`
       --tree-hover: #2a2d2e;
       --tree-active: #37373d;
       --entity-error-text: #f6dada;
+      --indent-size: 2;
+      --indent-width: calc(var(--indent-size) * 1ch);
+      --indent-guide: rgba(255, 255, 255, 0.06);
+      --indent-guide-active: rgba(255, 255, 255, 0.12);
     }
 
     /* Layout */
@@ -679,6 +683,29 @@ export const appStyles = css`
       width: max-content;
       min-height: 100%;
       box-sizing: border-box;
+      --active-indent-level: 0;
+    }
+    .code.showGuides {
+      background-image: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(var(--indent-width) - 1px),
+        var(--indent-guide) calc(var(--indent-width) - 1px),
+        var(--indent-guide) calc(var(--indent-width)),
+        transparent calc(var(--indent-width))
+      );
+      background-size: calc(var(--indent-width)) 100%;
+      background-position: var(--editor-pad) 0;
+    }
+    .code.showGuides::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: calc(var(--editor-pad) + var(--active-indent-level) * var(--indent-width));
+      width: 1px;
+      background: var(--indent-guide-active);
+      pointer-events: none;
     }
     .codeLine {
       white-space: normal;

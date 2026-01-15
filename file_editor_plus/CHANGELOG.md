@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.7
+
+- 🪢 Fix overlay: rimosso whitespace extra nell’overlay .code per riallineare testo/gutter/textarea con indent guides attivi.
+
+## 0.2.6
+
+- 📏 Indent guides opzionali (View → Indent guides) con guida attiva evidenziata; preferenza salvata in user_config.
+
 ## 0.2.5
 
 - 🛠️ Toolbar: nuova barra strumenti persistente (toggle da View → Menù strumenti) con save/undo/redo/search/replace/indent/split/compare; bottoni nella crumbs nascosti quando attiva.
