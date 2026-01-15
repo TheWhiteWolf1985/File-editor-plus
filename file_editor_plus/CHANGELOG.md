@@ -1,47 +1,11 @@
 # Changelog
 
-## 0.2.11
-
-- 💾 Promemoria modifiche: modale “Modifiche non salvate” su cambio file (salva/non salvare/annulla) + warning beforeunload quando ci sono dirty.
-
 ## 0.2.12
 
-- 💾 Modale non salvati anche su chiusura tab (X): se dirty, chiede Salva/Non salvare/Annulla prima di chiudere.
-
-## 0.2.10
-
-- ✨ Indent guides segmentate: guida attiva solo sul blocco (livello con start/end), niente highlight full-height; overlay senza righe vuote.
-
-## 0.2.9
-
-- 🪢 Fix overlay: impostato `.code` a `white-space: normal` per eliminare righe vuote dal template e riallineare gutter/textarea con le indent guides per-riga.
-
-## 0.2.8
-
-- 🧭 Indent guides per-riga (solo sull’area indent, niente “pagina a righe”) con skip righe vuote/commenti e guida attiva invariata.
-
-## 0.2.7
-
-- 🪢 Fix overlay: rimosso whitespace extra nell’overlay .code per riallineare testo/gutter/textarea con indent guides attivi.
-
-## 0.2.6
-
-- 📏 Indent guides opzionali (View → Indent guides) con guida attiva evidenziata; preferenza salvata in user_config.
-
-## 0.2.5
-
-- 🛠️ Toolbar: nuova barra strumenti persistente (toggle da View → Menù strumenti) con save/undo/redo/search/replace/indent/split/compare; bottoni nella crumbs nascosti quando attiva.
-
-## 0.2.4
-
-- Risolta Issue GitHub ref. [#7](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/7)
-- Risolta Issue GitHub ref. [#8](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/8)
-- 🎨 Syntax: colore delle chiavi (.token-key) ora theme-aware (dark invariato, light rgb(28 47 193)).
-
-## 0.2.3
-
-- 🎨 Editor: caret e selezione ora usano variabili tema (dark/light) per rendere leggibile l’overlay in light theme.
-
-## 0.2.2
-
-- ⌨️ Editor: Tab/Shift+Tab ora indenta/outdenta le selezioni senza cancellare testo; mantiene la selezione e sincronizza l’overlay.
+- 🧰 **Toolbar** (View → Menù strumenti): comandi rapidi **Save, Save all, Undo, Redo, Search, Replace, Indent, Split, Compare**. Preferenza persistente; i 3 pulsanti nella **crumbs** vengono nascosti quando la toolbar è attiva.
+- 🧭 **Indent guides** (View → Indent guides): guide leggere e “pulite” (niente effetto pagina a righe), con guida attiva e segmentazione corretta per blocchi.
+- 🎨 **Editor/tema**: selezione e caret ora theme-aware (light/dark) per mantenere l’overlay sempre leggibile; migliorata anche la colorazione chiavi.
+- ⌨️ **Tab/Shift+Tab**: indent/outdent su selezione senza cancellare testo, con selezione mantenuta.
+- 💾 **Modifiche non salvate**: modale su cambio file (Salva/Non salvare/Annulla) + warning in chiusura/refresh tab.
+- 🪢 **Stabilità overlay**: fix allineamenti gutter/textarea/overlay con indent guides.
+- 🐛 Fix: GitHub **#7**, **#8** + improvements **#9**, **#10**.
