@@ -164,7 +164,8 @@ export class AppRoot extends LitElement {
     diffLoading: { state: true },
     toolbarVisible: { state: true },
     showIndentGuides: { state: true },
-    activeIndentLevel: { state: true },
+    activeIndentSegmentId: { state: true },
+    showUnsavedModal: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -187,6 +188,7 @@ export class AppRoot extends LitElement {
   declare toolbarVisible: boolean;
   declare showIndentGuides: boolean;
   declare activeIndentSegmentId: string | null;
+  declare showUnsavedModal: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
   declare contextMenuY: number;
@@ -277,7 +279,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.10";
+  private readonly appVersion = "0.2.11";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -286,7 +288,14 @@ export class AppRoot extends LitElement {
   private mdiSuggestCache = new Map<string, MdiIcon[]>();
   private mdiSuggestRequestId = 0;
   private pendingJump: { path: string; line: number; col: number } | null = null;
+  private pendingOpenPath: string | null = null;
   private treeClipboard: { path: string; type: "file" | "dir" } | null = null;
+  private beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+    if (this.isActiveDirty()) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  };
   private selectionListener = () => {
     if (!this.editorRef) return;
     const active = this.shadowRoot?.activeElement || document.activeElement;
@@ -365,6 +374,7 @@ export class AppRoot extends LitElement {
     this.toolbarVisible = true;
     this.showIndentGuides = false;
     this.activeIndentSegmentId = null;
+    this.showUnsavedModal = false;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -437,6 +447,7 @@ export class AppRoot extends LitElement {
     void this.loadFontSettings();
     document.addEventListener("selectionchange", this.selectionListener);
     document.addEventListener("click", this.handleGlobalClick, true);
+    window.addEventListener("beforeunload", this.beforeUnloadHandler);
     this.loadSnippets();
     this.initEntities();
   }
@@ -444,6 +455,7 @@ export class AppRoot extends LitElement {
   disconnectedCallback(): void {
     document.removeEventListener("selectionchange", this.selectionListener);
     document.removeEventListener("click", this.handleGlobalClick, true);
+    window.removeEventListener("beforeunload", this.beforeUnloadHandler);
     this.stopSidebarResize();
     if (this.themeMedia) {
       this.themeMedia.removeEventListener("change", this.handleThemeChange);
@@ -455,6 +467,21 @@ export class AppRoot extends LitElement {
       this.haClient = null;
     }
     super.disconnectedCallback();
+  }
+
+  private requestOpenFile(path: string) {
+    if (this.activePath === path) {
+      if (!this.tabs.find((t) => t.path === path)) {
+        this.openFile(path);
+      }
+      return;
+    }
+    if (this.isActiveDirty()) {
+      this.pendingOpenPath = path;
+      this.showUnsavedModal = true;
+      return;
+    }
+    this.openFile(path);
   }
 
   private openFile(path: string) {
@@ -470,6 +497,34 @@ export class AppRoot extends LitElement {
     this.diffHunks = [];
     this.diffSummary = null;
     this.loadFile(path);
+  }
+
+  private async confirmUnsavedSave() {
+    const target = this.pendingOpenPath;
+    await this.save();
+    if (this.isActiveDirty()) {
+      this.showToast("Errore salvataggio", "error");
+      return;
+    }
+    this.showUnsavedModal = false;
+    this.pendingOpenPath = null;
+    if (target) {
+      this.openFile(target);
+    }
+  }
+
+  private confirmUnsavedDiscard() {
+    const target = this.pendingOpenPath;
+    this.showUnsavedModal = false;
+    this.pendingOpenPath = null;
+    if (target) {
+      this.openFile(target);
+    }
+  }
+
+  private cancelUnsavedModal() {
+    this.showUnsavedModal = false;
+    this.pendingOpenPath = null;
   }
 
   private async loadFile(path: string) {
@@ -537,6 +592,12 @@ export class AppRoot extends LitElement {
       t.path === this.activePath ? { ...t, dirty: true } : t
     );
     this.scheduleDiff();
+  }
+
+  private isActiveDirty() {
+    if (!this.activePath) return false;
+    const tab = this.tabs.find((t) => t.path === this.activePath);
+    return Boolean(tab?.dirty);
   }
 
   private scheduleDiff() {
@@ -2019,6 +2080,22 @@ export class AppRoot extends LitElement {
                 </div>
               </div>
             `
+          : nothing}
+
+        ${this.showUnsavedModal
+          ? html`<div class="modalBackdrop" @click=${() => this.cancelUnsavedModal()}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:480px;">
+                <h3>Modifiche non salvate</h3>
+                <p style="margin-top:8px; color:var(--muted-color);">
+                  Hai modifiche non salvate su ${this.activePath ?? "file corrente"}.
+                </p>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.cancelUnsavedModal()}>Annulla</button>
+                  <button class="btn" @click=${() => this.confirmUnsavedDiscard()}>Non salvare</button>
+                  <button class="btn primary" @click=${() => this.confirmUnsavedSave()}>Salva</button>
+                </div>
+              </div>
+            </div>`
           : nothing}
 
         <div class="statusbar">

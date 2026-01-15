@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.11
+
+- 💾 Promemoria modifiche: modale “Modifiche non salvate” su cambio file (salva/non salvare/annulla) + warning beforeunload quando ci sono dirty.
+
 ## 0.2.10
 
 - ✨ Indent guides segmentate: guida attiva solo sul blocco (livello con start/end), niente highlight full-height; overlay senza righe vuote.
