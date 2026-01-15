@@ -272,7 +272,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.7";
+  private readonly appVersion = "0.2.9";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -1674,7 +1674,18 @@ export class AppRoot extends LitElement {
                       <div class="editorWrap">
                         <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
                     <div class="codeWrap">
-                      <div class="code ${this.showIndentGuides ? "showGuides" : ""}" style=${this.showIndentGuides ? `--active-indent-level:${this.activeIndentLevel};` : ""} ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content, diffMaps.left)}</div>
+                      <div
+                        class="code ${this.showIndentGuides ? "showGuides" : ""}"
+                        style=${this.showIndentGuides ? `--active-indent-level:${this.activeIndentLevel};` : ""}
+                        ${ref((el) => (this.codeRef = el))}
+                      >
+                        ${renderHighlighted(this.content, {
+                          diffMap: diffMaps.left,
+                          showGuides: this.showIndentGuides,
+                          indentSize: 2,
+                          skipCommentGuides: true,
+                        })}
+                      </div>
                       <textarea
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}
@@ -1699,7 +1710,7 @@ export class AppRoot extends LitElement {
                       <div class="editorWrap">
                         <div class="gutter" ${ref((el) => (this.baseGutterRef = el))}>${renderLineNumbersFor(this.savedBaseText)}</div>
                     <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${renderHighlighted(this.savedBaseText, diffMaps.right)}</div>
+                      <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${renderHighlighted(this.savedBaseText, { diffMap: diffMaps.right })}</div>
                       <pre class="basePre" ${ref((el) => (this.basePreRef = el))} @scroll=${this.syncBaseScroll}>${this.savedBaseText}</pre>
                     </div>
                       </div>
@@ -1708,7 +1719,17 @@ export class AppRoot extends LitElement {
                 : html`<div class="editorWrap">
                     <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
                     <div class="codeWrap">
-                      <div class="code ${this.showIndentGuides ? "showGuides" : ""}" style=${this.showIndentGuides ? `--active-indent-level:${this.activeIndentLevel};` : ""} ${ref((el) => (this.codeRef = el))}>${renderHighlighted(this.content)}</div>
+                      <div
+                        class="code ${this.showIndentGuides ? "showGuides" : ""}"
+                        style=${this.showIndentGuides ? `--active-indent-level:${this.activeIndentLevel};` : ""}
+                        ${ref((el) => (this.codeRef = el))}
+                      >
+                        ${renderHighlighted(this.content, {
+                          showGuides: this.showIndentGuides,
+                          indentSize: 2,
+                          skipCommentGuides: true,
+                        })}
+                      </div>
                       <textarea
                         ${ref((el) => (this.editorRef = el))}
                         .value=${this.content}

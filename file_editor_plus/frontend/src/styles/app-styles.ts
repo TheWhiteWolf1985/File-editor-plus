@@ -672,7 +672,7 @@ export const appStyles = css`
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: var(--font-size-md);
       line-height: 1.4;
-      white-space: pre;
+      white-space: normal;
       word-wrap: normal;
       color: var(--text-color);
       pointer-events: none;
@@ -685,18 +685,6 @@ export const appStyles = css`
       box-sizing: border-box;
       --active-indent-level: 0;
     }
-    .code.showGuides {
-      background-image: repeating-linear-gradient(
-        to right,
-        transparent 0,
-        transparent calc(var(--indent-width) - 1px),
-        var(--indent-guide) calc(var(--indent-width) - 1px),
-        var(--indent-guide) calc(var(--indent-width)),
-        transparent calc(var(--indent-width))
-      );
-      background-size: calc(var(--indent-width)) 100%;
-      background-position: var(--editor-pad) 0;
-    }
     .code.showGuides::before {
       content: "";
       position: absolute;
@@ -708,11 +696,38 @@ export const appStyles = css`
       pointer-events: none;
     }
     .codeLine {
-      white-space: normal;
+      position: relative;
+      white-space: pre;
       min-height: 1.4em;
       line-height: 1.4;
       user-select: none;
       -webkit-user-select: none;
+      display: block;
+      margin: 0;
+      padding: 0;
+    }
+    .codeLine.hasGuides::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: calc(var(--line-indent-level, 0) * var(--indent-width));
+      background-image: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(var(--indent-width) - 1px),
+        var(--indent-guide) calc(var(--indent-width) - 1px),
+        var(--indent-guide) calc(var(--indent-width)),
+        transparent calc(var(--indent-width))
+      );
+      background-repeat: no-repeat;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .codeLine.hasGuides > * {
+      position: relative;
+      z-index: 1;
     }
     .codeIndent {
       white-space: pre;

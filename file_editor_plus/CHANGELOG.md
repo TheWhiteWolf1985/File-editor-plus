@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.9
+
+- 🪢 Fix overlay: impostato `.code` a `white-space: normal` per eliminare righe vuote dal template e riallineare gutter/textarea con le indent guides per-riga.
+
+## 0.2.8
+
+- 🧭 Indent guides per-riga (solo sull’area indent, niente “pagina a righe”) con skip righe vuote/commenti e guida attiva invariata.
+
 ## 0.2.7
 
 - 🪢 Fix overlay: rimosso whitespace extra nell’overlay .code per riallineare testo/gutter/textarea con indent guides attivi.

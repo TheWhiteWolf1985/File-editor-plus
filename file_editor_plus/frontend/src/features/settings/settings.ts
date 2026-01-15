@@ -68,8 +68,8 @@ export function applyTheme(this: any) {
           "--editor-caret": "#d4d4d4",
           "--editor-selection-bg": "rgba(80, 140, 255, 0.35)",
           "--token-key-color": "#9cdcfe",
-          "--indent-guide": "rgba(255, 255, 255, 0.06)",
-          "--indent-guide-active": "rgba(255, 255, 255, 0.12)",
+          "--indent-guide": "rgba(255, 255, 255, 0.2)",
+          "--indent-guide-active": "rgba(255, 255, 255, 0.4)",
         }
       : {
           "--bg-color": "#f5f6f8",

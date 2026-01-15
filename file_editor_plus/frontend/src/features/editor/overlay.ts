@@ -2,6 +2,13 @@ import { html, nothing } from "lit";
 
 type HighlightSegment = { text: string; cls?: string };
 
+type HighlightOptions = {
+  diffMap?: Map<number, string>;
+  showGuides?: boolean;
+  indentSize?: number;
+  skipCommentGuides?: boolean;
+};
+
 const highlightLine = (line: string): HighlightSegment[] => {
   const segments: HighlightSegment[] = [];
   const pushWithStyles = (text: string) => {
@@ -52,14 +59,25 @@ const highlightLine = (line: string): HighlightSegment[] => {
 
 const renderOverlayText = (text: string) => text.replace(/\t/g, "  ").replace(/ /g, "\u00A0");
 
-export const renderHighlighted = (text: string, diffMap?: Map<number, string>) => {
+export const renderHighlighted = (text: string, options?: HighlightOptions) => {
+  const diffMap = options?.diffMap;
+  const showGuides = options?.showGuides ?? false;
+  const indentSize = options?.indentSize ?? 2;
+  const skipCommentGuides = options?.skipCommentGuides ?? true;
   const lines = text.split("\n");
   return lines.map((line, idx) => {
     const lineNo = idx + 1;
     const diffClass = diffMap?.get(lineNo);
-    const cls = diffClass ? `codeLine ${diffClass}` : "codeLine";
+    let cls = diffClass ? `codeLine ${diffClass}` : "codeLine";
     const indentMatch = line.match(/^[\t ]+/);
     const indentRaw = indentMatch ? indentMatch[0] : "";
+    const indentSpaces = indentRaw
+      ? indentRaw.split("").reduce((acc, ch) => acc + (ch === "\t" ? indentSize : 1), 0)
+      : 0;
+    const indentLevel = Math.max(0, Math.floor(indentSpaces / indentSize));
+    const trimmed = line.trim();
+    const eligibleGuide = showGuides && indentLevel > 0 && trimmed !== "" && !(skipCommentGuides && trimmed.startsWith("#"));
+    if (eligibleGuide) cls += " hasGuides";
     const rest = indentRaw ? line.slice(indentRaw.length) : line;
     const indentRendered = indentRaw ? indentRaw.replace(/\t/g, "  ").replace(/ /g, "\u00A0") : "";
     const indentNode = indentRendered ? html`<span class="codeIndent">${indentRendered}</span>` : nothing;
@@ -68,7 +86,8 @@ export const renderHighlighted = (text: string, diffMap?: Map<number, string>) =
       const display = renderOverlayText(raw);
       return html`<span class=${seg.cls ?? ""}>${display}</span>`;
     });
-    return html`<div class=${cls} data-gutter-line=${lineNo}>${indentNode}${tokens}</div>`;
+    const style = eligibleGuide ? `--line-indent-level:${indentLevel};` : nothing;
+    return html`<div class=${cls} data-gutter-line=${lineNo} style=${style}>${indentNode}${tokens}</div>`;
   });
 };
 
