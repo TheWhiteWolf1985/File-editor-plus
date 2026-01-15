@@ -4,6 +4,10 @@
 
 - 💾 Promemoria modifiche: modale “Modifiche non salvate” su cambio file (salva/non salvare/annulla) + warning beforeunload quando ci sono dirty.
 
+## 0.2.12
+
+- 💾 Modale non salvati anche su chiusura tab (X): se dirty, chiede Salva/Non salvare/Annulla prima di chiudere.
+
 ## 0.2.10
 
 - ✨ Indent guides segmentate: guida attiva solo sul blocco (livello con start/end), niente highlight full-height; overlay senza righe vuote.

@@ -279,7 +279,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.11";
+  private readonly appVersion = "0.2.12";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -288,7 +288,7 @@ export class AppRoot extends LitElement {
   private mdiSuggestCache = new Map<string, MdiIcon[]>();
   private mdiSuggestRequestId = 0;
   private pendingJump: { path: string; line: number; col: number } | null = null;
-  private pendingOpenPath: string | null = null;
+  private pendingUnsavedAction: { type: "open" | "close"; path: string } | null = null;
   private treeClipboard: { path: string; type: "file" | "dir" } | null = null;
   private beforeUnloadHandler = (e: BeforeUnloadEvent) => {
     if (this.isActiveDirty()) {
@@ -477,7 +477,7 @@ export class AppRoot extends LitElement {
       return;
     }
     if (this.isActiveDirty()) {
-      this.pendingOpenPath = path;
+      this.pendingUnsavedAction = { type: "open", path };
       this.showUnsavedModal = true;
       return;
     }
@@ -500,31 +500,39 @@ export class AppRoot extends LitElement {
   }
 
   private async confirmUnsavedSave() {
-    const target = this.pendingOpenPath;
+    const action = this.pendingUnsavedAction;
     await this.save();
     if (this.isActiveDirty()) {
       this.showToast("Errore salvataggio", "error");
       return;
     }
     this.showUnsavedModal = false;
-    this.pendingOpenPath = null;
-    if (target) {
-      this.openFile(target);
+    this.pendingUnsavedAction = null;
+    if (action) {
+      if (action.type === "open") {
+        this.openFile(action.path);
+      } else if (action.type === "close") {
+        this.closeTab(action.path, true);
+      }
     }
   }
 
   private confirmUnsavedDiscard() {
-    const target = this.pendingOpenPath;
+    const action = this.pendingUnsavedAction;
     this.showUnsavedModal = false;
-    this.pendingOpenPath = null;
-    if (target) {
-      this.openFile(target);
+    this.pendingUnsavedAction = null;
+    if (action) {
+      if (action.type === "open") {
+        this.openFile(action.path);
+      } else if (action.type === "close") {
+        this.closeTab(action.path, true);
+      }
     }
   }
 
   private cancelUnsavedModal() {
     this.showUnsavedModal = false;
-    this.pendingOpenPath = null;
+    this.pendingUnsavedAction = null;
   }
 
   private async loadFile(path: string) {
@@ -561,7 +569,12 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private closeTab(path: string) {
+  private closeTab(path: string, skipPrompt = false) {
+    if (!skipPrompt && path === this.activePath && this.isActiveDirty()) {
+      this.pendingUnsavedAction = { type: "close", path };
+      this.showUnsavedModal = true;
+      return;
+    }
     const idx = this.tabs.findIndex((t) => t.path === path);
     if (idx < 0) {
       console.debug("[app-root] closeTab: tab not found", path);
