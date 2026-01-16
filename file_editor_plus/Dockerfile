@@ -1,3 +1,5 @@
+ARG BUILD_FROM
+
 # ---------- frontend build ----------
 FROM node:20-alpine AS fe
 WORKDIR /fe
@@ -7,7 +9,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # ---------- runtime ----------
-FROM ghcr.io/home-assistant/amd64-base:latest
+FROM ${BUILD_FROM}
 
 RUN apk add --no-cache python3 py3-pip py3-virtualenv
 
@@ -19,7 +21,6 @@ WORKDIR /app
 
 COPY backend/ /app/backend/
 RUN pip install --no-cache-dir -r /app/backend/requirements.txt
-
 
 # Frontend dist -> /app/frontend
 COPY --from=fe /fe/dist /app/frontend

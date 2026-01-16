@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.14
+
+- 🛠️ Compatibilità: estesa la matrice di build per includere ARM64/aarch64 (preparazione release multi-arch).
+
 ## 0.2.12
 
 - 🧰 **Toolbar** (View → Menù strumenti): comandi rapidi **Save, Save all, Undo, Redo, Search, Replace, Indent, Split, Compare**. Preferenza persistente; i 3 pulsanti nella **crumbs** vengono nascosti quando la toolbar è attiva.
