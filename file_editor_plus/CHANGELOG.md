@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.22
+
+- 🔄 Fix Undo: l’indent/outdent con Tab/Shift+Tab è registrato nello stack Undo nativo, quindi Ctrl+Z/Undo annullano l’azione in un solo passo.
+
 ## 0.2.21
 
 - ⌨️ Undo Tab: l’indent/outdent con Tab/Shift+Tab ora è undoable (Ctrl+Z) grazie a edit undo-friendly sulla textarea.

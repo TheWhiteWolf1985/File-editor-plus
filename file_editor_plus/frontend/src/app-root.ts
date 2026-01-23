@@ -305,7 +305,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.21";
+  private readonly appVersion = "0.2.22";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -942,12 +942,18 @@ export class AppRoot extends LitElement {
   ) {
     try {
       ta.focus();
-      if (typeof ta.setRangeText === "function") {
+      let applied = false;
+      try {
+        ta.setSelectionRange(start, end);
+        if (typeof document !== "undefined" && typeof (document as any).execCommand === "function") {
+          applied = (document as any).execCommand("insertText", false, replacement);
+        }
+      } catch {
+        applied = false;
+      }
+      if (!applied && typeof ta.setRangeText === "function") {
         ta.setSelectionRange(start, end);
         ta.setRangeText(replacement, start, end, "preserve");
-      } else if (typeof document !== "undefined" && typeof (document as any).execCommand === "function") {
-        ta.setSelectionRange(start, end);
-        (document as any).execCommand("insertText", false, replacement);
       } else {
         ta.value = nextValue;
       }

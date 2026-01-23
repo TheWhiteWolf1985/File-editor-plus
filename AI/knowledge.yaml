@@ -685,6 +685,18 @@ log:
       - "file_editor_plus/frontend/src/styles/app-styles.ts"
     verification:
       - "Sessione con tab dirty: dopo reload compare un toast informativo; nessun elemento UI fisso appare."
+  - date: "2026-01-12"
+    actor: "codex"
+    version: "0.2.22"
+    change: "Issue #14 fix 2/3: invertito l'ordine per Tab/Shift+Tab per usare execCommand/setRangeText e registrare l'indent nello stack Undo nativo; toast dirty session resta invariato."
+    reason: "Assicurare che Ctrl+Z e comando Undo annullino l'indent in un singolo step."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Tab/Shift+Tab seguiti da Ctrl+Z: indent/outdent annullato in un passo; nessun 'Undo non disponibile'."
   - date: "2026-01-11"
     actor: "codex"
     version: "0.2.4"
