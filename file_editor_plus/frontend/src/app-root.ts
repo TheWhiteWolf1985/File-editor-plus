@@ -73,6 +73,7 @@ import {
   apiGetUserConfig,
   apiPostDiff,
   apiSaveFile,
+  apiGenerateDebugLog,
 } from "./services/api";
 import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS } from "./constants";
 import type { MdiIcon, SearchResult, SearchSummary, Snippet, ThemeMode } from "./types/api";
@@ -134,6 +135,7 @@ export class AppRoot extends LitElement {
     lineCount: { state: true },
     cursorLine: { state: true },
     cursorCol: { state: true },
+    treeDirty: { state: true },
     searchQuery: { state: true },
     searchReplace: { state: true },
     searchCaseSensitive: { state: true },
@@ -166,6 +168,7 @@ export class AppRoot extends LitElement {
     showIndentGuides: { state: true },
     activeIndentSegmentId: { state: true },
     showUnsavedModal: { state: true },
+    utilityGenerating: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -177,7 +180,7 @@ export class AppRoot extends LitElement {
   declare newItemKind: "file" | "folder" | null;
   declare newItemName: string;
   declare newItemExt: string;
-  declare activeActivity: "explorer" | "search" | "entity" | "snippet" | "system" | "backup";
+  declare activeActivity: "explorer" | "search" | "entity" | "snippet" | "system" | "backup" | "utility";
   declare toastMessage: string | null;
   declare toastType: "info" | "error";
   declare entityFilter: string;
@@ -189,6 +192,7 @@ export class AppRoot extends LitElement {
   declare showIndentGuides: boolean;
   declare activeIndentSegmentId: string | null;
   declare showUnsavedModal: boolean;
+  declare utilityGenerating: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
   declare contextMenuY: number;
@@ -256,6 +260,8 @@ export class AppRoot extends LitElement {
   declare lineCount: number;
   declare cursorLine: number;
   declare cursorCol: number;
+  declare treeDirty: boolean;
+  treeDirty = false;
   private loadedPaths = new Set<string>();
   private loadingPaths = new Set<string>();
   private fileCache: Record<string, string> = {};
@@ -279,7 +285,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.14";
+  private readonly appVersion = "0.2.18";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -375,6 +381,7 @@ export class AppRoot extends LitElement {
     this.showIndentGuides = false;
     this.activeIndentSegmentId = null;
     this.showUnsavedModal = false;
+    this.utilityGenerating = false;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -482,6 +489,37 @@ export class AppRoot extends LitElement {
       return;
     }
     this.openFile(path);
+  }
+
+  private async generateDebugLog() {
+    if (this.utilityGenerating) return;
+    this.utilityGenerating = true;
+    this.status = "Generazione debug log...";
+    try {
+      const res = await apiGenerateDebugLog(this.apiBase);
+      let payload: any = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+      if (!res.ok || payload?.ok !== true) {
+        const msg = payload?.error || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      const fname = payload?.filename || "debug log";
+      await this.notifyFsChanged();
+      this.showToast(`Creato debug log: ${fname}`);
+      this.status = "Ready";
+    } catch (e) {
+      this.showToast("Errore generazione debug log", "error");
+      this.status = "Errore debug log";
+    } finally {
+      this.utilityGenerating = false;
+      if (this.status === "Errore debug log") {
+        setTimeout(() => (this.status = "Ready"), 1200);
+      }
+    }
   }
 
   private openFile(path: string) {
@@ -1204,6 +1242,27 @@ export class AppRoot extends LitElement {
     this.activeIndentSegmentId = seg ? seg.id : null;
   }
 
+  private async notifyFsChanged() {
+    this.treeDirty = true;
+    if (this.activeActivity !== "explorer") return;
+    try {
+      await this.reloadTree(true);
+      this.treeDirty = false;
+    } catch (err) {
+      console.warn("notifyFsChanged reload failed", err);
+    }
+  }
+
+  private async ensureTreeFresh() {
+    if (!this.treeDirty) return;
+    try {
+      await this.reloadTree(true);
+      this.treeDirty = false;
+    } catch (err) {
+      console.warn("ensureTreeFresh reload failed", err);
+    }
+  }
+
   private toggleMenu(e: Event, name: string) {
     e.preventDefault();
     e.stopPropagation();
@@ -1369,8 +1428,11 @@ export class AppRoot extends LitElement {
     return window.matchMedia("(max-width: 900px)").matches;
   }
 
-  private setActivity(name: "explorer" | "search" | "entity" | "snippet" | "system" | "backup") {
+  private setActivity(name: "explorer" | "search" | "entity" | "snippet" | "system" | "backup" | "utility") {
     this.activeActivity = name;
+    if (name === "explorer") {
+      void this.ensureTreeFresh();
+    }
     if (this.isNarrowLayout()) {
       this.sidebarOpen = true;
     }
@@ -1515,6 +1577,24 @@ export class AppRoot extends LitElement {
         </div>
       </div>`;
     }
+    if (this.activeActivity === "utility") {
+      return html`<div class="sidebarContent systemPane">
+        <div class="systemGrid">
+          <button
+            class="systemCard"
+            type="button"
+            ?disabled=${this.utilityGenerating}
+            @click=${() => this.generateDebugLog()}
+          >
+            <div class="systemCardTitle">
+              <span>🛠️</span>
+              <span>${this.utilityGenerating ? "Generazione..." : "Genera debug log"}</span>
+            </div>
+            <div class="systemCardDesc">Crea un file di debug in /config/.fep-config con info di sistema e log Supervisor.</div>
+          </button>
+        </div>
+      </div>`;
+    }
     if (this.activeActivity === "system") {
       const actions = [
         {
@@ -1592,6 +1672,7 @@ export class AppRoot extends LitElement {
       );
       this.scheduleDiff();
       requestAnimationFrame(() => this.syncBaseOverlay());
+      await this.notifyFsChanged();
       this.status = "Saved";
       setTimeout(() => (this.status = "Ready"), 800);
     } catch (e) {
@@ -1688,6 +1769,7 @@ export class AppRoot extends LitElement {
               <div class="act ${this.activeActivity === "entity" ? "active" : ""}" title="Entity" @click=${() => this.setActivity("entity")}>🗂️</div>
               <div class="act ${this.activeActivity === "snippet" ? "active" : ""}" title="Snippet" @click=${() => this.setActivity("snippet")}>📜</div>
               <div class="act ${this.activeActivity === "backup" ? "active" : ""}" title="Backup" @click=${() => this.setActivity("backup")}>💾</div>
+              <div class="act ${this.activeActivity === "utility" ? "active" : ""}" title="Utility" @click=${() => this.setActivity("utility")}>🛠️</div>
             </div>
             <div class="activityGroup bottom">
               <div class="act ${this.activeActivity === "system" ? "active" : ""}" title="System" @click=${() => this.setActivity("system")}>
@@ -1711,7 +1793,9 @@ export class AppRoot extends LitElement {
                         ? "Snippet"
                         : this.activeActivity === "backup"
                           ? "Backup"
-                          : "System"}
+                          : this.activeActivity === "utility"
+                            ? "Utility"
+                            : "System"}
               </div>
               <button class="sidebarClose" title="Close" @click=${() => (this.sidebarOpen = false)}>✕</button>
             </div>

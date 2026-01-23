@@ -90,6 +90,9 @@ export async function replaceAll(this: any) {
     const stale = summary.stale_files ?? 0;
     const msg = `Replace completato: ${modified} file aggiornati${stale ? `, ${stale} stale` : ""}`;
     this.showToast(msg);
+    if (typeof this.notifyFsChanged === "function") {
+      await this.notifyFsChanged();
+    }
     await this.performSearch();
   } catch (e) {
     this.showToast("Errore replace", "error");

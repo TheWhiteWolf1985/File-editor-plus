@@ -55,7 +55,7 @@ export async function loadTree(this: any, path: string, force = false) {
   }
 }
 
-export async function reloadTree(this: any) {
+export async function reloadTree(this: any, quiet = false) {
   const expandedPaths = Array.from(this.expanded).filter((p: string) => p !== "");
   this.loadedPaths.clear();
   this.loadingPaths.clear();
@@ -65,7 +65,12 @@ export async function reloadTree(this: any) {
   for (const p of expandedPaths) {
     await this.loadTree(p, true);
   }
-  this.showToast("Tree ricaricato");
+  if ("treeDirty" in this) {
+    this.treeDirty = false;
+  }
+  if (!quiet) {
+    this.showToast("Tree ricaricato");
+  }
 }
 
 export async function toggleDir(this: any, path: string) {
@@ -133,7 +138,11 @@ export async function pasteTreeItem(this: any) {
     }
     const destPath = payload?.dest ? String(payload.dest) : destName;
     this.showToast(`Incollato: ${destPath}`);
-    await this.reloadTreePath(destDir);
+    if (typeof this.notifyFsChanged === "function") {
+      await this.notifyFsChanged();
+    } else {
+      await this.reloadTreePath(destDir);
+    }
   } catch {
     this.showToast("Errore copia", "error");
   } finally {
@@ -174,7 +183,11 @@ export async function executeTreeDelete(this: any) {
     }
     closeTabsForDeletedPath(this, target, this.deleteTargetType);
     this.showToast("Elemento eliminato");
-    await this.reloadTreePath(parent);
+    if (typeof this.notifyFsChanged === "function") {
+      await this.notifyFsChanged();
+    } else {
+      await this.reloadTreePath(parent);
+    }
   } catch {
     this.showToast("Errore eliminazione", "error");
   } finally {
@@ -225,10 +238,15 @@ export async function createNewItem(this: any) {
         this.status = msg;
         return;
       }
+      const nextExpanded = new Set(this.expanded);
+      if (dir !== null) {
+        nextExpanded.add(dir);
+        this.expanded = nextExpanded;
+      }
       this.newItemKind = null;
-      this.loadedPaths.delete(dir);
-      await this.loadTree(dir, true);
-      this.expanded = new Set(this.expanded).add(dir);
+      if (typeof this.notifyFsChanged === "function") {
+        await this.notifyFsChanged();
+      }
       this.openFile(target);
     } catch (e) {
       this.status = "Errore creazione file";
@@ -267,10 +285,13 @@ export async function createNewItem(this: any) {
         this.status = msg;
         return;
       }
+      const nextExpanded = new Set(this.expanded);
+      nextExpanded.add(target);
+      this.expanded = nextExpanded;
       this.newItemKind = null;
-      this.loadedPaths.delete(dir);
-      await this.loadTree(dir, true);
-      this.expanded = new Set(this.expanded).add(target);
+      if (typeof this.notifyFsChanged === "function") {
+        await this.notifyFsChanged();
+      }
     } catch (e) {
       this.status = "Errore creazione cartella";
       this.showToast("Errore creazione cartella", "error");

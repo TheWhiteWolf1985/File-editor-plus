@@ -9,6 +9,9 @@ import time
 import logging
 import uuid
 import re
+import socket
+import platform
+from logging.handlers import RotatingFileHandler
 import tempfile
 import zipfile
 from datetime import datetime
@@ -33,6 +36,7 @@ LEGACY_SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
 LEGACY_USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
 MDI_META_FILE = (Path(__file__).parent / "mdi_meta.json").resolve()
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
+ADDON_VERSION = os.environ.get("ADDON_VERSION") or os.environ.get("VERSION") or "unknown"
 logger = logging.getLogger("file_editor_plus")
 MAX_FORMAT_SIZE = 2 * 1024 * 1024  # 2MB
 MAX_SEARCH_FILE_SIZE = 2 * 1024 * 1024  # 2MB per file
@@ -333,6 +337,28 @@ def ensure_user_config() -> None:
         except Exception as e:
             logger.exception("user_config: errore creazione %s: %s", USER_CONFIG_FILE, e)
             raise HTTPException(500, f"Errore creazione user_config: {e}")
+
+
+def setup_file_logging() -> None:
+    ensure_config_store()
+    log_path = FEP_CONFIG_DIR / "fep_runtime.log"
+    existing = [
+        h for h in logger.handlers if isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", None) == str(log_path)
+    ]
+    if existing:
+        return
+    handler = RotatingFileHandler(log_path, maxBytes=2 * 1024 * 1024, backupCount=3, encoding="utf-8")
+    fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    handler.setFormatter(fmt)
+    handler.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    if logger.level == logging.NOTSET:
+        logger.setLevel(logging.INFO)
+    logger.propagate = False
+    logger.info("fep runtime log initialized at %s", log_path)
+
+
+setup_file_logging()
 
 
 def load_user_config() -> dict:
@@ -835,6 +861,171 @@ async def ha_action(request: Request):
     except Exception as e:
         logger.exception("ha_action: error on %s: %s", action, e)
         raise HTTPException(500, f"Error calling Home Assistant: {e}")
+
+
+async def supervisor_get_json(path: str):
+    if not SUPERVISOR_TOKEN:
+        return None, "missing supervisor token"
+    try:
+        async with httpx.AsyncClient(base_url="http://supervisor", timeout=15) as client:
+            res = await client.get(path, headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"})
+            res.raise_for_status()
+            return res.json(), None
+    except Exception as e:
+        logger.warning("supervisor_get_json %s failed: %s", path, e)
+        return None, str(e)
+
+
+async def supervisor_get_text(path: str, accept: str = "text/plain"):
+    if not SUPERVISOR_TOKEN:
+        return None, "missing supervisor token"
+    headers = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
+    headers["X-Supervisor-Token"] = SUPERVISOR_TOKEN
+    if accept:
+        headers["Accept"] = accept
+    try:
+        async with httpx.AsyncClient(base_url="http://supervisor", timeout=30) as client:
+            res = await client.get(path, headers=headers)
+            if res.status_code in (401, 403):
+                return None, f"HTTP {res.status_code} (unauthorized)"
+            res.raise_for_status()
+            return res.text, None
+    except Exception as e:
+        logger.warning("supervisor_get_text %s failed: %s", path, e)
+        return None, str(e)
+
+
+def mask_secrets(text: str) -> str:
+    if not text:
+        return text
+    masked = text
+    if SUPERVISOR_TOKEN:
+        masked = masked.replace(SUPERVISOR_TOKEN, "***")
+    masked = re.sub(r"Bearer\s+[A-Za-z0-9._\-]+", "Bearer ***", masked, flags=re.IGNORECASE)
+    return masked
+
+
+@app.post("/api/utils/debug-log")
+async def generate_debug_log():
+    ensure_config_store()
+    setup_file_logging()
+    timestamp = datetime.now()
+    ts_short = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+    fname = timestamp.strftime("debug_%Y-%m-%d_%H-%M-%S.txt")
+    target = safe_path(f".fep-config/{fname}")
+
+    hostname = socket.gethostname()
+    arch = platform.machine() or os.uname().machine
+    lines = []
+    lines.append(f"File Editor Plus debug log - {ts_short}")
+    lines.append(f"Addon version: {ADDON_VERSION}")
+    lines.append(f"Host: {hostname} | Arch: {arch}")
+    lines.append("")
+
+    sections = []
+
+    def add_section(title: str, content: str):
+        sections.append(f"== {title} ==")
+        sections.append(content)
+        sections.append("")
+
+    def clean_err(val: Optional[str]) -> str:
+        return mask_secrets(val) if val else ""
+
+    headers = None
+    if SUPERVISOR_TOKEN:
+        headers = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}", "X-Supervisor-Token": SUPERVISOR_TOKEN}
+
+    async def fetch_json(client: httpx.AsyncClient, path: str):
+        try:
+            res = await client.get(path)
+            status = res.status_code
+            if status >= 400:
+                return None, f"HTTP {status} {res.text}", status
+            return res.json(), None, status
+        except Exception as e:
+            return None, str(e), None
+
+    async def fetch_text(client: httpx.AsyncClient, path: str):
+        try:
+            res = await client.get(path, headers={"Accept": "text/plain"})
+            status = res.status_code
+            if status >= 400:
+                return None, f"HTTP {status} {res.text}", status
+            return res.text, None, status
+        except Exception as e:
+            return None, str(e), None
+
+    sup_info = (None, "missing supervisor token", None)
+    core_info = (None, "missing supervisor token", None)
+    host_info = (None, "missing supervisor token", None)
+    os_info = (None, "missing supervisor token", None)
+    sup_logs = (None, "missing supervisor token", None)
+    core_logs = (None, "missing supervisor token", None)
+
+    if headers:
+        async with httpx.AsyncClient(base_url="http://supervisor", timeout=30, headers=headers) as client:
+            sup_info = await fetch_json(client, "/supervisor/info")
+            core_info = await fetch_json(client, "/core/info")
+            os_info = await fetch_json(client, "/os/info")
+            host_info = await fetch_json(client, "/host/info")
+            sup_logs = await fetch_text(client, "/supervisor/logs?lines=200")
+            core_logs = await fetch_text(client, "/core/logs?lines=200")
+
+    sup_info_data, sup_info_err, sup_info_status = sup_info
+    core_info_data, core_info_err, core_info_status = core_info
+    os_info_data, os_info_err, _ = os_info
+    host_info_data, host_info_err, _ = host_info
+
+    add_section("Home Assistant Core info", json.dumps(core_info_data, ensure_ascii=False, indent=2) if core_info_data else f"FAILED: {clean_err(core_info_err)}")
+    add_section("Supervisor info", json.dumps(sup_info_data, ensure_ascii=False, indent=2) if sup_info_data else f"FAILED: {clean_err(sup_info_err)}")
+    add_section("OS info", json.dumps(os_info_data, ensure_ascii=False, indent=2) if os_info_data else f"FAILED: {clean_err(os_info_err)}")
+    add_section("Host info", json.dumps(host_info_data, ensure_ascii=False, indent=2) if host_info_data else f"FAILED: {clean_err(host_info_err)}")
+
+    sup_logs_text, sup_logs_err, sup_logs_status = sup_logs
+    if sup_logs_text:
+        tail = "\n".join(sup_logs_text.splitlines()[-300:])
+        add_section("Supervisor logs (last 300 lines)", mask_secrets(tail))
+    else:
+        if sup_logs_status == 403:
+            msg = "FORBIDDEN 403 – allega manualmente i log Supervisor dalla UI"
+        elif sup_info_status and sup_info_status < 400:
+            msg = f"FAILED logs: HTTP {sup_logs_status or ''} {clean_err(sup_logs_err) or ''}".strip()
+        else:
+            msg = f"FAILED: {clean_err(sup_logs_err) or f'HTTP {sup_logs_status}'}"
+        add_section("Supervisor logs", msg)
+
+    core_logs_text, core_logs_err, core_logs_status = core_logs
+    if core_logs_text:
+        tail_core = "\n".join(core_logs_text.splitlines()[-300:])
+        add_section("Core logs (last 300 lines)", mask_secrets(tail_core))
+    else:
+        if core_logs_status == 403:
+            msg = "FORBIDDEN 403 – allega manualmente i log Supervisor dalla UI"
+        else:
+            msg = f"FAILED: {clean_err(core_logs_err) or f'HTTP {core_logs_status}'}"
+        add_section("Core logs", msg)
+
+    runtime_log = FEP_CONFIG_DIR / "fep_runtime.log"
+    if runtime_log.exists():
+        try:
+            with open(runtime_log, "r", encoding="utf-8", errors="ignore") as f:
+                lines_log = f.read().splitlines()
+            tail_app = mask_secrets("\n".join(lines_log[-300:]))
+            add_section("App logs (tail 300)", tail_app)
+        except Exception as e:
+            add_section("App logs", f"FAILED lettura fep_runtime.log: {e}")
+    else:
+        add_section("App logs", "MISSING: fep_runtime.log non trovato")
+
+    content = "\n".join(lines + sections)
+    try:
+        atomic_write(target, content)
+    except Exception as e:
+        logger.exception("debug-log: error writing %s: %s", target, e)
+        raise HTTPException(500, f"Errore salvataggio debug log: {e}")
+
+    return {"ok": True, "filename": fname, "path": str(target)}
 @app.post("/api/folder")
 def create_folder(path: str):
     target = safe_path(path)

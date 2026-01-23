@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.18
+
+- 🐛 Debug log: richiesta log Supervisor/Core con header corretti (no fallback /core/api), note chiare su 403 e auto-inclusione dei log runtime dell’add-on.
+- 🌳 Tree: flag dirty + refresh automatico quando il filesystem cambia, così i nuovi file compaiono senza ricarichi manuali.
+
+## 0.2.17
+
+- 🐛 Debug log: richiesta ai log Supervisor con header/token corretti e fallback su endpoint alternativo, messaggi FAILED solo se l’API nega l’accesso.
+- 🌳 Tree: refresh automatico dopo le operazioni file (save, replace, debug log) così i nuovi artefatti compaiono subito senza refresh manuale.
+
+## 0.2.15
+
+- 🛠️ Utility: nuovo comando “Genera debug log” (salva in /config/.fep-config con info sistema e ultimi log Supervisor).
+
+## 0.2.16
+
+- 🛠️ Debug log migliorato: gestione 403 Supervisor logs con fallback ai log Home Assistant e messaggi chiari.
+
 ## 0.2.14
 
 - 🛠️ Compatibilità: estesa la matrice di build per includere ARM64/aarch64 (preparazione release multi-arch).

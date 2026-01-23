@@ -177,3 +177,8 @@ export const apiGetUserConfig = (apiBase: string) => {
   const url = `${apiBase}api/user-config`;
   return fetch(url);
 };
+
+export const apiGenerateDebugLog = (apiBase: string) => {
+  const url = `${apiBase}api/utils/debug-log`;
+  return fetch(url, { method: "POST" });
+};
