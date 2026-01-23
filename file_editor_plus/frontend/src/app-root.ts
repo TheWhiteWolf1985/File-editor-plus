@@ -176,7 +176,6 @@ export class AppRoot extends LitElement {
     activeIndentSegmentId: { state: true },
     showUnsavedModal: { state: true },
     utilityGenerating: { state: true },
-    sessionDirtyNotice: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -203,7 +202,6 @@ export class AppRoot extends LitElement {
   declare activeIndentSegmentId: string | null;
   declare showUnsavedModal: boolean;
   declare utilityGenerating: boolean;
-  declare sessionDirtyNotice: boolean;
   declare showResetSessionModal: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
@@ -297,6 +295,7 @@ export class AppRoot extends LitElement {
   private readonly maxBufferFiles = 10;
   private pendingViewApply: Record<string, { scrollTop?: number; selStart?: number; selEnd?: number }> = {};
   private readonly indentUnit = "  ";
+  private dirtySessionToastShown = false;
   private lastCursorLine = 1;
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
@@ -465,7 +464,6 @@ export class AppRoot extends LitElement {
     this.lineCount = 1;
     this.cursorLine = 1;
     this.cursorCol = 1;
-    this.sessionDirtyNotice = false;
     this.showResetSessionModal = false;
   }
 
@@ -1631,10 +1629,10 @@ export class AppRoot extends LitElement {
     this.openSnapshotByPath = {};
     this.savedBaseText = "";
     this.openSnapshotText = "";
-    this.sessionDirtyNotice = false;
     this.restoredBufferCount = 0;
     this.clearBufferTimer("");
     this.bufferSaveTimers.clear();
+    this.dirtySessionToastShown = false;
   }
 
   private normalizeDir(path: string | null | undefined): string {
@@ -1802,8 +1800,9 @@ export class AppRoot extends LitElement {
       if (data?.corrupted) {
         this.showToast("Sessione ripristinata ai valori predefiniti (session file corrotto)", "error");
       }
-      if (hadDirty) {
-        this.sessionDirtyNotice = true;
+      if (hadDirty && !this.dirtySessionToastShown) {
+        this.showToast("Sessione precedente con modifiche non salvate. I file sono stati riaperti dalla versione su disco.");
+        this.dirtySessionToastShown = true;
       }
       if (this.restoredBufferCount > 0) {
         this.showToast(`Ripristinati ${this.restoredBufferCount} file non salvati dalla sessione precedente`);
@@ -1833,10 +1832,6 @@ export class AppRoot extends LitElement {
 
   private closeAboutModal() {
     this.showAboutModal = false;
-  }
-
-  private dismissSessionDirtyNotice() {
-    this.sessionDirtyNotice = false;
   }
 
   private async resetSession() {
@@ -2257,14 +2252,6 @@ export class AppRoot extends LitElement {
             </div>
 
             <div class="content">
-              ${this.sessionDirtyNotice
-                ? html`<div class="sessionNotice">
-                    <div>
-                      Sessione precedente con modifiche non salvate. I file sono stati riaperti dalla versione su disco.
-                    </div>
-                    <button class="btn" type="button" @click=${() => this.dismissSessionDirtyNotice()}>OK</button>
-                  </div>`
-                : nothing}
               <div class="crumbs">
                 <div>${activeTab ? `/config/${activeTab.path}` : "Apri un file dall’Explorer"}</div>
                 ${this.toolbarVisible

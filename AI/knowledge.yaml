@@ -675,6 +675,16 @@ log:
     verification:
       - "Premi Tab o Shift+Tab e poi Ctrl+Z: l'indent/outdent viene annullato in un solo passo."
       - "Selezione/posizione cursore invariata dopo l'operazione."
+  - date: "2026-01-12"
+    actor: "codex"
+    version: "0.2.21"
+    change: "Fix Issue #14 (parte toast): warning 'Sessione precedente con modifiche non salvate' ora usa solo toast (niente banner inline) e viene mostrato una sola volta dopo il restore."
+    reason: "Evitare che il banner rompa il layout e uniformare la messaggistica ai toast esistenti."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/styles/app-styles.ts"
+    verification:
+      - "Sessione con tab dirty: dopo reload compare un toast informativo; nessun elemento UI fisso appare."
   - date: "2026-01-11"
     actor: "codex"
     version: "0.2.4"

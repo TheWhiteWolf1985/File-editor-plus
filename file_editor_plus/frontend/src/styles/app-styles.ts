@@ -486,18 +486,6 @@ export const appStyles = css`
     .treeScrollable {
       min-height: 100%;
     }
-    .sessionNotice {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      margin: 6px 0;
-      border-radius: 8px;
-      border: 1px solid var(--border-color);
-      background: color-mix(in srgb, var(--accent-color) 10%, transparent);
-      color: var(--text-color);
-      font-size: var(--font-size-sm);
-    }
     .treeRow {
       display: flex;
       align-items: center;
