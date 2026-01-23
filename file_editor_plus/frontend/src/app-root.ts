@@ -296,6 +296,7 @@ export class AppRoot extends LitElement {
   private readonly maxBufferBytes = 256 * 1024;
   private readonly maxBufferFiles = 10;
   private pendingViewApply: Record<string, { scrollTop?: number; selStart?: number; selEnd?: number }> = {};
+  private readonly indentUnit = "  ";
   private lastCursorLine = 1;
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
@@ -305,7 +306,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.20";
+  private readonly appVersion = "0.2.21";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -932,6 +933,42 @@ export class AppRoot extends LitElement {
     requestAnimationFrame(() => this.updateCursorFromTextarea());
   }
 
+  private applyTextEditWithUndo(
+    ta: HTMLTextAreaElement,
+    start: number,
+    end: number,
+    replacement: string,
+    selStart: number,
+    selEnd: number,
+    nextValue: string
+  ) {
+    try {
+      ta.focus();
+      if (typeof ta.setRangeText === "function") {
+        ta.setSelectionRange(start, end);
+        ta.setRangeText(replacement, start, end, "preserve");
+      } else if (typeof document !== "undefined" && typeof (document as any).execCommand === "function") {
+        ta.setSelectionRange(start, end);
+        (document as any).execCommand("insertText", false, replacement);
+      } else {
+        ta.value = nextValue;
+      }
+      ta.setSelectionRange(selStart, selEnd);
+      try {
+        const evt = new InputEvent("input", { bubbles: true, cancelable: false, inputType: "insertText", data: replacement });
+        ta.dispatchEvent(evt);
+      } catch {
+        // ignore if InputEvent unsupported
+      }
+    } catch (err) {
+      console.warn("applyTextEditWithUndo failed, fallback", err);
+      ta.value = nextValue;
+      ta.setSelectionRange(selStart, selEnd);
+    }
+    this.markDirty(nextValue);
+    requestAnimationFrame(() => this.updateCursorFromTextarea());
+  }
+
   private handleEditorKeyDown(e: KeyboardEvent) {
     if ((e.key === "s" || e.key === "S") && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
@@ -978,7 +1015,7 @@ export class AppRoot extends LitElement {
     e.preventDefault();
     const ta = this.editorRef;
     const value = this.content;
-    const indent = "  ";
+    const indent = this.indentUnit;
     const start = ta.selectionStart ?? 0;
     const end = ta.selectionEnd ?? start;
     const newlineMatch = value.match(/\r\n/);
@@ -1000,14 +1037,7 @@ export class AppRoot extends LitElement {
       const newValue = `${value.slice(0, blockStart)}${newBlock}${value.slice(endLineBreak)}`;
       const newStart = start + indent.length;
       const newEnd = end + indent.length * lines.length;
-      this.markDirty(newValue);
-      requestAnimationFrame(() => {
-        if (!this.editorRef) return;
-        this.editorRef.selectionStart = newStart;
-        this.editorRef.selectionEnd = newEnd;
-        this.editorRef.focus();
-        this.updateCursorFromTextarea();
-      });
+      this.applyTextEditWithUndo(ta, blockStart, endLineBreak, newBlock, newStart, newEnd, newValue);
       return true;
     }
 
@@ -1035,14 +1065,7 @@ export class AppRoot extends LitElement {
     const newValue = `${value.slice(0, blockStart)}${newBlock}${value.slice(endLineBreak)}`;
     const newStart = Math.max(blockStart, start - removedFirst);
     const newEnd = Math.max(newStart, end - totalRemoved);
-    this.markDirty(newValue);
-    requestAnimationFrame(() => {
-      if (!this.editorRef) return;
-      this.editorRef.selectionStart = newStart;
-      this.editorRef.selectionEnd = newEnd;
-      this.editorRef.focus();
-      this.updateCursorFromTextarea();
-    });
+    this.applyTextEditWithUndo(ta, blockStart, endLineBreak, newBlock, newStart, newEnd, newValue);
     return true;
   }
 
