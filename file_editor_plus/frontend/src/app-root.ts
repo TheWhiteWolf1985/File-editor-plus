@@ -70,9 +70,14 @@ import {
 import {
   apiFormatYaml,
   apiGetFile,
-  apiGetUserConfig,
+  apiGetSession,
   apiPostDiff,
   apiSaveFile,
+  apiGenerateDebugLog,
+  apiPutSession,
+  apiPutSessionBuffer,
+  apiGetSessionBuffer,
+  apiResetSession,
 } from "./services/api";
 import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS } from "./constants";
 import type { MdiIcon, SearchResult, SearchSummary, Snippet, ThemeMode } from "./types/api";
@@ -100,6 +105,8 @@ export class AppRoot extends LitElement {
     activeActivity: { state: true },
     toastMessage: { state: true },
     toastType: { state: true },
+    activeIsDir: { state: true },
+    activeDir: { state: true },
     entityFilter: { state: true },
     entities: { state: true },
     entityError: { state: true },
@@ -134,6 +141,7 @@ export class AppRoot extends LitElement {
     lineCount: { state: true },
     cursorLine: { state: true },
     cursorCol: { state: true },
+    treeDirty: { state: true },
     searchQuery: { state: true },
     searchReplace: { state: true },
     searchCaseSensitive: { state: true },
@@ -152,6 +160,7 @@ export class AppRoot extends LitElement {
     treeMenuY: { state: true },
     treeMenuPath: { state: true },
     treeMenuType: { state: true },
+    treeMenuFromBlank: { state: true },
     showTreeDeleteModal: { state: true },
     deleteTargetPath: { state: true },
     deleteTargetType: { state: true },
@@ -166,6 +175,7 @@ export class AppRoot extends LitElement {
     showIndentGuides: { state: true },
     activeIndentSegmentId: { state: true },
     showUnsavedModal: { state: true },
+    utilityGenerating: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -177,9 +187,11 @@ export class AppRoot extends LitElement {
   declare newItemKind: "file" | "folder" | null;
   declare newItemName: string;
   declare newItemExt: string;
-  declare activeActivity: "explorer" | "search" | "entity" | "snippet" | "system" | "backup";
+  declare activeActivity: "explorer" | "search" | "entity" | "snippet" | "system" | "backup" | "utility";
   declare toastMessage: string | null;
   declare toastType: "info" | "error";
+  declare activeIsDir: boolean;
+  declare activeDir: string;
   declare entityFilter: string;
   declare entities: Record<string, HassState>;
   declare entityError: string | null;
@@ -189,6 +201,8 @@ export class AppRoot extends LitElement {
   declare showIndentGuides: boolean;
   declare activeIndentSegmentId: string | null;
   declare showUnsavedModal: boolean;
+  declare utilityGenerating: boolean;
+  declare showResetSessionModal: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
   declare contextMenuY: number;
@@ -233,6 +247,7 @@ export class AppRoot extends LitElement {
   declare treeMenuY: number;
   declare treeMenuPath: string | null;
   declare treeMenuType: "file" | "dir" | null;
+  declare treeMenuFromBlank: boolean;
   declare showTreeDeleteModal: boolean;
   declare deleteTargetPath: string | null;
   declare deleteTargetType: "file" | "dir" | null;
@@ -256,6 +271,8 @@ export class AppRoot extends LitElement {
   declare lineCount: number;
   declare cursorLine: number;
   declare cursorCol: number;
+  declare treeDirty: boolean;
+  treeDirty = false;
   private loadedPaths = new Set<string>();
   private loadingPaths = new Set<string>();
   private fileCache: Record<string, string> = {};
@@ -270,6 +287,15 @@ export class AppRoot extends LitElement {
   private baseGutterRef: HTMLDivElement | null = null;
   private basePreRef: HTMLPreElement | null = null;
   private cursorRaf: number | null = null;
+  private sessionSaveTimer: number | null = null;
+  private restoringSession = false;
+  private bufferSaveTimers: Map<string, number> = new Map();
+  private restoredBufferCount = 0;
+  private readonly maxBufferBytes = 256 * 1024;
+  private readonly maxBufferFiles = 10;
+  private pendingViewApply: Record<string, { scrollTop?: number; selStart?: number; selEnd?: number }> = {};
+  private readonly indentUnit = "  ";
+  private dirtySessionToastShown = false;
   private lastCursorLine = 1;
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
@@ -279,7 +305,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.14";
+  private readonly appVersion = "0.2.22";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -369,12 +395,15 @@ export class AppRoot extends LitElement {
     this.entityFilter = "";
     this.entities = {};
     this.entityError = null;
+    this.activeIsDir = false;
+    this.activeDir = "/";
     this.collapsedDomains = new Set<string>();
     this.autoIndentEnabled = true;
     this.toolbarVisible = true;
     this.showIndentGuides = false;
     this.activeIndentSegmentId = null;
     this.showUnsavedModal = false;
+    this.utilityGenerating = false;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -419,6 +448,7 @@ export class AppRoot extends LitElement {
     this.treeMenuY = 0;
     this.treeMenuPath = null;
     this.treeMenuType = null;
+    this.treeMenuFromBlank = false;
     this.showTreeDeleteModal = false;
     this.deleteTargetPath = null;
     this.deleteTargetType = null;
@@ -434,6 +464,7 @@ export class AppRoot extends LitElement {
     this.lineCount = 1;
     this.cursorLine = 1;
     this.cursorCol = 1;
+    this.showResetSessionModal = false;
   }
 
   connectedCallback() {
@@ -450,6 +481,7 @@ export class AppRoot extends LitElement {
     window.addEventListener("beforeunload", this.beforeUnloadHandler);
     this.loadSnippets();
     this.initEntities();
+    void this.restoreSession();
   }
 
   disconnectedCallback(): void {
@@ -484,7 +516,39 @@ export class AppRoot extends LitElement {
     this.openFile(path);
   }
 
+  private async generateDebugLog() {
+    if (this.utilityGenerating) return;
+    this.utilityGenerating = true;
+    this.status = "Generazione debug log...";
+    try {
+      const res = await apiGenerateDebugLog(this.apiBase);
+      let payload: any = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+      if (!res.ok || payload?.ok !== true) {
+        const msg = payload?.error || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      const fname = payload?.filename || "debug log";
+      await this.notifyFsChanged();
+      this.showToast(`Creato debug log: ${fname}`);
+      this.status = "Ready";
+    } catch (e) {
+      this.showToast("Errore generazione debug log", "error");
+      this.status = "Errore debug log";
+    } finally {
+      this.utilityGenerating = false;
+      if (this.status === "Errore debug log") {
+        setTimeout(() => (this.status = "Ready"), 1200);
+      }
+    }
+  }
+
   private openFile(path: string) {
+    this.setActiveSelection(path, false);
     const name = path.split("/").pop() || path;
     const existing = this.tabs.find((t) => t.path === path);
     if (!existing) {
@@ -497,6 +561,7 @@ export class AppRoot extends LitElement {
     this.diffHunks = [];
     this.diffSummary = null;
     this.loadFile(path);
+    this.scheduleSaveSession();
   }
 
   private async confirmUnsavedSave() {
@@ -575,6 +640,10 @@ export class AppRoot extends LitElement {
       this.showUnsavedModal = true;
       return;
     }
+    if (path === this.activePath) {
+      this.captureActiveView();
+    }
+    this.clearBufferTimer(path);
     const idx = this.tabs.findIndex((t) => t.path === path);
     if (idx < 0) {
       console.debug("[app-root] closeTab: tab not found", path);
@@ -594,23 +663,118 @@ export class AppRoot extends LitElement {
       }
     }
     console.debug("[app-root] closeTab: closed", path, { remaining: this.tabs.map((t) => t.path), active: this.activePath });
+    this.scheduleSaveSession();
   }
 
   private markDirty(val: string) {
     this.content = val;
     this.lineCount = Math.max(1, this.content.split("\n").length);
     if (!this.activePath) return;
+    const prevTab = this.tabs.find((t) => t.path === this.activePath);
+    const wasDirty = !!prevTab?.dirty;
+    if (this.editorRef) {
+      const scrollTop = this.editorRef.scrollTop;
+      const selStart = this.editorRef.selectionStart ?? 0;
+      const selEnd = this.editorRef.selectionEnd ?? selStart;
+      this.tabs = this.tabs.map((t) =>
+        t.path === this.activePath ? { ...t, view: { scrollTop, selStart, selEnd } } : t
+      );
+    }
     this.fileCache[this.activePath] = val;
     this.tabs = this.tabs.map((t) =>
       t.path === this.activePath ? { ...t, dirty: true } : t
     );
     this.scheduleDiff();
+    if (!wasDirty) {
+      this.scheduleSaveSession();
+    }
+    this.scheduleBufferSave(this.activePath, val);
   }
 
   private isActiveDirty() {
     if (!this.activePath) return false;
     const tab = this.tabs.find((t) => t.path === this.activePath);
     return Boolean(tab?.dirty);
+  }
+
+  private clearBufferTimer(path: string) {
+    const existing = this.bufferSaveTimers.get(path);
+    if (existing !== undefined) {
+      clearTimeout(existing);
+      this.bufferSaveTimers.delete(path);
+    }
+  }
+
+  private async persistBuffer(path: string, content: string) {
+    const dirtyTabs = this.tabs.filter((t) => t.dirty);
+    if (dirtyTabs.length > this.maxBufferFiles) {
+      console.warn("buffer save skipped: too many dirty tabs", dirtyTabs.length);
+      return;
+    }
+    const size = new TextEncoder().encode(content).length;
+    if (size > this.maxBufferBytes) {
+      console.warn("buffer save skipped: too large", { path, size });
+      return;
+    }
+    try {
+      const res = await apiPutSessionBuffer(this.apiBase, { path, content });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.ok === false) {
+        console.warn("buffer save failed", res.status, data);
+        return;
+      }
+      const bufferId = data?.buffer_id || data?.bufferId;
+      const bufferSize = data?.size ?? size;
+      const lastEditAt = new Date().toISOString();
+      this.tabs = this.tabs.map((t) =>
+        t.path === path ? { ...t, bufferId, bufferSize, lastEditAt } : t
+      );
+      this.scheduleSaveSession();
+    } catch (err) {
+      console.warn("persistBuffer error", err);
+    }
+  }
+
+  private scheduleBufferSave(path: string, content: string) {
+    if (!path) return;
+    this.clearBufferTimer(path);
+    const timer = window.setTimeout(() => {
+      this.bufferSaveTimers.delete(path);
+      void this.persistBuffer(path, content);
+    }, 1000);
+    this.bufferSaveTimers.set(path, timer);
+  }
+
+  private captureActiveView() {
+    if (!this.activePath || !this.editorRef) return;
+    const scrollTop = this.editorRef.scrollTop;
+    const selStart = this.editorRef.selectionStart ?? 0;
+    const selEnd = this.editorRef.selectionEnd ?? selStart;
+    this.tabs = this.tabs.map((t) =>
+      t.path === this.activePath ? { ...t, view: { scrollTop, selStart, selEnd } } : t
+    );
+  }
+
+  private applyViewForPath(path: string) {
+    const tab = this.tabs.find((t) => t.path === path);
+    const view = tab?.view ?? this.pendingViewApply[path];
+    if (!view || !this.editorRef) return;
+    const len = this.content.length;
+    const selStart = Math.max(0, Math.min(view.selStart ?? 0, len));
+    const selEnd = Math.max(0, Math.min(view.selEnd ?? selStart, len));
+    requestAnimationFrame(() => {
+      if (!this.editorRef) return;
+      if (typeof view.scrollTop === "number") {
+        this.editorRef.scrollTop = Math.max(0, view.scrollTop);
+      }
+      try {
+        this.editorRef.setSelectionRange(selStart, selEnd);
+      } catch {
+        // ignore invalid selection
+      }
+      this.updateCursorFromTextarea();
+    });
+    delete this.pendingViewApply[path];
   }
 
   private scheduleDiff() {
@@ -767,6 +931,48 @@ export class AppRoot extends LitElement {
     requestAnimationFrame(() => this.updateCursorFromTextarea());
   }
 
+  private applyTextEditWithUndo(
+    ta: HTMLTextAreaElement,
+    start: number,
+    end: number,
+    replacement: string,
+    selStart: number,
+    selEnd: number,
+    nextValue: string
+  ) {
+    try {
+      ta.focus();
+      let applied = false;
+      try {
+        ta.setSelectionRange(start, end);
+        if (typeof document !== "undefined" && typeof (document as any).execCommand === "function") {
+          applied = (document as any).execCommand("insertText", false, replacement);
+        }
+      } catch {
+        applied = false;
+      }
+      if (!applied && typeof ta.setRangeText === "function") {
+        ta.setSelectionRange(start, end);
+        ta.setRangeText(replacement, start, end, "preserve");
+      } else {
+        ta.value = nextValue;
+      }
+      ta.setSelectionRange(selStart, selEnd);
+      try {
+        const evt = new InputEvent("input", { bubbles: true, cancelable: false, inputType: "insertText", data: replacement });
+        ta.dispatchEvent(evt);
+      } catch {
+        // ignore if InputEvent unsupported
+      }
+    } catch (err) {
+      console.warn("applyTextEditWithUndo failed, fallback", err);
+      ta.value = nextValue;
+      ta.setSelectionRange(selStart, selEnd);
+    }
+    this.markDirty(nextValue);
+    requestAnimationFrame(() => this.updateCursorFromTextarea());
+  }
+
   private handleEditorKeyDown(e: KeyboardEvent) {
     if ((e.key === "s" || e.key === "S") && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
@@ -813,7 +1019,7 @@ export class AppRoot extends LitElement {
     e.preventDefault();
     const ta = this.editorRef;
     const value = this.content;
-    const indent = "  ";
+    const indent = this.indentUnit;
     const start = ta.selectionStart ?? 0;
     const end = ta.selectionEnd ?? start;
     const newlineMatch = value.match(/\r\n/);
@@ -835,14 +1041,7 @@ export class AppRoot extends LitElement {
       const newValue = `${value.slice(0, blockStart)}${newBlock}${value.slice(endLineBreak)}`;
       const newStart = start + indent.length;
       const newEnd = end + indent.length * lines.length;
-      this.markDirty(newValue);
-      requestAnimationFrame(() => {
-        if (!this.editorRef) return;
-        this.editorRef.selectionStart = newStart;
-        this.editorRef.selectionEnd = newEnd;
-        this.editorRef.focus();
-        this.updateCursorFromTextarea();
-      });
+      this.applyTextEditWithUndo(ta, blockStart, endLineBreak, newBlock, newStart, newEnd, newValue);
       return true;
     }
 
@@ -870,14 +1069,7 @@ export class AppRoot extends LitElement {
     const newValue = `${value.slice(0, blockStart)}${newBlock}${value.slice(endLineBreak)}`;
     const newStart = Math.max(blockStart, start - removedFirst);
     const newEnd = Math.max(newStart, end - totalRemoved);
-    this.markDirty(newValue);
-    requestAnimationFrame(() => {
-      if (!this.editorRef) return;
-      this.editorRef.selectionStart = newStart;
-      this.editorRef.selectionEnd = newEnd;
-      this.editorRef.focus();
-      this.updateCursorFromTextarea();
-    });
+    this.applyTextEditWithUndo(ta, blockStart, endLineBreak, newBlock, newStart, newEnd, newValue);
     return true;
   }
 
@@ -926,7 +1118,43 @@ export class AppRoot extends LitElement {
   private closeContextMenu() {
     if (this.contextMenuOpen) {
       this.contextMenuOpen = false;
+      this.contextMenuX = 0;
+      this.contextMenuY = 0;
     }
+    if (this.treeMenuOpen) {
+      this.treeMenuOpen = false;
+      this.treeMenuX = 0;
+      this.treeMenuY = 0;
+      this.treeMenuPath = null;
+      this.treeMenuType = null;
+      this.treeMenuFromBlank = false;
+    }
+  }
+
+  private createFromContext(kind: "file" | "folder") {
+    if (!this.treeMenuPath || this.treeMenuType !== "dir") return;
+    this.setActiveSelection(this.treeMenuPath, true);
+    this.newItemKind = kind;
+    this.newItemName = "";
+    this.newItemExt = "";
+    this.closeContextMenu();
+  }
+
+  private handleTreeBlankContextMenu(e: MouseEvent) {
+    const target = e.target as HTMLElement | null;
+    const insideItem = target?.closest?.(".treeRow");
+    if (insideItem) return;
+    e.preventDefault();
+    const path = this.normalizeDir(this.activeDir || "/");
+    this.treeMenuOpen = true;
+    this.treeMenuX = e.clientX;
+    this.treeMenuY = e.clientY;
+    this.treeMenuPath = path;
+    this.treeMenuType = "dir";
+    this.treeMenuFromBlank = true;
+    this.contextMenuOpen = false;
+    this.openMenu = null;
+    this.closeSuggestions();
   }
 
   private async handleCopyCut(action: "copy" | "cut") {
@@ -1204,6 +1432,27 @@ export class AppRoot extends LitElement {
     this.activeIndentSegmentId = seg ? seg.id : null;
   }
 
+  private async notifyFsChanged() {
+    this.treeDirty = true;
+    if (this.activeActivity !== "explorer") return;
+    try {
+      await this.reloadTree(true);
+      this.treeDirty = false;
+    } catch (err) {
+      console.warn("notifyFsChanged reload failed", err);
+    }
+  }
+
+  private async ensureTreeFresh() {
+    if (!this.treeDirty) return;
+    try {
+      await this.reloadTree(true);
+      this.treeDirty = false;
+    } catch (err) {
+      console.warn("ensureTreeFresh reload failed", err);
+    }
+  }
+
   private toggleMenu(e: Event, name: string) {
     e.preventDefault();
     e.stopPropagation();
@@ -1260,6 +1509,7 @@ export class AppRoot extends LitElement {
       } else if (action === "Split view") {
         const next = !this.splitViewEnabled;
         this.splitViewEnabled = next;
+        this.scheduleSaveSession();
         if (!next) {
           this.compareEnabled = false;
           this.diffHunks = [];
@@ -1309,6 +1559,9 @@ export class AppRoot extends LitElement {
   }
 
   private switchTab(path: string) {
+    if (path !== this.activePath) {
+      this.captureActiveView();
+    }
     this.activePath = path;
     const cached = this.fileCache[path];
     if (cached !== undefined) {
@@ -1323,6 +1576,7 @@ export class AppRoot extends LitElement {
       requestAnimationFrame(() => {
         this.syncEditorOverlay();
         this.syncBaseOverlay();
+        this.applyViewForPath(path);
       });
       this.scheduleDiff();
     } else {
@@ -1331,7 +1585,10 @@ export class AppRoot extends LitElement {
       this.cursorLine = 1;
       this.cursorCol = 1;
       this.loadFile(path);
+      this.pendingViewApply[path] = this.tabs.find((t) => t.path === path)?.view || {};
+      requestAnimationFrame(() => this.applyViewForPath(path));
     }
+    this.scheduleSaveSession();
   }
 
   private renderMenu(label: string, name: string, items: { icon: string; label: string }[]) {
@@ -1369,8 +1626,207 @@ export class AppRoot extends LitElement {
     return window.matchMedia("(max-width: 900px)").matches;
   }
 
-  private setActivity(name: "explorer" | "search" | "entity" | "snippet" | "system" | "backup") {
+  private resetSessionStateInMemory() {
+    this.tabs = [];
+    this.activePath = null;
+    this.content = "";
+    this.fileCache = {};
+    this.savedBaseByPath = {};
+    this.openSnapshotByPath = {};
+    this.savedBaseText = "";
+    this.openSnapshotText = "";
+    this.restoredBufferCount = 0;
+    this.clearBufferTimer("");
+    this.bufferSaveTimers.clear();
+    this.dirtySessionToastShown = false;
+  }
+
+  private normalizeDir(path: string | null | undefined): string {
+    if (!path || path === "/") return "/";
+    const trimmed = path.endsWith("/") ? path.slice(0, -1) : path;
+    return trimmed || "/";
+  }
+
+  private setActiveSelection(path: string | null, isDir: boolean) {
+    this.activePath = path;
+    this.activeIsDir = isDir;
+    const dir = isDir
+      ? this.normalizeDir(path)
+      : this.normalizeDir(path && path.includes("/") ? path.split("/").slice(0, -1).join("/") : "/");
+    this.activeDir = dir;
+    // Debug: track active directory selection
+    console.debug("[tree] active selection", { path, isDir, activeDir: dir });
+  }
+
+  private scheduleSaveSession() {
+    if (this.restoringSession) return;
+    if (this.sessionSaveTimer !== null) {
+      clearTimeout(this.sessionSaveTimer);
+    }
+    this.sessionSaveTimer = window.setTimeout(() => {
+      this.sessionSaveTimer = null;
+      void this.saveSession();
+    }, 450);
+  }
+
+  private async saveSession() {
+    const payload = {
+      tabs: this.tabs.map((t) => ({
+        path: t.path,
+        dirty: !!t.dirty,
+        buffer_id: t.bufferId || null,
+        buffer_size: t.bufferSize ?? null,
+        last_edit_at: t.lastEditAt || null,
+        view: t.view || null,
+      })),
+      active: this.activePath ?? null,
+      split: !!this.splitViewEnabled,
+    };
+    try {
+      const res = await apiPutSession(this.apiBase, payload);
+      if (!res.ok) {
+        throw new Error(`session save ${res.status}`);
+      }
+    } catch (err) {
+      console.warn("saveSession failed", err);
+    }
+  }
+
+  private addRestoredTab(
+    path: string,
+    content: string,
+    dirty = false,
+    savedBase?: string,
+    bufferId?: string,
+    bufferSize?: number,
+    lastEditAt?: string,
+    view?: { scrollTop?: number; selStart?: number; selEnd?: number }
+  ) {
+    const name = path.split("/").pop() || path;
+    const existing = this.tabs.find((t) => t.path === path);
+    const nextTab = existing
+      ? { ...existing, dirty, bufferId, bufferSize, lastEditAt, view }
+      : { path, name, dirty, bufferId, bufferSize, lastEditAt, view };
+    this.tabs = existing
+      ? this.tabs.map((t) => (t.path === path ? nextTab : t))
+      : [...this.tabs, nextTab];
+    this.fileCache[path] = content;
+    this.savedBaseByPath[path] = savedBase !== undefined ? savedBase : content;
+    this.openSnapshotByPath[path] = savedBase !== undefined ? savedBase : content;
+  }
+
+  private activateRestoredTab(path: string) {
+    const cached = this.fileCache[path] ?? "";
+    this.setActiveSelection(path, false);
+    this.activePath = path;
+    this.content = cached;
+    this.lineCount = Math.max(1, cached.split("\n").length);
+    this.cursorLine = 1;
+    this.cursorCol = 1;
+    this.openSnapshotText = cached;
+    this.savedBaseText = cached;
+    this.diffHunks = [];
+    this.diffSummary = null;
+    requestAnimationFrame(() => {
+      this.syncEditorOverlay();
+      this.syncBaseOverlay();
+    });
+    this.scheduleDiff();
+  }
+
+  private async restoreSession() {
+    if (this.restoringSession) return;
+    this.restoringSession = true;
+    try {
+      const res = await apiGetSession(this.apiBase);
+      if (!res.ok) {
+        throw new Error(`session load ${res.status}`);
+      }
+      const data = await res.json();
+      const rawTabs = Array.isArray(data?.tabs) ? data.tabs : [];
+      const tabs = rawTabs
+        .map((t: any) => {
+          if (typeof t === "string") return { path: t, dirty: false };
+          if (t && typeof t.path === "string") return { path: t.path, dirty: !!t.dirty };
+          return null;
+        })
+        .filter((t: any) => t !== null) as { path: string; dirty: boolean }[];
+      const active = typeof data?.active === "string" ? data.active : null;
+      const split = typeof data?.split === "boolean" ? data.split : false;
+      const restored: string[] = [];
+      let hadDirty = false;
+      this.restoredBufferCount = 0;
+      for (const entry of tabs) {
+        const path = entry.path;
+        const wasDirty = !!entry.dirty;
+        const bufferId = typeof (entry as any).buffer_id === "string" ? (entry as any).buffer_id : (entry as any).bufferId;
+        const bufferSize = typeof (entry as any).buffer_size === "number" ? (entry as any).buffer_size : (entry as any).bufferSize;
+        try {
+          const fileRes = await apiGetFile(this.apiBase, path);
+          if (!fileRes.ok) {
+            console.warn("restoreSession: file not found, skip", path, fileRes.status);
+            continue;
+          }
+          const payload = await fileRes.json();
+          const diskContent = typeof payload?.content === "string" ? payload.content : "";
+          let effectiveContent = diskContent;
+          let usedBufferId: string | undefined;
+          let usedBufferSize: number | undefined = bufferSize;
+          if (wasDirty && bufferId) {
+            try {
+              const bufRes = await apiGetSessionBuffer(this.apiBase, bufferId);
+              if (bufRes.ok) {
+                const bufPayload = await bufRes.json();
+                const bufContent = typeof bufPayload?.content === "string" ? bufPayload.content : "";
+                effectiveContent = bufContent;
+                usedBufferId = bufferId;
+                usedBufferSize = new TextEncoder().encode(bufContent).length;
+                this.restoredBufferCount += 1;
+              } else {
+                console.warn("restoreSession: buffer not found for", path, bufferId, bufRes.status);
+              }
+            } catch (bufErr) {
+              console.warn("restoreSession: errore buffer", path, bufErr);
+            }
+          }
+          this.addRestoredTab(path, effectiveContent, wasDirty, diskContent, usedBufferId, usedBufferSize, entry.last_edit_at || entry.lastEditAt);
+          restored.push(path);
+          if (wasDirty) hadDirty = true;
+        } catch (err) {
+          console.warn("restoreSession: errore su file", path, err);
+        }
+      }
+      if (split) {
+        this.splitViewEnabled = true;
+      }
+      const targetActive = restored.find((p) => p === active) ?? restored[0] ?? null;
+      if (targetActive) {
+        this.activateRestoredTab(targetActive);
+      }
+      if (data?.corrupted) {
+        this.showToast("Sessione ripristinata ai valori predefiniti (session file corrotto)", "error");
+      }
+      if (hadDirty && !this.dirtySessionToastShown) {
+        this.showToast("Sessione precedente con modifiche non salvate. I file sono stati riaperti dalla versione su disco.");
+        this.dirtySessionToastShown = true;
+      }
+      if (this.restoredBufferCount > 0) {
+        this.showToast(`Ripristinati ${this.restoredBufferCount} file non salvati dalla sessione precedente`);
+      }
+    } catch (err) {
+      console.warn("restoreSession failed", err);
+      this.showToast("Sessione ripristinata ai valori predefiniti (errore)", "error");
+    } finally {
+      this.restoringSession = false;
+      this.scheduleSaveSession();
+    }
+  }
+
+  private setActivity(name: "explorer" | "search" | "entity" | "snippet" | "system" | "backup" | "utility") {
     this.activeActivity = name;
+    if (name === "explorer") {
+      void this.ensureTreeFresh();
+    }
     if (this.isNarrowLayout()) {
       this.sidebarOpen = true;
     }
@@ -1384,9 +1840,31 @@ export class AppRoot extends LitElement {
     this.showAboutModal = false;
   }
 
+  private async resetSession() {
+    if (this.utilityGenerating) return;
+    this.showResetSessionModal = false;
+    try {
+      const res = await apiResetSession(this.apiBase);
+      if (!res.ok) {
+        throw new Error(`reset ${res.status}`);
+      }
+      this.resetSessionStateInMemory();
+      this.status = "Session reset";
+      this.showToast("Sessione resettata");
+      this.reloadTree(true);
+    } catch (err) {
+      this.showToast("Errore reset sessione", "error");
+    }
+  }
+
   private renderSidebarContent() {
     if (this.activeActivity === "explorer") {
-      return html`<div class="tree">${this.renderTree("")}</div>`;
+      return html`<div class="tree">
+        <div class="treeScrollable" @contextmenu=${(e: Event) => this.handleTreeBlankContextMenu(e as MouseEvent)}>
+          ${this.renderTree("")}
+        </div>
+        <div class="treeTargetLabel">Target: ${this.activeDir || "/"}</div>
+      </div>`;
     }
     if (this.activeActivity === "search") {
       const summary = this.searchSummary;
@@ -1515,6 +1993,35 @@ export class AppRoot extends LitElement {
         </div>
       </div>`;
     }
+    if (this.activeActivity === "utility") {
+      return html`<div class="sidebarContent systemPane">
+        <div class="systemGrid">
+          <button
+            class="systemCard"
+            type="button"
+            ?disabled=${this.utilityGenerating}
+            @click=${() => this.generateDebugLog()}
+          >
+            <div class="systemCardTitle">
+              <span>🛠️</span>
+              <span>${this.utilityGenerating ? "Generazione..." : "Genera debug log"}</span>
+            </div>
+            <div class="systemCardDesc">Crea un file di debug in /config/.fep-config con info di sistema e log Supervisor.</div>
+          </button>
+          <button
+            class="systemCard"
+            type="button"
+            @click=${() => (this.showResetSessionModal = true)}
+          >
+            <div class="systemCardTitle">
+              <span>♻️</span>
+              <span>Reset session</span>
+            </div>
+            <div class="systemCardDesc">Cancella tabs salvati e buffer, chiude tutte le schede.</div>
+          </button>
+        </div>
+      </div>`;
+    }
     if (this.activeActivity === "system") {
       const actions = [
         {
@@ -1587,11 +2094,17 @@ export class AppRoot extends LitElement {
       this.fileCache[this.activePath] = this.content;
       this.savedBaseByPath[this.activePath] = this.content;
       this.savedBaseText = this.content;
-      this.tabs = this.tabs.map((t) =>
-        t.path === this.activePath ? { ...t, dirty: false } : t
-      );
-      this.scheduleDiff();
-      requestAnimationFrame(() => this.syncBaseOverlay());
+      this.clearBufferTimer(this.activePath);
+    this.tabs = this.tabs.map((t) =>
+      t.path === this.activePath
+        ? { ...t, dirty: false, bufferId: undefined, bufferSize: undefined, lastEditAt: undefined }
+        : t
+    );
+    this.captureActiveView();
+    this.scheduleDiff();
+    requestAnimationFrame(() => this.syncBaseOverlay());
+    await this.notifyFsChanged();
+    this.scheduleSaveSession();
       this.status = "Saved";
       setTimeout(() => (this.status = "Ready"), 800);
     } catch (e) {
@@ -1688,6 +2201,7 @@ export class AppRoot extends LitElement {
               <div class="act ${this.activeActivity === "entity" ? "active" : ""}" title="Entity" @click=${() => this.setActivity("entity")}>🗂️</div>
               <div class="act ${this.activeActivity === "snippet" ? "active" : ""}" title="Snippet" @click=${() => this.setActivity("snippet")}>📜</div>
               <div class="act ${this.activeActivity === "backup" ? "active" : ""}" title="Backup" @click=${() => this.setActivity("backup")}>💾</div>
+              <div class="act ${this.activeActivity === "utility" ? "active" : ""}" title="Utility" @click=${() => this.setActivity("utility")}>🛠️</div>
             </div>
             <div class="activityGroup bottom">
               <div class="act ${this.activeActivity === "system" ? "active" : ""}" title="System" @click=${() => this.setActivity("system")}>
@@ -1711,7 +2225,9 @@ export class AppRoot extends LitElement {
                         ? "Snippet"
                         : this.activeActivity === "backup"
                           ? "Backup"
-                          : "System"}
+                          : this.activeActivity === "utility"
+                            ? "Utility"
+                            : "System"}
               </div>
               <button class="sidebarClose" title="Close" @click=${() => (this.sidebarOpen = false)}>✕</button>
             </div>
@@ -1861,14 +2377,24 @@ export class AppRoot extends LitElement {
               style="top:${this.treeMenuY}px; left:${this.treeMenuX}px;"
               @click=${(e: Event) => e.stopPropagation()}
             >
-              <div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
-              <div
-                class="contextMenuItem ${this.treeClipboard ? "" : "disabled"}"
-                @click=${() => this.pasteTreeItem()}
-              >
-                📥 Incolla
-              </div>
-              <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}>🗑️ Elimina</div>
+              ${this.treeMenuType === "dir"
+                ? html`<div class="contextMenuItem" @click=${() => this.createFromContext("file")}>
+                      📄 New File ${this.treeMenuFromBlank ? "" : "here"}
+                    </div>
+                    <div class="contextMenuItem" @click=${() => this.createFromContext("folder")}>
+                      📁 New Folder ${this.treeMenuFromBlank ? "" : "here"}
+                    </div>`
+                : nothing}
+              ${!this.treeMenuFromBlank
+                ? html`<div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
+                    <div
+                      class="contextMenuItem ${this.treeClipboard ? "" : "disabled"}"
+                      @click=${() => this.pasteTreeItem()}
+                    >
+                      📥 Incolla
+                    </div>
+                    <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}>🗑️ Elimina</div>`
+                : nothing}
             </div>`
           : nothing}
 
@@ -2106,6 +2632,21 @@ export class AppRoot extends LitElement {
                   <button class="btn" @click=${() => this.cancelUnsavedModal()}>Annulla</button>
                   <button class="btn" @click=${() => this.confirmUnsavedDiscard()}>Non salvare</button>
                   <button class="btn primary" @click=${() => this.confirmUnsavedSave()}>Salva</button>
+                </div>
+              </div>
+            </div>`
+          : nothing}
+
+        ${this.showResetSessionModal
+          ? html`<div class="modalBackdrop" @click=${() => (this.showResetSessionModal = false)}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:460px;">
+                <h3>Reset session</h3>
+                <p style="margin-top:8px; color:var(--muted-color);">
+                  Questo chiuderà tutte le schede e cancellerà la sessione salvata (session.json e buffer).
+                </p>
+                <div class="actions">
+                  <button class="btn" @click=${() => (this.showResetSessionModal = false)}>Annulla</button>
+                  <button class="btn primary" @click=${() => this.resetSession()}>Reset</button>
                 </div>
               </div>
             </div>`

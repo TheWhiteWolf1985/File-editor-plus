@@ -9,6 +9,10 @@ import time
 import logging
 import uuid
 import re
+import socket
+import platform
+import hashlib
+from logging.handlers import RotatingFileHandler
 import tempfile
 import zipfile
 from datetime import datetime
@@ -26,13 +30,16 @@ BASE_DIR = Path("/config").resolve()
 BACKUP_DIR = (BASE_DIR / ".fep-backups").resolve()
 FRONTEND_DIR = Path("/app/frontend").resolve()
 FEP_CONFIG_DIR = (BASE_DIR / ".fep-config").resolve()
+BUFFER_DIR = (FEP_CONFIG_DIR / "session_buffers").resolve()
 SNIPPET_DIR = FEP_CONFIG_DIR
 SNIPPET_FILE = SNIPPET_DIR / "snippets.json"
 USER_CONFIG_FILE = FEP_CONFIG_DIR / "user_config.json"
+SESSION_FILE = FEP_CONFIG_DIR / "session.json"
 LEGACY_SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
 LEGACY_USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
 MDI_META_FILE = (Path(__file__).parent / "mdi_meta.json").resolve()
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
+ADDON_VERSION = os.environ.get("ADDON_VERSION") or os.environ.get("VERSION") or "unknown"
 logger = logging.getLogger("file_editor_plus")
 MAX_FORMAT_SIZE = 2 * 1024 * 1024  # 2MB
 MAX_SEARCH_FILE_SIZE = 2 * 1024 * 1024  # 2MB per file
@@ -58,6 +65,9 @@ DEFAULT_USER_CONFIG = {
     "toolbar_visible": True,
     "show_indent_guides": False,
 }
+DEFAULT_SESSION_STATE = {"tabs": [], "active": None, "split": False}
+MAX_BUFFER_BYTES = 256 * 1024  # 256KB
+MAX_BUFFER_FILES = 10
 HA_ACTIONS = {
     "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_core_config"},
     "restart_core": {"type": "service", "domain": "homeassistant", "service": "restart"},
@@ -306,6 +316,7 @@ def search_mdi(query: str, limit: int) -> List[dict]:
 
 def ensure_config_store() -> None:
     FEP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    BUFFER_DIR.mkdir(parents=True, exist_ok=True)
     if LEGACY_SNIPPET_DIR.exists() and not SNIPPET_DIR.exists():
         try:
             shutil.move(str(LEGACY_SNIPPET_DIR), str(SNIPPET_DIR))
@@ -333,6 +344,28 @@ def ensure_user_config() -> None:
         except Exception as e:
             logger.exception("user_config: errore creazione %s: %s", USER_CONFIG_FILE, e)
             raise HTTPException(500, f"Errore creazione user_config: {e}")
+
+
+def setup_file_logging() -> None:
+    ensure_config_store()
+    log_path = FEP_CONFIG_DIR / "fep_runtime.log"
+    existing = [
+        h for h in logger.handlers if isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", None) == str(log_path)
+    ]
+    if existing:
+        return
+    handler = RotatingFileHandler(log_path, maxBytes=2 * 1024 * 1024, backupCount=3, encoding="utf-8")
+    fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    handler.setFormatter(fmt)
+    handler.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    if logger.level == logging.NOTSET:
+        logger.setLevel(logging.INFO)
+    logger.propagate = False
+    logger.info("fep runtime log initialized at %s", log_path)
+
+
+setup_file_logging()
 
 
 def load_user_config() -> dict:
@@ -367,6 +400,46 @@ def normalize_user_config(data: dict) -> dict:
         if value is not None:
             out[key] = value
     return out
+
+
+def normalize_session(data: dict) -> dict:
+    tabs_raw = data.get("tabs") if isinstance(data, dict) else []
+    tabs: List[dict] = []
+    if isinstance(tabs_raw, list):
+        for item in tabs_raw:
+            if isinstance(item, str):
+                tabs.append({"path": item, "dirty": False})
+            elif isinstance(item, dict) and isinstance(item.get("path"), str):
+                tab_entry = {
+                    "path": item["path"],
+                    "dirty": bool(item.get("dirty", False)),
+                }
+                if isinstance(item.get("buffer_id"), str):
+                    tab_entry["buffer_id"] = item["buffer_id"]
+                if isinstance(item.get("buffer_size"), int):
+                    tab_entry["buffer_size"] = item["buffer_size"]
+                if isinstance(item.get("last_edit_at"), str):
+                    tab_entry["last_edit_at"] = item["last_edit_at"]
+                view = item.get("view")
+                if isinstance(view, dict):
+                    st = view.get("scrollTop")
+                    ss = view.get("selStart")
+                    se = view.get("selEnd")
+                    view_clean = {}
+                    if isinstance(st, int):
+                        view_clean["scrollTop"] = st
+                    if isinstance(ss, int):
+                        view_clean["selStart"] = ss
+                    if isinstance(se, int):
+                        view_clean["selEnd"] = se
+                    if view_clean:
+                        tab_entry["view"] = view_clean
+                tabs.append(tab_entry)
+    active = data.get("active") if isinstance(data, dict) else None
+    active_clean = active if isinstance(active, str) else None
+    split_raw = data.get("split") if isinstance(data, dict) else False
+    split_clean = bool(split_raw) if isinstance(split_raw, bool) else False
+    return {"tabs": tabs, "active": active_clean, "split": split_clean}
 
 
 def ensure_snippet_store() -> None:
@@ -835,6 +908,171 @@ async def ha_action(request: Request):
     except Exception as e:
         logger.exception("ha_action: error on %s: %s", action, e)
         raise HTTPException(500, f"Error calling Home Assistant: {e}")
+
+
+async def supervisor_get_json(path: str):
+    if not SUPERVISOR_TOKEN:
+        return None, "missing supervisor token"
+    try:
+        async with httpx.AsyncClient(base_url="http://supervisor", timeout=15) as client:
+            res = await client.get(path, headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"})
+            res.raise_for_status()
+            return res.json(), None
+    except Exception as e:
+        logger.warning("supervisor_get_json %s failed: %s", path, e)
+        return None, str(e)
+
+
+async def supervisor_get_text(path: str, accept: str = "text/plain"):
+    if not SUPERVISOR_TOKEN:
+        return None, "missing supervisor token"
+    headers = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}"}
+    headers["X-Supervisor-Token"] = SUPERVISOR_TOKEN
+    if accept:
+        headers["Accept"] = accept
+    try:
+        async with httpx.AsyncClient(base_url="http://supervisor", timeout=30) as client:
+            res = await client.get(path, headers=headers)
+            if res.status_code in (401, 403):
+                return None, f"HTTP {res.status_code} (unauthorized)"
+            res.raise_for_status()
+            return res.text, None
+    except Exception as e:
+        logger.warning("supervisor_get_text %s failed: %s", path, e)
+        return None, str(e)
+
+
+def mask_secrets(text: str) -> str:
+    if not text:
+        return text
+    masked = text
+    if SUPERVISOR_TOKEN:
+        masked = masked.replace(SUPERVISOR_TOKEN, "***")
+    masked = re.sub(r"Bearer\s+[A-Za-z0-9._\-]+", "Bearer ***", masked, flags=re.IGNORECASE)
+    return masked
+
+
+@app.post("/api/utils/debug-log")
+async def generate_debug_log():
+    ensure_config_store()
+    setup_file_logging()
+    timestamp = datetime.now()
+    ts_short = timestamp.strftime("%Y-%m-%d %H:%M:%S")
+    fname = timestamp.strftime("debug_%Y-%m-%d_%H-%M-%S.txt")
+    target = safe_path(f".fep-config/{fname}")
+
+    hostname = socket.gethostname()
+    arch = platform.machine() or os.uname().machine
+    lines = []
+    lines.append(f"File Editor Plus debug log - {ts_short}")
+    lines.append(f"Addon version: {ADDON_VERSION}")
+    lines.append(f"Host: {hostname} | Arch: {arch}")
+    lines.append("")
+
+    sections = []
+
+    def add_section(title: str, content: str):
+        sections.append(f"== {title} ==")
+        sections.append(content)
+        sections.append("")
+
+    def clean_err(val: Optional[str]) -> str:
+        return mask_secrets(val) if val else ""
+
+    headers = None
+    if SUPERVISOR_TOKEN:
+        headers = {"Authorization": f"Bearer {SUPERVISOR_TOKEN}", "X-Supervisor-Token": SUPERVISOR_TOKEN}
+
+    async def fetch_json(client: httpx.AsyncClient, path: str):
+        try:
+            res = await client.get(path)
+            status = res.status_code
+            if status >= 400:
+                return None, f"HTTP {status} {res.text}", status
+            return res.json(), None, status
+        except Exception as e:
+            return None, str(e), None
+
+    async def fetch_text(client: httpx.AsyncClient, path: str):
+        try:
+            res = await client.get(path, headers={"Accept": "text/plain"})
+            status = res.status_code
+            if status >= 400:
+                return None, f"HTTP {status} {res.text}", status
+            return res.text, None, status
+        except Exception as e:
+            return None, str(e), None
+
+    sup_info = (None, "missing supervisor token", None)
+    core_info = (None, "missing supervisor token", None)
+    host_info = (None, "missing supervisor token", None)
+    os_info = (None, "missing supervisor token", None)
+    sup_logs = (None, "missing supervisor token", None)
+    core_logs = (None, "missing supervisor token", None)
+
+    if headers:
+        async with httpx.AsyncClient(base_url="http://supervisor", timeout=30, headers=headers) as client:
+            sup_info = await fetch_json(client, "/supervisor/info")
+            core_info = await fetch_json(client, "/core/info")
+            os_info = await fetch_json(client, "/os/info")
+            host_info = await fetch_json(client, "/host/info")
+            sup_logs = await fetch_text(client, "/supervisor/logs?lines=200")
+            core_logs = await fetch_text(client, "/core/logs?lines=200")
+
+    sup_info_data, sup_info_err, sup_info_status = sup_info
+    core_info_data, core_info_err, core_info_status = core_info
+    os_info_data, os_info_err, _ = os_info
+    host_info_data, host_info_err, _ = host_info
+
+    add_section("Home Assistant Core info", json.dumps(core_info_data, ensure_ascii=False, indent=2) if core_info_data else f"FAILED: {clean_err(core_info_err)}")
+    add_section("Supervisor info", json.dumps(sup_info_data, ensure_ascii=False, indent=2) if sup_info_data else f"FAILED: {clean_err(sup_info_err)}")
+    add_section("OS info", json.dumps(os_info_data, ensure_ascii=False, indent=2) if os_info_data else f"FAILED: {clean_err(os_info_err)}")
+    add_section("Host info", json.dumps(host_info_data, ensure_ascii=False, indent=2) if host_info_data else f"FAILED: {clean_err(host_info_err)}")
+
+    sup_logs_text, sup_logs_err, sup_logs_status = sup_logs
+    if sup_logs_text:
+        tail = "\n".join(sup_logs_text.splitlines()[-300:])
+        add_section("Supervisor logs (last 300 lines)", mask_secrets(tail))
+    else:
+        if sup_logs_status == 403:
+            msg = "FORBIDDEN 403 – allega manualmente i log Supervisor dalla UI"
+        elif sup_info_status and sup_info_status < 400:
+            msg = f"FAILED logs: HTTP {sup_logs_status or ''} {clean_err(sup_logs_err) or ''}".strip()
+        else:
+            msg = f"FAILED: {clean_err(sup_logs_err) or f'HTTP {sup_logs_status}'}"
+        add_section("Supervisor logs", msg)
+
+    core_logs_text, core_logs_err, core_logs_status = core_logs
+    if core_logs_text:
+        tail_core = "\n".join(core_logs_text.splitlines()[-300:])
+        add_section("Core logs (last 300 lines)", mask_secrets(tail_core))
+    else:
+        if core_logs_status == 403:
+            msg = "FORBIDDEN 403 – allega manualmente i log Supervisor dalla UI"
+        else:
+            msg = f"FAILED: {clean_err(core_logs_err) or f'HTTP {core_logs_status}'}"
+        add_section("Core logs", msg)
+
+    runtime_log = FEP_CONFIG_DIR / "fep_runtime.log"
+    if runtime_log.exists():
+        try:
+            with open(runtime_log, "r", encoding="utf-8", errors="ignore") as f:
+                lines_log = f.read().splitlines()
+            tail_app = mask_secrets("\n".join(lines_log[-300:]))
+            add_section("App logs (tail 300)", tail_app)
+        except Exception as e:
+            add_section("App logs", f"FAILED lettura fep_runtime.log: {e}")
+    else:
+        add_section("App logs", "MISSING: fep_runtime.log non trovato")
+
+    content = "\n".join(lines + sections)
+    try:
+        atomic_write(target, content)
+    except Exception as e:
+        logger.exception("debug-log: error writing %s: %s", target, e)
+        raise HTTPException(500, f"Errore salvataggio debug log: {e}")
+
+    return {"ok": True, "filename": fname, "path": str(target)}
 @app.post("/api/folder")
 def create_folder(path: str):
     target = safe_path(path)
@@ -1137,6 +1375,156 @@ async def update_user_config(request: Request):
         raise HTTPException(400, "Config must be an object")
     save_user_config(config)
     return {"ok": True, "config": load_user_config()}
+
+
+def load_session_state() -> dict:
+    ensure_config_store()
+    target = safe_path(".fep-config/session.json")
+    if not target.exists():
+        return DEFAULT_SESSION_STATE.copy()
+    try:
+        with open(target, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except Exception as e:
+        logger.warning("session: errore lettura %s: %s", target, e)
+        try:
+            broken = target.with_name(f"session.broken_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+            shutil.move(str(target), broken)
+        except Exception as move_err:
+            logger.warning("session: impossibile rinominare session corrotta: %s", move_err)
+        state = DEFAULT_SESSION_STATE.copy()
+        state["corrupted"] = True
+        return state
+    if not isinstance(raw, dict):
+        state = DEFAULT_SESSION_STATE.copy()
+        state["corrupted"] = True
+        return state
+    normalized = normalize_session(raw)
+    if "corrupted" not in normalized:
+        normalized["corrupted"] = False
+    return normalized
+
+
+def save_session_state(data: dict) -> None:
+    ensure_config_store()
+    target = safe_path(".fep-config/session.json")
+    normalized = normalize_session(data)
+    try:
+        atomic_write(target, json.dumps(normalized, ensure_ascii=False, indent=2))
+        # cleanup buffer files not referenced
+        try:
+            keep_ids = {t.get("buffer_id") for t in normalized.get("tabs", []) if isinstance(t, dict) and t.get("buffer_id")}
+            for f in BUFFER_DIR.glob("*.txt"):
+                buf_id = f.stem
+                if buf_id not in keep_ids:
+                    f.unlink(missing_ok=True)
+        except Exception as gc_err:
+            logger.warning("session: buffer gc skipped: %s", gc_err)
+    except Exception as e:
+        logger.exception("session: errore salvataggio %s: %s", target, e)
+        raise HTTPException(500, f"Errore salvataggio sessione: {e}")
+
+
+@app.get("/api/session")
+def get_session():
+    return load_session_state()
+
+
+@app.put("/api/session")
+async def put_session(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "Body JSON richiesto")
+    if not isinstance(payload, dict):
+        raise HTTPException(400, "Session deve essere un oggetto")
+    tabs = payload.get("tabs")
+    if tabs is not None:
+        if not isinstance(tabs, list):
+            raise HTTPException(400, "tabs deve essere una lista")
+        for item in tabs:
+            if isinstance(item, str):
+                continue
+            if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+                raise HTTPException(400, "Ogni tab deve essere string o object {path,dirty}")
+            if "dirty" in item and not isinstance(item.get("dirty"), bool):
+                raise HTTPException(400, "dirty deve essere boolean")
+            if "view" in item and not isinstance(item.get("view"), dict):
+                raise HTTPException(400, "view deve essere un oggetto")
+            if isinstance(item.get("view"), dict):
+                v = item.get("view")
+                for key in ("scrollTop", "selStart", "selEnd"):
+                    if key in v and not isinstance(v.get(key), int):
+                        raise HTTPException(400, f"view.{key} deve essere int")
+    active = payload.get("active")
+    if active is not None and not isinstance(active, str):
+        raise HTTPException(400, "active deve essere string o null")
+    if "split" in payload and not isinstance(payload.get("split"), bool):
+        raise HTTPException(400, "split deve essere boolean")
+    save_session_state(payload)
+    return {"ok": True}
+
+
+@app.put("/api/session/buffer")
+async def put_session_buffer(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "Body JSON richiesto")
+    if not isinstance(payload, dict):
+        raise HTTPException(400, "Body deve essere un oggetto")
+    path = payload.get("path")
+    content = payload.get("content", "")
+    if not isinstance(path, str):
+        raise HTTPException(400, "path richiesto (string)")
+    if not isinstance(content, str):
+        raise HTTPException(400, "content deve essere string")
+    encoded = content.encode("utf-8")
+    if len(encoded) > MAX_BUFFER_BYTES:
+        return {"ok": False, "skipped": True, "reason": "too_large", "max": MAX_BUFFER_BYTES}
+    buffer_id = hashlib.sha1(path.encode("utf-8")).hexdigest()
+    target = BUFFER_DIR / f"{buffer_id}.txt"
+    try:
+        atomic_write(target, content)
+    except Exception as e:
+        logger.exception("session buffer: errore salvataggio %s: %s", target, e)
+        raise HTTPException(500, f"Errore salvataggio buffer: {e}")
+    return {"ok": True, "buffer_id": buffer_id, "size": len(encoded)}
+
+
+@app.get("/api/session/buffer/{buffer_id}")
+def get_session_buffer(buffer_id: str):
+    if not re.fullmatch(r"[a-fA-F0-9]{40}", buffer_id or ""):
+        raise HTTPException(400, "buffer_id non valido")
+    target = BUFFER_DIR / f"{buffer_id}.txt"
+    if not target.exists():
+        raise HTTPException(404, "Buffer not found")
+    try:
+        content = target.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        raise HTTPException(500, f"Errore lettura buffer: {e}")
+    return {"ok": True, "content": content}
+
+
+@app.post("/api/session/reset")
+def reset_session():
+    ensure_config_store()
+    # elimina session.json
+    try:
+        session_path = safe_path(".fep-config/session.json")
+        session_path.unlink(missing_ok=True)
+    except Exception as e:
+        logger.warning("session reset: errore rimozione session.json: %s", e)
+    # elimina buffer files
+    try:
+        for f in BUFFER_DIR.glob("*.txt"):
+            try:
+                f.unlink(missing_ok=True)
+            except Exception:
+                continue
+    except Exception as e:
+        logger.warning("session reset: errore pulizia buffer: %s", e)
+    return {"ok": True}
 
 
 @app.post("/api/format/yaml")

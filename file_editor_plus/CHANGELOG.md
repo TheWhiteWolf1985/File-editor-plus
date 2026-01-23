@@ -1,15 +1,16 @@
 # Changelog
 
-## 0.2.14
+## 0.2.22
 
-- 🛠️ Compatibilità: estesa la matrice di build per includere ARM64/aarch64 (preparazione release multi-arch).
+- 🔄 Fix Undo: l’indent/outdent con Tab/Shift+Tab è registrato nello stack Undo nativo, quindi Ctrl+Z/Undo annullano l’azione in un solo passo.
 
-## 0.2.12
+## 0.2.21
 
-- 🧰 **Toolbar** (View → Menù strumenti): comandi rapidi **Save, Save all, Undo, Redo, Search, Replace, Indent, Split, Compare**. Preferenza persistente; i 3 pulsanti nella **crumbs** vengono nascosti quando la toolbar è attiva.
-- 🧭 **Indent guides** (View → Indent guides): guide leggere e “pulite” (niente effetto pagina a righe), con guida attiva e segmentazione corretta per blocchi.
-- 🎨 **Editor/tema**: selezione e caret ora theme-aware (light/dark) per mantenere l’overlay sempre leggibile; migliorata anche la colorazione chiavi.
-- ⌨️ **Tab/Shift+Tab**: indent/outdent su selezione senza cancellare testo, con selezione mantenuta.
-- 💾 **Modifiche non salvate**: modale su cambio file (Salva/Non salvare/Annulla) + warning in chiusura/refresh tab.
-- 🪢 **Stabilità overlay**: fix allineamenti gutter/textarea/overlay con indent guides.
-- 🐛 Fix: GitHub **#7**, **#8** + improvements **#9**, **#10**.
+- ⌨️ Undo Tab: l’indent/outdent con Tab/Shift+Tab ora è undoable (Ctrl+Z) grazie a edit undo-friendly sulla textarea.
+- 🗂️ Session restore completo: tab/attivo/split persistiti, flag dirty e buffer non salvati (con limiti) ripristinati con avvisi e reset sicuro della sessione.
+- 📍 Stato editor per tab: caret/selection e scroll vengono salvati e ripristinati all’apertura del tab.
+- ♻️ Reset session: comando in Utility per cancellare session.json e buffer, con fallback automatico se il file sessione è corrotto.
+- Issue [#11](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/11) Testing
+- Issue [#12](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/12) Testing
+- Issue [#13](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/13) Testing
+- Issue [#14](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/14) Testing

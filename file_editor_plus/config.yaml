@@ -1,5 +1,5 @@
 name: "File Editor Plus"
-version: "0.2.14"
+version: "0.2.22"
 slug: "file_editor_plus"
 description: "Pro File Editor for Home Assistant"
 arch:
@@ -12,6 +12,7 @@ boot: auto
 init: false
 homeassistant_api: true
 hassio_api: true
+hassio_role: admin
 
 ingress: true
 ingress_port: 8099

@@ -483,6 +483,9 @@ export const appStyles = css`
       flex: 1;
       min-height: 0;
     }
+    .treeScrollable {
+      min-height: 100%;
+    }
     .treeRow {
       display: flex;
       align-items: center;
@@ -498,6 +501,10 @@ export const appStyles = css`
     .treeRow.active {
       background: var(--tree-active);
     }
+    .treeRow.targetDir {
+      box-shadow: inset 3px 0 var(--accent-color);
+      background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+    }
     .indent {
       width: 14px;
       flex: 0 0 14px;
@@ -509,6 +516,15 @@ export const appStyles = css`
     }
     .muted {
       opacity: 0.8;
+    }
+    .treeTargetLabel {
+      margin-top: 8px;
+      padding: 4px 8px;
+      font-size: var(--font-size-xs);
+      color: var(--muted-color);
+      background: var(--panel-strong);
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
     }
 
     /* Editor */
