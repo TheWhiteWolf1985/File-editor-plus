@@ -92,6 +92,7 @@ export function handleTreeContextMenu(this: any, e: MouseEvent, item: TreeItem) 
   this.treeMenuY = e.clientY;
   this.treeMenuPath = item.path;
   this.treeMenuType = item.type;
+   this.treeMenuFromBlank = false;
   this.contextMenuOpen = false;
   this.openMenu = null;
   this.closeSuggestions();
@@ -203,7 +204,8 @@ export async function reloadTreePath(this: any, path: string) {
 
 export async function createNewItem(this: any) {
   if (!this.newItemKind) return;
-  const dir = this.activePath && this.activePath.includes("/") ? this.activePath.split("/").slice(0, -1).join("/") : "";
+  const dirBase = this.activeDir && this.activeDir !== "/" ? this.activeDir : "";
+  const dir = dirBase;
   if (this.newItemKind === "file") {
     const base = this.newItemName.trim();
     const ext = this.newItemExt.trim();
@@ -316,14 +318,19 @@ export function renderTree(this: any, path: string, depth = 0) {
     const isDir = it.type === "dir";
     const isExpanded = isDir && this.expanded.has(it.path);
     const active = this.activePath === it.path;
+    const targetDir = isDir && this.activeDir === it.path;
 
     return html`
       <div
-        class="treeRow ${active ? "active" : ""}"
+        class="treeRow ${active ? "active" : ""} ${targetDir ? "targetDir" : ""}"
         style="padding-left:${8 + depth * 14}px"
         @click=${() => {
-          if (isDir) this.toggleDir(it.path);
-          else this.requestOpenFile(it.path);
+          if (isDir) {
+            this.setActiveSelection(it.path, true);
+            this.toggleDir(it.path);
+          } else {
+            this.requestOpenFile(it.path);
+          }
         }}
         @contextmenu=${(e: MouseEvent) => this.handleTreeContextMenu(e, it)}
       >

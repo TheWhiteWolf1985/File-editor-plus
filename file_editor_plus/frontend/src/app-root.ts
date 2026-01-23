@@ -101,6 +101,8 @@ export class AppRoot extends LitElement {
     activeActivity: { state: true },
     toastMessage: { state: true },
     toastType: { state: true },
+    activeIsDir: { state: true },
+    activeDir: { state: true },
     entityFilter: { state: true },
     entities: { state: true },
     entityError: { state: true },
@@ -154,6 +156,7 @@ export class AppRoot extends LitElement {
     treeMenuY: { state: true },
     treeMenuPath: { state: true },
     treeMenuType: { state: true },
+    treeMenuFromBlank: { state: true },
     showTreeDeleteModal: { state: true },
     deleteTargetPath: { state: true },
     deleteTargetType: { state: true },
@@ -183,6 +186,8 @@ export class AppRoot extends LitElement {
   declare activeActivity: "explorer" | "search" | "entity" | "snippet" | "system" | "backup" | "utility";
   declare toastMessage: string | null;
   declare toastType: "info" | "error";
+  declare activeIsDir: boolean;
+  declare activeDir: string;
   declare entityFilter: string;
   declare entities: Record<string, HassState>;
   declare entityError: string | null;
@@ -237,6 +242,7 @@ export class AppRoot extends LitElement {
   declare treeMenuY: number;
   declare treeMenuPath: string | null;
   declare treeMenuType: "file" | "dir" | null;
+  declare treeMenuFromBlank: boolean;
   declare showTreeDeleteModal: boolean;
   declare deleteTargetPath: string | null;
   declare deleteTargetType: "file" | "dir" | null;
@@ -375,6 +381,8 @@ export class AppRoot extends LitElement {
     this.entityFilter = "";
     this.entities = {};
     this.entityError = null;
+    this.activeIsDir = false;
+    this.activeDir = "/";
     this.collapsedDomains = new Set<string>();
     this.autoIndentEnabled = true;
     this.toolbarVisible = true;
@@ -426,6 +434,7 @@ export class AppRoot extends LitElement {
     this.treeMenuY = 0;
     this.treeMenuPath = null;
     this.treeMenuType = null;
+    this.treeMenuFromBlank = false;
     this.showTreeDeleteModal = false;
     this.deleteTargetPath = null;
     this.deleteTargetType = null;
@@ -523,6 +532,7 @@ export class AppRoot extends LitElement {
   }
 
   private openFile(path: string) {
+    this.setActiveSelection(path, false);
     const name = path.split("/").pop() || path;
     const existing = this.tabs.find((t) => t.path === path);
     if (!existing) {
@@ -964,7 +974,43 @@ export class AppRoot extends LitElement {
   private closeContextMenu() {
     if (this.contextMenuOpen) {
       this.contextMenuOpen = false;
+      this.contextMenuX = 0;
+      this.contextMenuY = 0;
     }
+    if (this.treeMenuOpen) {
+      this.treeMenuOpen = false;
+      this.treeMenuX = 0;
+      this.treeMenuY = 0;
+      this.treeMenuPath = null;
+      this.treeMenuType = null;
+      this.treeMenuFromBlank = false;
+    }
+  }
+
+  private createFromContext(kind: "file" | "folder") {
+    if (!this.treeMenuPath || this.treeMenuType !== "dir") return;
+    this.setActiveSelection(this.treeMenuPath, true);
+    this.newItemKind = kind;
+    this.newItemName = "";
+    this.newItemExt = "";
+    this.closeContextMenu();
+  }
+
+  private handleTreeBlankContextMenu(e: MouseEvent) {
+    const target = e.target as HTMLElement | null;
+    const insideItem = target?.closest?.(".treeRow");
+    if (insideItem) return;
+    e.preventDefault();
+    const path = this.normalizeDir(this.activeDir || "/");
+    this.treeMenuOpen = true;
+    this.treeMenuX = e.clientX;
+    this.treeMenuY = e.clientY;
+    this.treeMenuPath = path;
+    this.treeMenuType = "dir";
+    this.treeMenuFromBlank = true;
+    this.contextMenuOpen = false;
+    this.openMenu = null;
+    this.closeSuggestions();
   }
 
   private async handleCopyCut(action: "copy" | "cut") {
@@ -1428,6 +1474,23 @@ export class AppRoot extends LitElement {
     return window.matchMedia("(max-width: 900px)").matches;
   }
 
+  private normalizeDir(path: string | null | undefined): string {
+    if (!path || path === "/") return "/";
+    const trimmed = path.endsWith("/") ? path.slice(0, -1) : path;
+    return trimmed || "/";
+  }
+
+  private setActiveSelection(path: string | null, isDir: boolean) {
+    this.activePath = path;
+    this.activeIsDir = isDir;
+    const dir = isDir
+      ? this.normalizeDir(path)
+      : this.normalizeDir(path && path.includes("/") ? path.split("/").slice(0, -1).join("/") : "/");
+    this.activeDir = dir;
+    // Debug: track active directory selection
+    console.debug("[tree] active selection", { path, isDir, activeDir: dir });
+  }
+
   private setActivity(name: "explorer" | "search" | "entity" | "snippet" | "system" | "backup" | "utility") {
     this.activeActivity = name;
     if (name === "explorer") {
@@ -1448,7 +1511,12 @@ export class AppRoot extends LitElement {
 
   private renderSidebarContent() {
     if (this.activeActivity === "explorer") {
-      return html`<div class="tree">${this.renderTree("")}</div>`;
+      return html`<div class="tree">
+        <div class="treeScrollable" @contextmenu=${(e: Event) => this.handleTreeBlankContextMenu(e as MouseEvent)}>
+          ${this.renderTree("")}
+        </div>
+        <div class="treeTargetLabel">Target: ${this.activeDir || "/"}</div>
+      </div>`;
     }
     if (this.activeActivity === "search") {
       const summary = this.searchSummary;
@@ -1945,14 +2013,24 @@ export class AppRoot extends LitElement {
               style="top:${this.treeMenuY}px; left:${this.treeMenuX}px;"
               @click=${(e: Event) => e.stopPropagation()}
             >
-              <div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
-              <div
-                class="contextMenuItem ${this.treeClipboard ? "" : "disabled"}"
-                @click=${() => this.pasteTreeItem()}
-              >
-                📥 Incolla
-              </div>
-              <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}>🗑️ Elimina</div>
+              ${this.treeMenuType === "dir"
+                ? html`<div class="contextMenuItem" @click=${() => this.createFromContext("file")}>
+                      📄 New File ${this.treeMenuFromBlank ? "" : "here"}
+                    </div>
+                    <div class="contextMenuItem" @click=${() => this.createFromContext("folder")}>
+                      📁 New Folder ${this.treeMenuFromBlank ? "" : "here"}
+                    </div>`
+                : nothing}
+              ${!this.treeMenuFromBlank
+                ? html`<div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
+                    <div
+                      class="contextMenuItem ${this.treeClipboard ? "" : "disabled"}"
+                      @click=${() => this.pasteTreeItem()}
+                    >
+                      📥 Incolla
+                    </div>
+                    <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}>🗑️ Elimina</div>`
+                : nothing}
             </div>`
           : nothing}
 
