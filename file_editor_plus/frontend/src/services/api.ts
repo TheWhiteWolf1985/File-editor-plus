@@ -178,6 +178,42 @@ export const apiGetUserConfig = (apiBase: string) => {
   return fetch(url);
 };
 
+export const apiGetSession = (apiBase: string) => {
+  const url = `${apiBase}api/session`;
+  return fetch(url);
+};
+
+export const apiPutSession = (
+  apiBase: string,
+  session: { tabs: Array<string | { path: string; dirty?: boolean; buffer_id?: string | null; buffer_size?: number | null; last_edit_at?: string | null }>; active: string | null; split: boolean }
+) => {
+  const url = `${apiBase}api/session`;
+  return fetch(url, {
+    method: "PUT",
+    headers: jsonHeaders,
+    body: JSON.stringify(session),
+  });
+};
+
+export const apiPutSessionBuffer = (apiBase: string, payload: { path: string; content: string }) => {
+  const url = `${apiBase}api/session/buffer`;
+  return fetch(url, {
+    method: "PUT",
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  });
+};
+
+export const apiGetSessionBuffer = (apiBase: string, bufferId: string) => {
+  const url = `${apiBase}api/session/buffer/${encodeURIComponent(bufferId)}`;
+  return fetch(url);
+};
+
+export const apiResetSession = (apiBase: string) => {
+  const url = `${apiBase}api/session/reset`;
+  return fetch(url, { method: "POST" });
+};
+
 export const apiGenerateDebugLog = (apiBase: string) => {
   const url = `${apiBase}api/utils/debug-log`;
   return fetch(url, { method: "POST" });

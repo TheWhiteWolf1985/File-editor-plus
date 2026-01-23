@@ -11,6 +11,7 @@ import uuid
 import re
 import socket
 import platform
+import hashlib
 from logging.handlers import RotatingFileHandler
 import tempfile
 import zipfile
@@ -29,9 +30,11 @@ BASE_DIR = Path("/config").resolve()
 BACKUP_DIR = (BASE_DIR / ".fep-backups").resolve()
 FRONTEND_DIR = Path("/app/frontend").resolve()
 FEP_CONFIG_DIR = (BASE_DIR / ".fep-config").resolve()
+BUFFER_DIR = (FEP_CONFIG_DIR / "session_buffers").resolve()
 SNIPPET_DIR = FEP_CONFIG_DIR
 SNIPPET_FILE = SNIPPET_DIR / "snippets.json"
 USER_CONFIG_FILE = FEP_CONFIG_DIR / "user_config.json"
+SESSION_FILE = FEP_CONFIG_DIR / "session.json"
 LEGACY_SNIPPET_DIR = (BASE_DIR / ".fep-snippets").resolve()
 LEGACY_USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
 MDI_META_FILE = (Path(__file__).parent / "mdi_meta.json").resolve()
@@ -62,6 +65,9 @@ DEFAULT_USER_CONFIG = {
     "toolbar_visible": True,
     "show_indent_guides": False,
 }
+DEFAULT_SESSION_STATE = {"tabs": [], "active": None, "split": False}
+MAX_BUFFER_BYTES = 256 * 1024  # 256KB
+MAX_BUFFER_FILES = 10
 HA_ACTIONS = {
     "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_core_config"},
     "restart_core": {"type": "service", "domain": "homeassistant", "service": "restart"},
@@ -310,6 +316,7 @@ def search_mdi(query: str, limit: int) -> List[dict]:
 
 def ensure_config_store() -> None:
     FEP_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    BUFFER_DIR.mkdir(parents=True, exist_ok=True)
     if LEGACY_SNIPPET_DIR.exists() and not SNIPPET_DIR.exists():
         try:
             shutil.move(str(LEGACY_SNIPPET_DIR), str(SNIPPET_DIR))
@@ -393,6 +400,46 @@ def normalize_user_config(data: dict) -> dict:
         if value is not None:
             out[key] = value
     return out
+
+
+def normalize_session(data: dict) -> dict:
+    tabs_raw = data.get("tabs") if isinstance(data, dict) else []
+    tabs: List[dict] = []
+    if isinstance(tabs_raw, list):
+        for item in tabs_raw:
+            if isinstance(item, str):
+                tabs.append({"path": item, "dirty": False})
+            elif isinstance(item, dict) and isinstance(item.get("path"), str):
+                tab_entry = {
+                    "path": item["path"],
+                    "dirty": bool(item.get("dirty", False)),
+                }
+                if isinstance(item.get("buffer_id"), str):
+                    tab_entry["buffer_id"] = item["buffer_id"]
+                if isinstance(item.get("buffer_size"), int):
+                    tab_entry["buffer_size"] = item["buffer_size"]
+                if isinstance(item.get("last_edit_at"), str):
+                    tab_entry["last_edit_at"] = item["last_edit_at"]
+                view = item.get("view")
+                if isinstance(view, dict):
+                    st = view.get("scrollTop")
+                    ss = view.get("selStart")
+                    se = view.get("selEnd")
+                    view_clean = {}
+                    if isinstance(st, int):
+                        view_clean["scrollTop"] = st
+                    if isinstance(ss, int):
+                        view_clean["selStart"] = ss
+                    if isinstance(se, int):
+                        view_clean["selEnd"] = se
+                    if view_clean:
+                        tab_entry["view"] = view_clean
+                tabs.append(tab_entry)
+    active = data.get("active") if isinstance(data, dict) else None
+    active_clean = active if isinstance(active, str) else None
+    split_raw = data.get("split") if isinstance(data, dict) else False
+    split_clean = bool(split_raw) if isinstance(split_raw, bool) else False
+    return {"tabs": tabs, "active": active_clean, "split": split_clean}
 
 
 def ensure_snippet_store() -> None:
@@ -1328,6 +1375,156 @@ async def update_user_config(request: Request):
         raise HTTPException(400, "Config must be an object")
     save_user_config(config)
     return {"ok": True, "config": load_user_config()}
+
+
+def load_session_state() -> dict:
+    ensure_config_store()
+    target = safe_path(".fep-config/session.json")
+    if not target.exists():
+        return DEFAULT_SESSION_STATE.copy()
+    try:
+        with open(target, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except Exception as e:
+        logger.warning("session: errore lettura %s: %s", target, e)
+        try:
+            broken = target.with_name(f"session.broken_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json")
+            shutil.move(str(target), broken)
+        except Exception as move_err:
+            logger.warning("session: impossibile rinominare session corrotta: %s", move_err)
+        state = DEFAULT_SESSION_STATE.copy()
+        state["corrupted"] = True
+        return state
+    if not isinstance(raw, dict):
+        state = DEFAULT_SESSION_STATE.copy()
+        state["corrupted"] = True
+        return state
+    normalized = normalize_session(raw)
+    if "corrupted" not in normalized:
+        normalized["corrupted"] = False
+    return normalized
+
+
+def save_session_state(data: dict) -> None:
+    ensure_config_store()
+    target = safe_path(".fep-config/session.json")
+    normalized = normalize_session(data)
+    try:
+        atomic_write(target, json.dumps(normalized, ensure_ascii=False, indent=2))
+        # cleanup buffer files not referenced
+        try:
+            keep_ids = {t.get("buffer_id") for t in normalized.get("tabs", []) if isinstance(t, dict) and t.get("buffer_id")}
+            for f in BUFFER_DIR.glob("*.txt"):
+                buf_id = f.stem
+                if buf_id not in keep_ids:
+                    f.unlink(missing_ok=True)
+        except Exception as gc_err:
+            logger.warning("session: buffer gc skipped: %s", gc_err)
+    except Exception as e:
+        logger.exception("session: errore salvataggio %s: %s", target, e)
+        raise HTTPException(500, f"Errore salvataggio sessione: {e}")
+
+
+@app.get("/api/session")
+def get_session():
+    return load_session_state()
+
+
+@app.put("/api/session")
+async def put_session(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "Body JSON richiesto")
+    if not isinstance(payload, dict):
+        raise HTTPException(400, "Session deve essere un oggetto")
+    tabs = payload.get("tabs")
+    if tabs is not None:
+        if not isinstance(tabs, list):
+            raise HTTPException(400, "tabs deve essere una lista")
+        for item in tabs:
+            if isinstance(item, str):
+                continue
+            if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+                raise HTTPException(400, "Ogni tab deve essere string o object {path,dirty}")
+            if "dirty" in item and not isinstance(item.get("dirty"), bool):
+                raise HTTPException(400, "dirty deve essere boolean")
+            if "view" in item and not isinstance(item.get("view"), dict):
+                raise HTTPException(400, "view deve essere un oggetto")
+            if isinstance(item.get("view"), dict):
+                v = item.get("view")
+                for key in ("scrollTop", "selStart", "selEnd"):
+                    if key in v and not isinstance(v.get(key), int):
+                        raise HTTPException(400, f"view.{key} deve essere int")
+    active = payload.get("active")
+    if active is not None and not isinstance(active, str):
+        raise HTTPException(400, "active deve essere string o null")
+    if "split" in payload and not isinstance(payload.get("split"), bool):
+        raise HTTPException(400, "split deve essere boolean")
+    save_session_state(payload)
+    return {"ok": True}
+
+
+@app.put("/api/session/buffer")
+async def put_session_buffer(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "Body JSON richiesto")
+    if not isinstance(payload, dict):
+        raise HTTPException(400, "Body deve essere un oggetto")
+    path = payload.get("path")
+    content = payload.get("content", "")
+    if not isinstance(path, str):
+        raise HTTPException(400, "path richiesto (string)")
+    if not isinstance(content, str):
+        raise HTTPException(400, "content deve essere string")
+    encoded = content.encode("utf-8")
+    if len(encoded) > MAX_BUFFER_BYTES:
+        return {"ok": False, "skipped": True, "reason": "too_large", "max": MAX_BUFFER_BYTES}
+    buffer_id = hashlib.sha1(path.encode("utf-8")).hexdigest()
+    target = BUFFER_DIR / f"{buffer_id}.txt"
+    try:
+        atomic_write(target, content)
+    except Exception as e:
+        logger.exception("session buffer: errore salvataggio %s: %s", target, e)
+        raise HTTPException(500, f"Errore salvataggio buffer: {e}")
+    return {"ok": True, "buffer_id": buffer_id, "size": len(encoded)}
+
+
+@app.get("/api/session/buffer/{buffer_id}")
+def get_session_buffer(buffer_id: str):
+    if not re.fullmatch(r"[a-fA-F0-9]{40}", buffer_id or ""):
+        raise HTTPException(400, "buffer_id non valido")
+    target = BUFFER_DIR / f"{buffer_id}.txt"
+    if not target.exists():
+        raise HTTPException(404, "Buffer not found")
+    try:
+        content = target.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        raise HTTPException(500, f"Errore lettura buffer: {e}")
+    return {"ok": True, "content": content}
+
+
+@app.post("/api/session/reset")
+def reset_session():
+    ensure_config_store()
+    # elimina session.json
+    try:
+        session_path = safe_path(".fep-config/session.json")
+        session_path.unlink(missing_ok=True)
+    except Exception as e:
+        logger.warning("session reset: errore rimozione session.json: %s", e)
+    # elimina buffer files
+    try:
+        for f in BUFFER_DIR.glob("*.txt"):
+            try:
+                f.unlink(missing_ok=True)
+            except Exception:
+                continue
+    except Exception as e:
+        logger.warning("session reset: errore pulizia buffer: %s", e)
+    return {"ok": True}
 
 
 @app.post("/api/format/yaml")

@@ -1,11 +1,18 @@
 # Changelog
 
+## 0.2.20
+
+- 🗂️ Session restore completo: tab/attivo/split persistiti, flag dirty e buffer non salvati (con limiti) ripristinati con avvisi e reset sicuro della sessione.
+- 📍 Stato editor per tab: caret/selection e scroll vengono salvati e ripristinati all’apertura del tab.
+- ♻️ Reset session: comando in Utility per cancellare session.json e buffer, con fallback automatico se il file sessione è corrotto.
+  Issue [#11](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/11) Testing
+  Issue [#12](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/12) Testing
+  Issue [#13](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/13) Testing
+
 ## 0.2.18
 
 - 🐛 Debug log: richiesta log Supervisor/Core con header corretti (no fallback /core/api), note chiare su 403 e auto-inclusione dei log runtime dell’add-on.
 - 🌳 Tree: flag dirty + refresh automatico quando il filesystem cambia, così i nuovi file compaiono senza ricarichi manuali.
-  Issue [#11](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/11) Solved
-  Issue [#12](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/12) Solved
 
 ## 0.2.17
 
