@@ -218,3 +218,14 @@ export const apiGenerateDebugLog = (apiBase: string) => {
   const url = `${apiBase}api/utils/debug-log`;
   return fetch(url, { method: "POST" });
 };
+
+export const apiUpload = (apiBase: string, file: File, targetDir: string) => {
+  const url = `${apiBase}api/upload`;
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("target_dir", targetDir);
+  return fetch(url, {
+    method: "POST",
+    body: fd,
+  });
+};

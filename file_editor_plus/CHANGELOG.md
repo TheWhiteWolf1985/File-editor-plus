@@ -8,6 +8,10 @@
 
 - 📤 Add: endpoint backend /api/upload (multipart) per caricare file sotto /config.
 
+## 0.2.30
+
+- 📤 Add: UI upload nel tab Explorer con modale (file picker + scelta cartella) e refresh tree automatico.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

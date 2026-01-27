@@ -75,6 +75,7 @@ import {
   apiPostDiff,
   apiSaveFile,
   apiGenerateDebugLog,
+  apiUpload,
   apiPutSession,
   apiPutSessionBuffer,
   apiGetSessionBuffer,
@@ -179,6 +180,9 @@ export class AppRoot extends LitElement {
     activeIndentSegmentId: { state: true },
     showUnsavedModal: { state: true },
     utilityGenerating: { state: true },
+    showUploadModal: { state: true },
+    uploadTargetDir: { state: true },
+    uploadInProgress: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -205,6 +209,10 @@ export class AppRoot extends LitElement {
   declare activeIndentSegmentId: string | null;
   declare showUnsavedModal: boolean;
   declare utilityGenerating: boolean;
+  declare showUploadModal: boolean;
+  declare uploadTargetDir: string;
+  declare uploadFile: File | null;
+  declare uploadInProgress: boolean;
   declare showResetSessionModal: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
@@ -312,7 +320,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.29";
+  private readonly appVersion = "0.2.30";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -411,6 +419,10 @@ export class AppRoot extends LitElement {
     this.activeIndentSegmentId = null;
     this.showUnsavedModal = false;
     this.utilityGenerating = false;
+    this.showUploadModal = false;
+    this.uploadTargetDir = "/";
+    this.uploadFile = null;
+    this.uploadInProgress = false;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -554,6 +566,63 @@ export class AppRoot extends LitElement {
       if (this.status === "Errore debug log") {
         setTimeout(() => (this.status = "Ready"), 1200);
       }
+    }
+  }
+
+  private openUploadModal() {
+    this.uploadTargetDir = this.normalizeDir(this.activeDir || "/");
+    this.uploadFile = null;
+    this.showUploadModal = true;
+  }
+
+  private closeUploadModal() {
+    this.showUploadModal = false;
+    this.uploadFile = null;
+    this.uploadInProgress = false;
+    this.uploadTargetDir = this.normalizeDir(this.activeDir || "/");
+  }
+
+  private handleUploadFileChange(e: Event) {
+    const input = e.target as HTMLInputElement | null;
+    this.uploadFile = input?.files && input.files[0] ? input.files[0] : null;
+  }
+
+  private async submitUpload() {
+    if (this.uploadInProgress) return;
+    if (!this.uploadFile) {
+      this.showToast("Seleziona un file da caricare", "error");
+      return;
+    }
+    const dir = this.uploadTargetDir || "/";
+    const targetDir = dir === "/" ? "/config" : dir;
+    this.uploadInProgress = true;
+    try {
+      const res = await apiUpload(this.apiBase, this.uploadFile, targetDir);
+      let payload: any = null;
+      try {
+        payload = await res.json();
+      } catch {
+        payload = null;
+      }
+      if (!res.ok || payload?.ok !== true) {
+        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
+        if (res.status === 409) {
+          this.showToast("File già esistente", "error");
+        } else if (res.status === 413) {
+          this.showToast("File troppo grande (max 50MB)", "error");
+        } else {
+          this.showToast(msg, "error");
+        }
+        return;
+      }
+      const fname = payload?.path || this.uploadFile.name;
+      this.showToast(`Upload completato: ${fname}`);
+      this.closeUploadModal();
+      await this.notifyFsChanged();
+    } catch (e) {
+      this.showToast("Errore upload file", "error");
+    } finally {
+      this.uploadInProgress = false;
     }
   }
 
@@ -1692,12 +1761,36 @@ export class AppRoot extends LitElement {
     this.dirtySessionToastShown = false;
     this.imagePreview = null;
     this.imagePreviewOpen = false;
+    this.showUploadModal = false;
+    this.uploadFile = null;
   }
 
   private normalizeDir(path: string | null | undefined): string {
     if (!path || path === "/") return "/";
     const trimmed = path.endsWith("/") ? path.slice(0, -1) : path;
     return trimmed || "/";
+  }
+
+  private getDirectoryOptions(): string[] {
+    const dirs = new Set<string>();
+    dirs.add("/");
+    dirs.add(this.normalizeDir(this.activeDir || "/"));
+    const scan = (p: string) => {
+      const items = this.treeData[p] || [];
+      items.forEach((item: TreeItem) => {
+        if (item.type === "dir") {
+          const d = this.normalizeDir(item.path);
+          if (!dirs.has(d)) {
+            dirs.add(d);
+            if (this.treeData[item.path]) {
+              scan(item.path);
+            }
+          }
+        }
+      });
+    };
+    scan("");
+    return Array.from(dirs).sort((a, b) => a.localeCompare(b));
   }
 
   private setActiveSelection(path: string | null, isDir: boolean) {
@@ -1914,6 +2007,9 @@ export class AppRoot extends LitElement {
   private renderSidebarContent() {
     if (this.activeActivity === "explorer") {
       return html`<div class="tree">
+        <div class="treeHeader">
+          <button class="btn" type="button" @click=${() => this.openUploadModal()}>⬆️ Upload</button>
+        </div>
         <div class="treeScrollable" @contextmenu=${(e: Event) => this.handleTreeBlankContextMenu(e as MouseEvent)}>
           ${this.renderTree("")}
         </div>
@@ -2690,6 +2786,35 @@ export class AppRoot extends LitElement {
                   <button class="btn" @click=${() => this.cancelUnsavedModal()}>Annulla</button>
                   <button class="btn" @click=${() => this.confirmUnsavedDiscard()}>Non salvare</button>
                   <button class="btn primary" @click=${() => this.confirmUnsavedSave()}>Salva</button>
+                </div>
+              </div>
+            </div>`
+          : nothing}
+
+        ${this.showUploadModal
+          ? html`<div class="modalBackdrop" @click=${() => this.closeUploadModal()}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:520px;">
+                <h3>Upload file</h3>
+                <div class="formRow" style="margin-top:12px; display:grid; gap:6px;">
+                  <label style="font-size:var(--font-size-sm); color:var(--muted-color);">File</label>
+                  <input type="file" @change=${this.handleUploadFileChange} />
+                </div>
+                <div class="formRow" style="margin-top:12px; display:grid; gap:6px;">
+                  <label style="font-size:var(--font-size-sm); color:var(--muted-color);">Cartella destinazione</label>
+                  <select
+                    .value=${this.uploadTargetDir}
+                    @change=${(e: Event) => (this.uploadTargetDir = this.normalizeDir((e.target as HTMLSelectElement).value))}
+                  >
+                    ${this.getDirectoryOptions().map((dir) =>
+                      html`<option value=${dir}>${dir === "/" ? "/config" : `/config/${dir}`}</option>`
+                    )}
+                  </select>
+                </div>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.closeUploadModal()} ?disabled=${this.uploadInProgress}>Annulla</button>
+                  <button class="btn primary" @click=${() => this.submitUpload()} ?disabled=${this.uploadInProgress || !this.uploadFile}>
+                    ${this.uploadInProgress ? "Caricamento..." : "Upload"}
+                  </button>
                 </div>
               </div>
             </div>`

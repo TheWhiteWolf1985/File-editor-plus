@@ -483,6 +483,12 @@ export const appStyles = css`
       flex: 1;
       min-height: 0;
     }
+    .treeHeader {
+      display: flex;
+      justify-content: flex-end;
+      padding: 0 4px 8px;
+      gap: 8px;
+    }
     .treeScrollable {
       min-height: 100%;
     }

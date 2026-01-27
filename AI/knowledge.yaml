@@ -1902,3 +1902,18 @@ log:
       - "upload >50MB => 413"
       - "upload filename già esistente => 409"
       - "Changelog top: 0.2.29"
+  - date: "2026-01-27"
+    actor: "codex"
+    change: "UI upload: aggiunto pulsante Upload in Explorer con modale (file picker + selezione cartella), chiamata a /api/upload e refresh tree; bump 0.2.30."
+    reason: "Consentire upload da PC verso /config direttamente dall'Explorer."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/services/api.ts"
+      - "file_editor_plus/frontend/src/styles/app-styles.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Explorer → Upload apre modale; default cartella = activeDir"
+      - "Submit carica file via /api/upload, toast success, tree aggiornato senza reload manuale"
+      - "Changelog top: 0.2.30"
