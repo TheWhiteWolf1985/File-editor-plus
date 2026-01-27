@@ -24,6 +24,10 @@
 
 - 🛡️ Improve: hardening upload/move (messaggi conflitto/size, filename invalido, refresh coerente, warning tab spostati).
 
+## 0.2.34
+
+- ⚠️ Add: modale di conferma per spostamento via drag&drop prima di eseguire il move.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

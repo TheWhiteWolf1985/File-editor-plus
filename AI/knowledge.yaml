@@ -1967,3 +1967,16 @@ log:
       - "Upload filename con slash → 415"
       - "Move 409/404/400 gestiti con toast dedicati; tab attivo spostato viene aggiornato di path"
       - "Changelog top: 0.2.33"
+  - date: "2026-01-27"
+    actor: "codex"
+    change: "Conferma drag&drop: modale prima dello spostamento, move eseguito solo dopo conferma; bump 0.2.34."
+    reason: "Evitare spostamenti accidentali."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/features/tree/tree.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Drop file/cartella apre modale; 'Sposta' esegue move con refresh tree; 'Annulla' non fa nulla"
+      - "Changelog top: 0.2.34"

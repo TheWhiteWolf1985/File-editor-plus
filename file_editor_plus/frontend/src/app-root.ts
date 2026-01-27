@@ -186,6 +186,7 @@ export class AppRoot extends LitElement {
     uploadInProgress: { state: true },
     pendingMove: { state: true },
     dropTargetPath: { state: true },
+    moveConfirmOpen: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -218,6 +219,7 @@ export class AppRoot extends LitElement {
   declare uploadInProgress: boolean;
   declare pendingMove: { src: string; dstDir: string } | null;
   declare dropTargetPath: string | null;
+  declare moveConfirmOpen: boolean;
   declare showResetSessionModal: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
@@ -325,7 +327,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.32";
+  private readonly appVersion = "0.2.34";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -370,6 +372,24 @@ export class AppRoot extends LitElement {
   private handleTreeDrop = treeHandleTreeDrop.bind(this);
   private handleTreeRootDragOver = treeHandleTreeRootDragOver.bind(this);
   private handleTreeRootDrop = treeHandleTreeRootDrop.bind(this);
+  private queueMove = (src: string, dstDir: string) => {
+    this.pendingMove = { src, dstDir };
+    this.moveConfirmOpen = true;
+  };
+
+  private cancelMoveConfirm() {
+    this.pendingMove = null;
+    this.moveConfirmOpen = false;
+  }
+
+  private async confirmMove() {
+    if (!this.pendingMove) {
+      this.moveConfirmOpen = false;
+      return;
+    }
+    const { src, dstDir } = this.pendingMove;
+    await this.performMove(src, dstDir);
+  }
   private performSearch = searchPerformSearch.bind(this);
   private replaceAll = searchReplaceAll.bind(this);
   private openSearchMatch = searchOpenSearchMatch.bind(this);
@@ -438,6 +458,7 @@ export class AppRoot extends LitElement {
     this.uploadInProgress = false;
     this.pendingMove = null;
     this.dropTargetPath = null;
+    this.moveConfirmOpen = false;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -709,6 +730,9 @@ export class AppRoot extends LitElement {
       await this.notifyFsChanged();
     } catch (e) {
       this.showToast("Errore spostamento", "error");
+    } finally {
+      this.pendingMove = null;
+      this.moveConfirmOpen = false;
     }
   }
 
@@ -2909,6 +2933,22 @@ export class AppRoot extends LitElement {
                   <button class="btn primary" @click=${() => this.submitUpload()} ?disabled=${this.uploadInProgress || !this.uploadFile}>
                     ${this.uploadInProgress ? "Caricamento..." : "Upload"}
                   </button>
+                </div>
+              </div>
+            </div>`
+          : nothing}
+
+        ${this.moveConfirmOpen && this.pendingMove
+          ? html`<div class="modalBackdrop" @click=${() => this.cancelMoveConfirm()}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:460px;">
+                <h3>Conferma spostamento</h3>
+                <p style="margin-top:8px; color:var(--muted-color);">
+                  Spostare <strong>${this.pendingMove.src.split("/").pop() || this.pendingMove.src}</strong>
+                  in <strong>${this.pendingMove.dstDir || "/"}</strong>?
+                </p>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.cancelMoveConfirm()}>Annulla</button>
+                  <button class="btn primary" @click=${() => this.confirmMove()}>Sposta</button>
                 </div>
               </div>
             </div>`
