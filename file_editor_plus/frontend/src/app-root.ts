@@ -620,14 +620,24 @@ export class AppRoot extends LitElement {
         payload = null;
       }
       if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
         if (res.status === 409) {
-          this.showToast("File già esistente", "error");
-        } else if (res.status === 413) {
-          this.showToast("File troppo grande (max 50MB)", "error");
-        } else {
-          this.showToast(msg, "error");
+          this.showToast("Esiste già un file con quel nome. Rinominare e riprovare.", "error");
+          return;
         }
+        if (res.status === 413) {
+          this.showToast("File troppo grande (max 50MB)", "error");
+          return;
+        }
+        if (res.status === 404) {
+          this.showToast("Cartella di destinazione non trovata", "error");
+          return;
+        }
+        if (res.status === 400 || res.status === 415) {
+          this.showToast("Nome file non valido o cartella non ammessa", "error");
+          return;
+        }
+        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
+        this.showToast(msg, "error");
         return;
       }
       const fname = payload?.path || this.uploadFile.name;
@@ -642,8 +652,7 @@ export class AppRoot extends LitElement {
   }
 
   private async performMove(src: string, dstDir: string) {
-    const dst = dstDir === "/" ? "" : dstDir;
-    const payloadDst = dst || "";
+    const payloadDst = dstDir === "/" ? "" : dstDir;
     try {
       const res = await apiMovePath(this.apiBase, src, payloadDst);
       let body: any = null;
@@ -657,15 +666,46 @@ export class AppRoot extends LitElement {
           this.showToast("Esiste già un elemento con lo stesso nome nella destinazione", "error");
         } else if (res.status === 400) {
           this.showToast(body?.detail || "Spostamento non valido", "error");
+        } else if (res.status === 404) {
+          this.showToast("Origine o destinazione non trovata", "error");
         } else {
           this.showToast(`Errore move (HTTP ${res.status})`, "error");
         }
         return;
       }
+      const dstPath = (body?.dst as string) || null;
       this.showToast(`Spostato: ${src.split("/").pop() || src}`);
-      if (this.activePath === src) {
+
+      if (dstPath) {
+        // Aggiorna tab aperti che puntavano al vecchio path
+        const updatedTabs = this.tabs.map((t) => (t.path === src ? { ...t, path: dstPath, name: dstPath.split("/").pop() || dstPath } : t));
+        const activeChanged = this.activePath === src;
+        if (activeChanged) {
+          this.activePath = dstPath;
+          const cached = this.fileCache[src];
+          if (cached !== undefined) {
+            delete this.fileCache[src];
+            this.fileCache[dstPath] = cached;
+          }
+          const savedBase = this.savedBaseByPath[src];
+          if (savedBase !== undefined) {
+            delete this.savedBaseByPath[src];
+            this.savedBaseByPath[dstPath] = savedBase;
+          }
+          const snap = this.openSnapshotByPath[src];
+          if (snap !== undefined) {
+            delete this.openSnapshotByPath[src];
+            this.openSnapshotByPath[dstPath] = snap;
+          }
+        }
+        this.tabs = updatedTabs;
+        if (activeChanged) {
+          this.status = "File spostato: riaperto dal nuovo percorso";
+        }
+      } else if (this.activePath === src) {
         this.showToast("File spostato: riaprilo dalla nuova posizione", "error");
       }
+
       await this.notifyFsChanged();
     } catch (e) {
       this.showToast("Errore spostamento", "error");

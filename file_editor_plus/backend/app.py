@@ -1281,6 +1281,9 @@ def read_file_raw(path: str):
 async def upload_file(file: UploadFile = File(...), target_dir: str = Form(...)):
     if not file or not file.filename:
         raise HTTPException(415, "Invalid filename")
+    original_name = file.filename
+    if "/" in original_name or "\\" in original_name:
+        raise HTTPException(415, "Invalid filename")
 
     # Normalizza target_dir: accetta anche /config/...
     td = (target_dir or "").strip()
@@ -1296,7 +1299,7 @@ async def upload_file(file: UploadFile = File(...), target_dir: str = Form(...))
     if not target_dir_path.is_dir():
         raise HTTPException(400, "Target is not a directory")
 
-    name = Path(file.filename).name
+    name = Path(original_name).name
     if not name:
         raise HTTPException(415, "Invalid filename")
 
@@ -1403,7 +1406,9 @@ async def move_path(request: Request):
 
     if not src.exists():
         raise HTTPException(404, "Source not found")
-    if not dst_dir.exists() or not dst_dir.is_dir():
+    if not dst_dir.exists():
+        raise HTTPException(404, "Destination directory not found")
+    if not dst_dir.is_dir():
         raise HTTPException(400, "Destination directory invalid")
 
     # Prevent moving dir into itself or subdir

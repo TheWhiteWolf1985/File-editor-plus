@@ -20,6 +20,10 @@
 
 - 📂 Add: spostamento reale file/cartelle via drag&drop con endpoint /api/fs/move e refresh tree.
 
+## 0.2.33
+
+- 🛡️ Improve: hardening upload/move (messaggi conflitto/size, filename invalido, refresh coerente, warning tab spostati).
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).
