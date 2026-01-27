@@ -14,8 +14,10 @@ export class ImagePreviewModal extends LitElement {
   @property({ type: String }) path: string | null = null;
   @property({ type: String }) name: string | null = null;
   @property({ type: Number }) size: number | null = null;
+  @property({ type: String }) message: string | null = null;
 
   private meta: ImageMeta = {};
+  private errored = false;
 
   static styles = css`
     :host {
@@ -102,6 +104,18 @@ export class ImagePreviewModal extends LitElement {
       word-break: break-all;
       font-family: "JetBrains Mono", "Fira Code", monospace;
     }
+    .placeholder {
+      width: 100%;
+      min-height: 240px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--muted-color, #aaa);
+      border: 1px dashed var(--border-color, #333);
+      border-radius: 6px;
+      padding: 16px;
+      background: var(--code-bg, #1e1e1e);
+    }
   `;
 
   connectedCallback(): void {
@@ -112,6 +126,14 @@ export class ImagePreviewModal extends LitElement {
   disconnectedCallback(): void {
     window.removeEventListener("keydown", this.onKeyDown);
     super.disconnectedCallback();
+  }
+
+  // Reset internal state when src or open flag changes
+  updated(changed: Map<string, unknown>): void {
+    if (changed.has("src") || changed.has("open")) {
+      this.meta = {};
+      this.errored = false;
+    }
   }
 
   private onKeyDown = (e: KeyboardEvent) => {
@@ -134,6 +156,7 @@ export class ImagePreviewModal extends LitElement {
 
   private handleImgError() {
     this.meta = {};
+    this.errored = true;
     this.dispatchEvent(new CustomEvent("error", { bubbles: true, composed: true }));
   }
 
@@ -141,12 +164,14 @@ export class ImagePreviewModal extends LitElement {
     if (size == null || size < 0) return "—";
     if (size < 1024) return `${size} B`;
     const kb = size / 1024;
-    if (kb < 1024) return `${kb.toFixed(1)} KB`;
-    return `${(kb / 1024).toFixed(1)} MB`;
+    if (kb < 1024) return `${kb.toFixed(kb < 10 ? 2 : 1)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(mb < 10 ? 2 : 1)} MB`;
   }
 
   render() {
     if (!this.open) return nothing;
+    const showImage = this.src && !this.errored && !this.message;
     return html`<div class="backdrop" @click=${this.emitClose}>
       <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
         <div class="header">
@@ -154,9 +179,11 @@ export class ImagePreviewModal extends LitElement {
           <button class="closeBtn" aria-label="Chiudi anteprima" @click=${this.emitClose}>✕</button>
         </div>
         <div class="body">
-          ${this.src
+          ${showImage
             ? html`<img class="preview" src=${this.src} @load=${this.handleImgLoad} @error=${this.handleImgError} />`
-            : html`<div>Immagine non disponibile</div>`}
+            : html`<div class="placeholder">
+                ${this.message || (this.errored ? "Anteprima non disponibile" : "Immagine non disponibile")}
+              </div>`}
           <div class="meta">
             <div class="row">
               <div class="label">Nome</div>

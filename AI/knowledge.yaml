@@ -2,7 +2,7 @@
 schema:
   name: "ai-knowledge"
   version: 2
-  updated_at: "2026-01-07"
+  updated_at: "2026-01-27"
   updated_by: "codex"
   update_policy:
     rulebook: "AI/agents.md"
@@ -1846,3 +1846,17 @@ log:
       - "AI/knowledge.yaml"
     verification:
       - "Righe allineate al gutter senza spaziatura extra (build manuale da fare quando confermi)"
+  - date: "2026-01-27"
+    actor: "codex"
+    change: "Image preview step 4/4: polish con limite 20MB, chiusura via backdrop/ESC, placeholder pulito, reset stato; bump versione 0.2.26."
+    reason: "Rendere l’anteprima immagini production-ready e prevenire caricamenti troppo pesanti."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/components/image-preview-modal.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "GET /api/file/raw?path=<img> + context menu → Anteprima immagine apre modale; click backdrop/ESC chiude"
+      - "File >20MB mostra toast 'File troppo grande per anteprima' e placeholder senza caricare"
+      - "Changelog top: 0.2.26"

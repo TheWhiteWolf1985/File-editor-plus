@@ -164,7 +164,6 @@ export class AppRoot extends LitElement {
     treeMenuFromBlank: { state: true },
     imagePreview: { state: true },
     imagePreviewOpen: { state: true },
-    imagePreviewRequest: { state: true },
     showTreeDeleteModal: { state: true },
     deleteTargetPath: { state: true },
     deleteTargetType: { state: true },
@@ -253,9 +252,8 @@ export class AppRoot extends LitElement {
   declare treeMenuType: "file" | "dir" | null;
   declare treeMenuSize: number | null;
   declare treeMenuFromBlank: boolean;
-  declare imagePreview: { path: string; url: string; name?: string; size?: number | null } | null;
+  declare imagePreview: { path: string; url: string | null; name?: string; size?: number | null; message?: string | null } | null;
   declare imagePreviewOpen: boolean;
-  declare imagePreviewRequest: { path: string; url: string; name?: string } | null;
   declare showTreeDeleteModal: boolean;
   declare deleteTargetPath: string | null;
   declare deleteTargetType: "file" | "dir" | null;
@@ -304,6 +302,7 @@ export class AppRoot extends LitElement {
   private pendingViewApply: Record<string, { scrollTop?: number; selStart?: number; selEnd?: number }> = {};
   private readonly indentUnit = "  ";
   private dirtySessionToastShown = false;
+  private readonly maxPreviewBytes = 20 * 1024 * 1024;
   private lastCursorLine = 1;
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
@@ -313,7 +312,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.25";
+  private readonly appVersion = "0.2.26";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -460,7 +459,6 @@ export class AppRoot extends LitElement {
     this.treeMenuFromBlank = false;
     this.imagePreview = null;
     this.imagePreviewOpen = false;
-    this.imagePreviewRequest = null;
     this.showTreeDeleteModal = false;
     this.deleteTargetPath = null;
     this.deleteTargetType = null;
@@ -1143,6 +1141,11 @@ export class AppRoot extends LitElement {
     }
   }
 
+  private closeImagePreview() {
+    this.imagePreviewOpen = false;
+    this.imagePreview = null;
+  }
+
   private createFromContext(kind: "file" | "folder") {
     if (!this.treeMenuPath || this.treeMenuType !== "dir") return;
     this.setActiveSelection(this.treeMenuPath, true);
@@ -1175,15 +1178,33 @@ export class AppRoot extends LitElement {
     return [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"].some((ext) => lower.endsWith(ext));
   }
 
+  private formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${kb.toFixed(kb < 10 ? 2 : 1)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(mb < 10 ? 2 : 1)} MB`;
+  }
+
   private handleImagePreview(path: string | null, size?: number | null) {
     if (!path) {
       this.showToast("Path immagine non valido", "error");
       return;
     }
-    const url = `${this.apiBase}api/file/raw?path=${encodeURIComponent(path)}`;
-    this.imagePreview = { path, url, name: path.split("/").pop() || path, size: size ?? null };
+    const normalizedSize = size ?? null;
+    const tooLarge = normalizedSize !== null && normalizedSize > this.maxPreviewBytes;
+    const url = tooLarge ? null : `${this.apiBase}api/file/raw?path=${encodeURIComponent(path)}`;
+    const message = tooLarge
+      ? `File troppo grande per anteprima (${this.formatBytes(normalizedSize)})`
+      : null;
+    const name = path.split("/").pop() || path;
+    this.imagePreview = { path, url, name, size: normalizedSize, message };
     this.imagePreviewOpen = true;
-    this.showToast(`Anteprima immagine: ${this.imagePreview.name || path}`);
+    if (tooLarge) {
+      this.showToast("File troppo grande per anteprima (>20MB)", "error");
+    } else {
+      this.showToast(`Anteprima immagine: ${name}`);
+    }
     this.closeContextMenu();
   }
 
@@ -2695,8 +2716,14 @@ export class AppRoot extends LitElement {
           .path=${this.imagePreview?.path || null}
           .name=${this.imagePreview?.name || null}
           .size=${this.imagePreview?.size ?? null}
-          @close=${() => (this.imagePreviewOpen = false)}
-          @error=${() => this.showToast("Impossibile caricare l'immagine", "error")}
+          .message=${this.imagePreview?.message ?? null}
+          @close=${this.closeImagePreview}
+          @error=${() => {
+            this.showToast("Impossibile caricare l'immagine", "error");
+            if (this.imagePreview) {
+              this.imagePreview = { ...this.imagePreview, url: null, message: "Anteprima non disponibile" };
+            }
+          }}
         ></image-preview-modal>
 
         <div class="statusbar">

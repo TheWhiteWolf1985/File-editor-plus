@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.26
+
+- 🖼️ Improve: polish anteprima immagini (limite 20MB, chiusura su backdrop/ESC, placeholder pulito, cleanup stato).
+
 ## 0.2.25
 
 - 🖼️ Image preview: aggiunta modale riutilizzabile con anteprima immagine e metadati base; la voce di context menu “Anteprima immagine” ora apre la modale (step 3/4).
