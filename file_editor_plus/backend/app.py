@@ -23,7 +23,7 @@ from typing import List, Optional
 import json
 import httpx
 import websockets
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -69,6 +69,7 @@ DEFAULT_USER_CONFIG = {
 DEFAULT_SESSION_STATE = {"tabs": [], "active": None, "split": False}
 MAX_BUFFER_BYTES = 256 * 1024  # 256KB
 MAX_BUFFER_FILES = 10
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
 HA_ACTIONS = {
     "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_core_config"},
     "restart_core": {"type": "service", "domain": "homeassistant", "service": "restart"},
@@ -1274,6 +1275,72 @@ def read_file_raw(path: str):
         media_type=media_type or "application/octet-stream",
         headers={"Cache-Control": "private, max-age=60"},
     )
+
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...), target_dir: str = Form(...)):
+    if not file or not file.filename:
+        raise HTTPException(415, "Invalid filename")
+
+    # Normalizza target_dir: accetta anche /config/...
+    td = (target_dir or "").strip()
+    if td.startswith("/config/"):
+        td = td[len("/config/") :]
+    elif td == "/config":
+        td = ""
+
+    target_dir_path = safe_path(td)
+
+    if not target_dir_path.exists():
+        raise HTTPException(404, "Target directory does not exist")
+    if not target_dir_path.is_dir():
+        raise HTTPException(400, "Target is not a directory")
+
+    name = Path(file.filename).name
+    if not name:
+        raise HTTPException(415, "Invalid filename")
+
+    dest = (target_dir_path / name).resolve()
+    if not _is_within_base(dest):
+        raise HTTPException(403, "Access denied")
+
+    if dest.exists():
+        raise HTTPException(409, "File already exists")
+
+    tmp_name = f".upload_tmp_{uuid.uuid4().hex}"
+    tmp_path = dest.with_name(tmp_name)
+
+    total = 0
+    try:
+        with open(tmp_path, "wb") as f:
+            while True:
+                chunk = await file.read(1024 * 64)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > MAX_UPLOAD_BYTES:
+                    raise HTTPException(413, "File too large (max 50MB)")
+                f.write(chunk)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, dest)
+    except HTTPException:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        raise
+    except Exception as e:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        logger.exception("upload_file: error writing %s: %s", dest, e)
+        raise HTTPException(500, f"Upload failed: {e}")
+    finally:
+        await file.close()
+
+    return {
+        "ok": True,
+        "path": dest.as_posix(),
+        "size_bytes": total,
+    }
 
 
 @app.put("/api/file")

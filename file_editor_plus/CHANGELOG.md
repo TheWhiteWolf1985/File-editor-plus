@@ -4,6 +4,10 @@
 
 - 🛠️ Fix: Utility buttons “Genera debug log” e “Reset session” ora chiamano le azioni corrette e rinfrescano il tree.
 
+## 0.2.29
+
+- 📤 Add: endpoint backend /api/upload (multipart) per caricare file sotto /config.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

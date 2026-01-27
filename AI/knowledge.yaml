@@ -1887,3 +1887,18 @@ log:
       - "Utility → Genera debug log crea file debug_* e mostra toast; tree si aggiorna"
       - "Utility → Reset session svuota i tab, mostra toast e resetta session.json"
       - "Changelog top: 0.2.28"
+  - date: "2026-01-27"
+    actor: "codex"
+    change: "Backend upload: aggiunto endpoint POST /api/upload (multipart) con safe_path, limite 50MB, scrittura atomica; bump versione 0.2.29."
+    reason: "Servire l’upload di file dal PC verso /config in modo sicuro prima di implementare la UI."
+    touched_files:
+      - "file_editor_plus/backend/app.py"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "curl -F target_dir=. -F file=@test.txt http://addon/api/upload -> 200 e file salvato"
+      - "upload >50MB => 413"
+      - "upload filename già esistente => 409"
+      - "Changelog top: 0.2.29"
