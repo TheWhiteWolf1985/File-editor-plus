@@ -312,7 +312,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.27";
+  private readonly appVersion = "0.2.28";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -1904,6 +1904,7 @@ export class AppRoot extends LitElement {
       this.resetSessionStateInMemory();
       this.status = "Session reset";
       this.showToast("Sessione resettata");
+      await this.notifyFsChanged();
       this.reloadTree(true);
     } catch (err) {
       this.showToast("Errore reset sessione", "error");

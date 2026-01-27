@@ -1874,3 +1874,16 @@ log:
       - "DOM non contiene più .treeTargetLabel"
       - "New File/New Folder continua a usare activeDir (cartella selezionata o parent del file)"
       - "Changelog top: 0.2.27"
+  - date: "2026-01-27"
+    actor: "codex"
+    change: "Utility fix: i pulsanti Genera debug log e Reset session ora richiamano le azioni corrette, con refresh tree e bump 0.2.28."
+    reason: "Il bottone debug log lanciava reset; reset session non funzionava; serve wiring corretto."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Utility → Genera debug log crea file debug_* e mostra toast; tree si aggiorna"
+      - "Utility → Reset session svuota i tab, mostra toast e resetta session.json"
+      - "Changelog top: 0.2.28"

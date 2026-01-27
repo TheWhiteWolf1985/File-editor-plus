@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.28
+
+- 🛠️ Fix: Utility buttons “Genera debug log” e “Reset session” ora chiamano le azioni corrette e rinfrescano il tree.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).
