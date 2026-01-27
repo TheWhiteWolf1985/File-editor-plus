@@ -1993,3 +1993,18 @@ log:
       - "Seleziona N file, 409 su uno → toast per quel file, batch continua, riepilogo X/N"
       - "Refresh tree avviene una sola volta se almeno un upload riesce"
       - "Changelog top: 0.2.35"
+  - date: "2026-01-27"
+    actor: "codex"
+    change: "Conflitti upload/move: modale scelta (rinomina/sovrascrivi/annulla), backend supporta mode fail/overwrite/autorename; retry automatico; bump 0.2.36."
+    reason: "Gestire gracefully i conflitti di nome su upload e move."
+    touched_files:
+      - "file_editor_plus/backend/app.py"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/services/api.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Upload file esistente → modale, scegli Rinomina/Sovrascrivi/Annulla, retry singolo file"
+      - "Move 409 → modale conflitto, retry con scelta"
+      - "Changelog top: 0.2.36"

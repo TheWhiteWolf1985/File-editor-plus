@@ -219,22 +219,23 @@ export const apiGenerateDebugLog = (apiBase: string) => {
   return fetch(url, { method: "POST" });
 };
 
-export const apiUpload = (apiBase: string, file: File, targetDir: string) => {
+export const apiUpload = (apiBase: string, file: File, targetDir: string, mode: "fail" | "overwrite" | "autorename" = "fail") => {
   const url = `${apiBase}api/upload`;
   const fd = new FormData();
   fd.append("file", file);
   fd.append("target_dir", targetDir);
+  fd.append("mode", mode);
   return fetch(url, {
     method: "POST",
     body: fd,
   });
 };
 
-export const apiMovePath = (apiBase: string, src: string, dstDir: string) => {
+export const apiMovePath = (apiBase: string, src: string, dstDir: string, mode: "fail" | "overwrite" | "autorename" = "fail") => {
   const url = `${apiBase}api/fs/move`;
   return fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ src, dst_dir: dstDir }),
+    body: JSON.stringify({ src, dst_dir: dstDir, mode }),
   });
 };

@@ -224,6 +224,8 @@ export class AppRoot extends LitElement {
   declare pendingMove: { src: string; dstDir: string } | null;
   declare dropTargetPath: string | null;
   declare moveConfirmOpen: boolean;
+  declare conflictDialogOpen: boolean;
+  declare conflictData: { type: "upload" | "move"; name: string; target: string } | null;
   declare showResetSessionModal: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
@@ -331,7 +333,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.34";
+  private readonly appVersion = "0.2.36";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -350,6 +352,7 @@ export class AppRoot extends LitElement {
       e.returnValue = "";
     }
   };
+  private conflictResolver: ((choice: "skip" | "overwrite" | "autorename") => void) | null = null;
   private selectionListener = () => {
     if (!this.editorRef) return;
     const active = this.shadowRoot?.activeElement || document.activeElement;
@@ -465,6 +468,10 @@ export class AppRoot extends LitElement {
     this.pendingMove = null;
     this.dropTargetPath = null;
     this.moveConfirmOpen = false;
+    this.conflictDialogOpen = false;
+    this.conflictData = null;
+    this.conflictDialogOpen = false;
+    this.conflictData = null;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -636,6 +643,23 @@ export class AppRoot extends LitElement {
     this.uploadFile = files[0] ?? null;
   }
 
+  private promptConflict(type: "upload" | "move", name: string, target: string) {
+    this.conflictData = { type, name, target };
+    this.conflictDialogOpen = true;
+    return new Promise<"skip" | "overwrite" | "autorename">((resolve) => {
+      this.conflictResolver = resolve;
+    });
+  }
+
+  private resolveConflict(choice: "skip" | "overwrite" | "autorename") {
+    if (this.conflictResolver) {
+      this.conflictResolver(choice);
+    }
+    this.conflictResolver = null;
+    this.conflictDialogOpen = false;
+    this.conflictData = null;
+  }
+
   private async submitUpload() {
     if (this.uploadInProgress) return;
     if (!this.uploadFiles || this.uploadFiles.length === 0) {
@@ -652,7 +676,7 @@ export class AppRoot extends LitElement {
         let res: Response | null = null;
         let payload: any = null;
         try {
-          res = await apiUpload(this.apiBase, file, targetDir);
+          res = await apiUpload(this.apiBase, file, targetDir, "fail");
           try {
             payload = await res.json();
           } catch {
@@ -666,7 +690,23 @@ export class AppRoot extends LitElement {
 
         if (!res.ok || payload?.ok !== true) {
           if (res.status === 409) {
-            this.showToast(`Conflitto: ${file.name} esiste già`, "error");
+            const choice = await this.promptConflict("upload", file.name, targetDir);
+            if (choice !== "skip") {
+              const retry = await apiUpload(this.apiBase, file, targetDir, choice);
+              let retryPayload: any = null;
+              try {
+                retryPayload = await retry.json();
+              } catch {
+                retryPayload = null;
+              }
+              if (retry.ok && retryPayload?.ok === true) {
+                const fname = retryPayload?.path || file.name;
+                this.showToast(`Caricato: ${fname}`);
+                success += 1;
+              } else {
+                this.showToast(`Errore upload ${file.name}`, "error");
+              }
+            }
           } else if (res.status === 413) {
             this.showToast(`File troppo grande: ${file.name}`, "error");
           } else if (res.status === 404) {
@@ -697,10 +737,10 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private async performMove(src: string, dstDir: string) {
+  private async performMove(src: string, dstDir: string, mode: "fail" | "overwrite" | "autorename" = "fail") {
     const payloadDst = dstDir === "/" ? "" : dstDir;
     try {
-      const res = await apiMovePath(this.apiBase, src, payloadDst);
+      const res = await apiMovePath(this.apiBase, src, payloadDst, mode);
       let body: any = null;
       try {
         body = await res.json();
@@ -709,7 +749,13 @@ export class AppRoot extends LitElement {
       }
       if (!res.ok || body?.ok !== true) {
         if (res.status === 409) {
-          this.showToast("Esiste già un elemento con lo stesso nome nella destinazione", "error");
+          if (mode !== "fail") {
+            this.showToast("Esiste già un elemento con lo stesso nome nella destinazione", "error");
+            return;
+          }
+          const choice = await this.promptConflict("move", src.split("/").pop() || src, dstDir || "/");
+          if (choice === "skip") return;
+          return await this.performMove(src, dstDir, choice);
         } else if (res.status === 400) {
           this.showToast(body?.detail || "Spostamento non valido", "error");
         } else if (res.status === 404) {
@@ -2995,6 +3041,22 @@ export class AppRoot extends LitElement {
                 <div class="actions">
                   <button class="btn" @click=${() => this.cancelMoveConfirm()}>Annulla</button>
                   <button class="btn primary" @click=${() => this.confirmMove()}>Sposta</button>
+                </div>
+              </div>
+            </div>`
+          : nothing}
+
+        ${this.conflictDialogOpen && this.conflictData
+          ? html`<div class="modalBackdrop" @click=${() => { if (!this.uploadInProgress) this.resolveConflict("skip"); }}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:480px;">
+                <h3>Conflitto nome</h3>
+                <p style="margin-top:8px; color:var(--muted-color);">
+                  Esiste già <strong>${this.conflictData.name}</strong> in <strong>${this.conflictData.target}</strong>.
+                </p>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.resolveConflict("skip")}>Annulla</button>
+                  <button class="btn" @click=${() => this.resolveConflict("autorename")}>Rinomina</button>
+                  <button class="btn primary" @click=${() => this.resolveConflict("overwrite")}>Sovrascrivi</button>
                 </div>
               </div>
             </div>`

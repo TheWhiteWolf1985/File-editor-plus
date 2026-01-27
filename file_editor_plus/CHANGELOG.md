@@ -32,6 +32,10 @@
 
 - 📤 Add: upload multi-file con progress seriale e refresh tree unico.
 
+## 0.2.36
+
+- 📝 Add: gestione conflitti upload/move con modale (rinomina/sovrascrivi/annulla) e retry automatico.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

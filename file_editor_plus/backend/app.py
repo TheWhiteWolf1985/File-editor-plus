@@ -70,6 +70,7 @@ DEFAULT_SESSION_STATE = {"tabs": [], "active": None, "split": False}
 MAX_BUFFER_BYTES = 256 * 1024  # 256KB
 MAX_BUFFER_FILES = 10
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
+CONFLICT_MODES = {"fail", "overwrite", "autorename"}
 HA_ACTIONS = {
     "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_core_config"},
     "restart_core": {"type": "service", "domain": "homeassistant", "service": "restart"},
@@ -159,6 +160,18 @@ def atomic_write(target: Path, data: str) -> None:
         os.fsync(f.fileno())
 
     os.replace(tmp, target)  # atomic sulla stessa FS
+
+
+def next_available_name(path: Path) -> Path:
+    parent = path.parent
+    stem = path.stem
+    suffix = path.suffix
+    i = 1
+    while True:
+        candidate = parent / f"{stem} ({i}){suffix}"
+        if not candidate.exists():
+            return candidate
+        i += 1
 
 
 def _match_globs(rel_path: Path, globs: Optional[List[str]]) -> bool:
@@ -1278,12 +1291,19 @@ def read_file_raw(path: str):
 
 
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), target_dir: str = Form(...)):
+async def upload_file(
+    file: UploadFile = File(...),
+    target_dir: str = Form(...),
+    mode: str = Form("fail"),
+):
     if not file or not file.filename:
         raise HTTPException(415, "Invalid filename")
     original_name = file.filename
     if "/" in original_name or "\\" in original_name:
         raise HTTPException(415, "Invalid filename")
+    mode = (mode or "fail").lower()
+    if mode not in CONFLICT_MODES:
+        mode = "fail"
 
     # Normalizza target_dir: accetta anche /config/...
     td = (target_dir or "").strip()
@@ -1308,7 +1328,13 @@ async def upload_file(file: UploadFile = File(...), target_dir: str = Form(...))
         raise HTTPException(403, "Access denied")
 
     if dest.exists():
-        raise HTTPException(409, "File already exists")
+        if dest.is_dir():
+            raise HTTPException(409, "Destination already exists")
+        if mode == "fail":
+            raise HTTPException(409, "File already exists")
+        if mode == "autorename":
+            dest = next_available_name(dest)
+        # overwrite handled later
 
     tmp_name = f".upload_tmp_{uuid.uuid4().hex}"
     tmp_path = dest.with_name(tmp_name)
@@ -1326,6 +1352,11 @@ async def upload_file(file: UploadFile = File(...), target_dir: str = Form(...))
                 f.write(chunk)
             f.flush()
             os.fsync(f.fileno())
+        if mode == "overwrite" and dest.exists():
+            if dest.is_file():
+                dest.unlink()
+            else:
+                raise HTTPException(409, "Destination already exists")
         os.replace(tmp_path, dest)
     except HTTPException:
         if tmp_path.exists():
@@ -1388,6 +1419,9 @@ async def move_path(request: Request):
         raise HTTPException(400, "Invalid JSON")
     src_raw = (payload.get("src") or "").strip()
     dst_dir_raw = (payload.get("dst_dir") or "").strip()
+    mode = (payload.get("mode") or "fail").lower() if isinstance(payload, dict) else "fail"
+    if mode not in CONFLICT_MODES:
+        mode = "fail"
 
     if not src_raw or not dst_dir_raw:
         raise HTTPException(400, "src and dst_dir are required")
@@ -1426,7 +1460,17 @@ async def move_path(request: Request):
     if not _is_within_base(dst):
         raise HTTPException(403, "Access denied")
     if dst.exists():
-        raise HTTPException(409, "Destination already exists")
+        if mode == "fail":
+            raise HTTPException(409, "Destination already exists")
+        if mode == "autorename":
+            dst = next_available_name(dst)
+        elif mode == "overwrite":
+            if dst.is_file():
+                dst.unlink()
+            elif dst.is_dir():
+                shutil.rmtree(dst)
+            else:
+                raise HTTPException(400, "Unsupported destination type")
 
     try:
         os.replace(src, dst)
