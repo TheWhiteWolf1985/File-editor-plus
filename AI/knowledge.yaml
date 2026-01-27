@@ -1980,3 +1980,16 @@ log:
     verification:
       - "Drop file/cartella apre modale; 'Sposta' esegue move con refresh tree; 'Annulla' non fa nulla"
       - "Changelog top: 0.2.34"
+  - date: "2026-01-27"
+    actor: "codex"
+    change: "Upload multi-file: input multiple, lista file, progress seriale, toast per file e riepilogo, refresh tree unico; bump 0.2.35."
+    reason: "Migliorare UX di upload batch senza introdurre drag&drop."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Seleziona N file, 409 su uno → toast per quel file, batch continua, riepilogo X/N"
+      - "Refresh tree avviene una sola volta se almeno un upload riesce"
+      - "Changelog top: 0.2.35"

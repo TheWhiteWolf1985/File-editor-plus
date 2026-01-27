@@ -28,6 +28,10 @@
 
 - ⚠️ Add: modale di conferma per spostamento via drag&drop prima di eseguire il move.
 
+## 0.2.35
+
+- 📤 Add: upload multi-file con progress seriale e refresh tree unico.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

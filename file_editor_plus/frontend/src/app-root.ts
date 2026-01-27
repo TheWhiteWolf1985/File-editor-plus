@@ -184,6 +184,8 @@ export class AppRoot extends LitElement {
     showUploadModal: { state: true },
     uploadTargetDir: { state: true },
     uploadInProgress: { state: true },
+    uploadFiles: { state: true },
+    uploadProgress: { state: true },
     pendingMove: { state: true },
     dropTargetPath: { state: true },
     moveConfirmOpen: { state: true },
@@ -216,7 +218,9 @@ export class AppRoot extends LitElement {
   declare showUploadModal: boolean;
   declare uploadTargetDir: string;
   declare uploadFile: File | null;
+  declare uploadFiles: File[];
   declare uploadInProgress: boolean;
+  declare uploadProgress: { done: number; total: number } | null;
   declare pendingMove: { src: string; dstDir: string } | null;
   declare dropTargetPath: string | null;
   declare moveConfirmOpen: boolean;
@@ -455,7 +459,9 @@ export class AppRoot extends LitElement {
     this.showUploadModal = false;
     this.uploadTargetDir = "/";
     this.uploadFile = null;
+    this.uploadFiles = [];
     this.uploadInProgress = false;
+    this.uploadProgress = null;
     this.pendingMove = null;
     this.dropTargetPath = null;
     this.moveConfirmOpen = false;
@@ -608,67 +614,86 @@ export class AppRoot extends LitElement {
   private openUploadModal() {
     this.uploadTargetDir = this.normalizeDir(this.activeDir || "/");
     this.uploadFile = null;
+    this.uploadFiles = [];
+    this.uploadProgress = null;
     this.showUploadModal = true;
   }
 
   private closeUploadModal() {
+    if (this.uploadInProgress) return;
     this.showUploadModal = false;
     this.uploadFile = null;
+    this.uploadFiles = [];
     this.uploadInProgress = false;
+    this.uploadProgress = null;
     this.uploadTargetDir = this.normalizeDir(this.activeDir || "/");
   }
 
   private handleUploadFileChange(e: Event) {
     const input = e.target as HTMLInputElement | null;
-    this.uploadFile = input?.files && input.files[0] ? input.files[0] : null;
+    const files = input?.files ? Array.from(input.files) : [];
+    this.uploadFiles = files;
+    this.uploadFile = files[0] ?? null;
   }
 
   private async submitUpload() {
     if (this.uploadInProgress) return;
-    if (!this.uploadFile) {
-      this.showToast("Seleziona un file da caricare", "error");
+    if (!this.uploadFiles || this.uploadFiles.length === 0) {
+      this.showToast("Seleziona almeno un file da caricare", "error");
       return;
     }
     const dir = this.uploadTargetDir || "/";
     const targetDir = dir === "/" ? "/config" : dir;
     this.uploadInProgress = true;
+    this.uploadProgress = { done: 0, total: this.uploadFiles.length };
+    let success = 0;
     try {
-      const res = await apiUpload(this.apiBase, this.uploadFile, targetDir);
-      let payload: any = null;
-      try {
-        payload = await res.json();
-      } catch {
-        payload = null;
+      for (const file of this.uploadFiles) {
+        let res: Response | null = null;
+        let payload: any = null;
+        try {
+          res = await apiUpload(this.apiBase, file, targetDir);
+          try {
+            payload = await res.json();
+          } catch {
+            payload = null;
+          }
+        } catch (e) {
+          this.showToast(`Errore upload ${file.name}`, "error");
+          this.uploadProgress = { done: (this.uploadProgress?.done ?? 0) + 1, total: this.uploadFiles.length };
+          continue;
+        }
+
+        if (!res.ok || payload?.ok !== true) {
+          if (res.status === 409) {
+            this.showToast(`Conflitto: ${file.name} esiste già`, "error");
+          } else if (res.status === 413) {
+            this.showToast(`File troppo grande: ${file.name}`, "error");
+          } else if (res.status === 404) {
+            this.showToast("Cartella di destinazione non trovata", "error");
+          } else if (res.status === 400 || res.status === 415) {
+            this.showToast(`Nome non valido: ${file.name}`, "error");
+          } else {
+            const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
+            this.showToast(`${file.name}: ${msg}`, "error");
+          }
+        } else {
+          const fname = payload?.path || file.name;
+          this.showToast(`Caricato: ${fname}`);
+          success += 1;
+        }
+
+        this.uploadProgress = { done: (this.uploadProgress?.done ?? 0) + 1, total: this.uploadFiles.length };
       }
-      if (!res.ok || payload?.ok !== true) {
-        if (res.status === 409) {
-          this.showToast("Esiste già un file con quel nome. Rinominare e riprovare.", "error");
-          return;
-        }
-        if (res.status === 413) {
-          this.showToast("File troppo grande (max 50MB)", "error");
-          return;
-        }
-        if (res.status === 404) {
-          this.showToast("Cartella di destinazione non trovata", "error");
-          return;
-        }
-        if (res.status === 400 || res.status === 415) {
-          this.showToast("Nome file non valido o cartella non ammessa", "error");
-          return;
-        }
-        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
-        this.showToast(msg, "error");
-        return;
+
+      this.showToast(`Upload completato: ${success}/${this.uploadFiles.length}`);
+      if (success > 0) {
+        await this.notifyFsChanged();
       }
-      const fname = payload?.path || this.uploadFile.name;
-      this.showToast(`Upload completato: ${fname}`);
       this.closeUploadModal();
-      await this.notifyFsChanged();
-    } catch (e) {
-      this.showToast("Errore upload file", "error");
     } finally {
       this.uploadInProgress = false;
+      this.uploadProgress = null;
     }
   }
 
@@ -2915,8 +2940,21 @@ export class AppRoot extends LitElement {
                 <h3>Upload file</h3>
                 <div class="formRow" style="margin-top:12px; display:grid; gap:6px;">
                   <label style="font-size:var(--font-size-sm); color:var(--muted-color);">File</label>
-                  <input type="file" @change=${this.handleUploadFileChange} />
+                  <input type="file" multiple @change=${this.handleUploadFileChange} />
                 </div>
+                ${this.uploadFiles && this.uploadFiles.length
+                  ? html`<div style="max-height:160px; overflow:auto; margin-top:6px; border:1px solid var(--border-color); border-radius:6px; padding:6px; display:grid; gap:4px;">
+                      ${this.uploadFiles.map(
+                        (f) =>
+                          html`<div style="display:flex; justify-content:space-between; gap:8px;">
+                            <span style="overflow:hidden; text-overflow:ellipsis;">${f.name}</span>
+                            <span style="color:var(--muted-color); white-space:nowrap;">${(f.size / 1024).toFixed(
+                              f.size < 10240 ? 2 : 1
+                            )} KB</span>
+                          </div>`
+                      )}
+                    </div>`
+                  : nothing}
                 <div class="formRow" style="margin-top:12px; display:grid; gap:6px;">
                   <label style="font-size:var(--font-size-sm); color:var(--muted-color);">Cartella destinazione</label>
                   <select
@@ -2930,8 +2968,16 @@ export class AppRoot extends LitElement {
                 </div>
                 <div class="actions">
                   <button class="btn" @click=${() => this.closeUploadModal()} ?disabled=${this.uploadInProgress}>Annulla</button>
-                  <button class="btn primary" @click=${() => this.submitUpload()} ?disabled=${this.uploadInProgress || !this.uploadFile}>
-                    ${this.uploadInProgress ? "Caricamento..." : "Upload"}
+                  <button
+                    class="btn primary"
+                    @click=${() => this.submitUpload()}
+                    ?disabled=${this.uploadInProgress || !this.uploadFiles || this.uploadFiles.length === 0}
+                  >
+                    ${this.uploadInProgress
+                      ? this.uploadProgress
+                        ? `Caricamento... ${this.uploadProgress.done}/${this.uploadProgress.total}`
+                        : "Caricamento..."
+                      : "Upload"}
                   </button>
                 </div>
               </div>
