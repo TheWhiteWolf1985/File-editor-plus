@@ -137,8 +137,7 @@ export function handleTreeDrop(this: any, e: DragEvent, item: TreeItem) {
     this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
     return;
   }
-  this.pendingMove = { src, dstDir };
-  this.showToast(`Spostamento: ${src} → ${dstDir} (non ancora applicato)`);
+  this.performMove(src, dstDir);
 }
 
 export function handleTreeRootDragOver(this: any, e: DragEvent) {
@@ -160,8 +159,7 @@ export function handleTreeRootDrop(this: any, e: DragEvent) {
     this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
     return;
   }
-  this.pendingMove = { src, dstDir };
-  this.showToast(`Spostamento: ${src} → ${dstDir} (non ancora applicato)`);
+  this.performMove(src, dstDir);
 }
 
 export function copyTreeItem(this: any) {

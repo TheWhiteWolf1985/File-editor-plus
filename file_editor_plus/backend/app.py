@@ -1377,6 +1377,61 @@ async def write_file(request: Request, path: str, create_only: bool = False):
     return {"ok": True, "path": f.resolve().relative_to(BASE_DIR).as_posix(), "backup": str(bak.relative_to(BASE_DIR)) if bak else None}
 
 
+@app.post("/api/fs/move")
+async def move_path(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    src_raw = (payload.get("src") or "").strip()
+    dst_dir_raw = (payload.get("dst_dir") or "").strip()
+
+    if not src_raw or not dst_dir_raw:
+        raise HTTPException(400, "src and dst_dir are required")
+
+    if src_raw.startswith("/config/"):
+        src_raw = src_raw[len("/config/") :]
+    if src_raw == "/config":
+        src_raw = ""
+    if dst_dir_raw.startswith("/config/"):
+        dst_dir_raw = dst_dir_raw[len("/config/") :]
+    if dst_dir_raw == "/config":
+        dst_dir_raw = ""
+
+    src = safe_path(src_raw)
+    dst_dir = safe_path(dst_dir_raw)
+
+    if not src.exists():
+        raise HTTPException(404, "Source not found")
+    if not dst_dir.exists() or not dst_dir.is_dir():
+        raise HTTPException(400, "Destination directory invalid")
+
+    # Prevent moving dir into itself or subdir
+    if src.is_dir():
+        try:
+            dst_rel = dst_dir.resolve().relative_to(src.resolve())
+            # if succeeds, dst is inside src (or same)
+            raise HTTPException(400, "Cannot move a directory into itself")
+        except ValueError:
+            pass
+        if dst_dir.resolve() == src.resolve():
+            raise HTTPException(400, "Cannot move a directory into itself")
+
+    dst = (dst_dir / src.name).resolve()
+    if not _is_within_base(dst):
+        raise HTTPException(403, "Access denied")
+    if dst.exists():
+        raise HTTPException(409, "Destination already exists")
+
+    try:
+        os.replace(src, dst)
+    except Exception as e:
+        logger.exception("move_path: error moving %s to %s: %s", src, dst, e)
+        raise HTTPException(500, f"Move failed: {e}")
+
+    return {"ok": True, "src": src.resolve().relative_to(BASE_DIR).as_posix(), "dst": dst.resolve().relative_to(BASE_DIR).as_posix()}
+
+
 @app.get("/api/snippets")
 def get_snippets():
     return {"items": load_snippets()}

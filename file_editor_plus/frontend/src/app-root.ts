@@ -76,6 +76,7 @@ import {
   apiSaveFile,
   apiGenerateDebugLog,
   apiUpload,
+  apiMovePath,
   apiPutSession,
   apiPutSessionBuffer,
   apiGetSessionBuffer,
@@ -324,7 +325,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.31";
+  private readonly appVersion = "0.2.32";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -637,6 +638,37 @@ export class AppRoot extends LitElement {
       this.showToast("Errore upload file", "error");
     } finally {
       this.uploadInProgress = false;
+    }
+  }
+
+  private async performMove(src: string, dstDir: string) {
+    const dst = dstDir === "/" ? "" : dstDir;
+    const payloadDst = dst || "";
+    try {
+      const res = await apiMovePath(this.apiBase, src, payloadDst);
+      let body: any = null;
+      try {
+        body = await res.json();
+      } catch {
+        body = null;
+      }
+      if (!res.ok || body?.ok !== true) {
+        if (res.status === 409) {
+          this.showToast("Esiste già un elemento con lo stesso nome nella destinazione", "error");
+        } else if (res.status === 400) {
+          this.showToast(body?.detail || "Spostamento non valido", "error");
+        } else {
+          this.showToast(`Errore move (HTTP ${res.status})`, "error");
+        }
+        return;
+      }
+      this.showToast(`Spostato: ${src.split("/").pop() || src}`);
+      if (this.activePath === src) {
+        this.showToast("File spostato: riaprilo dalla nuova posizione", "error");
+      }
+      await this.notifyFsChanged();
+    } catch (e) {
+      this.showToast("Errore spostamento", "error");
     }
   }
 

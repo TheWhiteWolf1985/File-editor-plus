@@ -229,3 +229,12 @@ export const apiUpload = (apiBase: string, file: File, targetDir: string) => {
     body: fd,
   });
 };
+
+export const apiMovePath = (apiBase: string, src: string, dstDir: string) => {
+  const url = `${apiBase}api/fs/move`;
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ src, dst_dir: dstDir }),
+  });
+};

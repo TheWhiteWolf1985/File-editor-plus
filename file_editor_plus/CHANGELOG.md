@@ -16,6 +16,10 @@
 
 - 🪢 Add: drag & drop nel tree (solo UI) con calcolo sorgente/target e toast placeholder per move.
 
+## 0.2.32
+
+- 📂 Add: spostamento reale file/cartelle via drag&drop con endpoint /api/fs/move e refresh tree.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).
