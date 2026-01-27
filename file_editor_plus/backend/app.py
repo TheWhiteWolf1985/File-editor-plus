@@ -12,6 +12,7 @@ import re
 import socket
 import platform
 import hashlib
+import mimetypes
 from logging.handlers import RotatingFileHandler
 import tempfile
 import zipfile
@@ -1251,6 +1252,28 @@ def read_file(path: str):
         raise HTTPException(500, f"Read failed: {e}")
 
     return {"path": f.resolve().relative_to(BASE_DIR).as_posix(), "content": content}
+
+
+@app.get("/api/file/raw")
+def read_file_raw(path: str):
+    # Support both relative and absolute "/config/..." paths for convenience
+    if path.startswith("/config/"):
+        path = path[len("/config/") :]
+    f = safe_path(path)
+    if not f.exists():
+        raise HTTPException(404, "File not found")
+    if not f.is_file():
+        raise HTTPException(400, "Not a file")
+    allowed_ext = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
+    ext = f.suffix.lower()
+    if ext not in allowed_ext:
+        raise HTTPException(415, f"Unsupported media type: {ext or 'unknown'}")
+    media_type, _ = mimetypes.guess_type(f.name)
+    return FileResponse(
+        str(f),
+        media_type=media_type or "application/octet-stream",
+        headers={"Cache-Control": "private, max-age=60"},
+    )
 
 
 @app.put("/api/file")
