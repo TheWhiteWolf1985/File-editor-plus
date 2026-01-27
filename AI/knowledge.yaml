@@ -1917,3 +1917,18 @@ log:
       - "Explorer → Upload apre modale; default cartella = activeDir"
       - "Submit carica file via /api/upload, toast success, tree aggiornato senza reload manuale"
       - "Changelog top: 0.2.30"
+  - date: "2026-01-27"
+    actor: "codex"
+    change: "Drag&Drop scaffold nel tree: nodi draggabili, drop solo su cartelle/root, calcolo src/dst e toast placeholder; nessun move backend; bump 0.2.31."
+    reason: "Preparare lo spostamento file/dir con sola logica UI."
+    touched_files:
+      - "file_editor_plus/frontend/src/features/tree/tree.ts"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/styles/app-styles.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Drag file/cartella su cartella → toast 'Spostamento: src → dst (non ancora applicato)'"
+      - "Drop su file non accettato; drop dir in sé/subdir mostra toast errore"
+      - "Changelog top: 0.2.31"

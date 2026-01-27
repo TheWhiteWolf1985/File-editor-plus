@@ -12,6 +12,10 @@
 
 - 📤 Add: UI upload nel tab Explorer con modale (file picker + scelta cartella) e refresh tree automatico.
 
+## 0.2.31
+
+- 🪢 Add: drag & drop nel tree (solo UI) con calcolo sorgente/target e toast placeholder per move.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

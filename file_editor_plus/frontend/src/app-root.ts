@@ -183,6 +183,8 @@ export class AppRoot extends LitElement {
     showUploadModal: { state: true },
     uploadTargetDir: { state: true },
     uploadInProgress: { state: true },
+    pendingMove: { state: true },
+    dropTargetPath: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -213,6 +215,8 @@ export class AppRoot extends LitElement {
   declare uploadTargetDir: string;
   declare uploadFile: File | null;
   declare uploadInProgress: boolean;
+  declare pendingMove: { src: string; dstDir: string } | null;
+  declare dropTargetPath: string | null;
   declare showResetSessionModal: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
@@ -320,7 +324,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.30";
+  private readonly appVersion = "0.2.31";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -331,6 +335,8 @@ export class AppRoot extends LitElement {
   private pendingJump: { path: string; line: number; col: number } | null = null;
   private pendingUnsavedAction: { type: "open" | "close"; path: string } | null = null;
   private treeClipboard: { path: string; type: "file" | "dir" } | null = null;
+  private draggingPath: string | null = null;
+  private draggingType: "file" | "dir" | null = null;
   private beforeUnloadHandler = (e: BeforeUnloadEvent) => {
     if (this.isActiveDirty()) {
       e.preventDefault();
@@ -357,6 +363,12 @@ export class AppRoot extends LitElement {
   private createNewItem = treeCreateNewItem.bind(this);
   private cancelNewItem = treeCancelNewItem.bind(this);
   private renderTree = treeRenderTree.bind(this);
+  private handleTreeDragStart = treeHandleTreeDragStart.bind(this);
+  private handleTreeDragOver = treeHandleTreeDragOver.bind(this);
+  private handleTreeDragLeave = treeHandleTreeDragLeave.bind(this);
+  private handleTreeDrop = treeHandleTreeDrop.bind(this);
+  private handleTreeRootDragOver = treeHandleTreeRootDragOver.bind(this);
+  private handleTreeRootDrop = treeHandleTreeRootDrop.bind(this);
   private performSearch = searchPerformSearch.bind(this);
   private replaceAll = searchReplaceAll.bind(this);
   private openSearchMatch = searchOpenSearchMatch.bind(this);
@@ -423,6 +435,8 @@ export class AppRoot extends LitElement {
     this.uploadTargetDir = "/";
     this.uploadFile = null;
     this.uploadInProgress = false;
+    this.pendingMove = null;
+    this.dropTargetPath = null;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -2010,7 +2024,15 @@ export class AppRoot extends LitElement {
         <div class="treeHeader">
           <button class="btn" type="button" @click=${() => this.openUploadModal()}>⬆️ Upload</button>
         </div>
-        <div class="treeScrollable" @contextmenu=${(e: Event) => this.handleTreeBlankContextMenu(e as MouseEvent)}>
+        <div
+          class="treeScrollable"
+          @contextmenu=${(e: Event) => this.handleTreeBlankContextMenu(e as MouseEvent)}
+          @dragover=${(e: DragEvent) => this.handleTreeRootDragOver(e)}
+          @drop=${(e: DragEvent) => this.handleTreeRootDrop(e)}
+          @dragleave=${() => {
+            if (this.dropTargetPath === "/") this.dropTargetPath = null;
+          }}
+        >
           ${this.renderTree("")}
         </div>
       </div>`;

@@ -511,6 +511,10 @@ export const appStyles = css`
       box-shadow: inset 3px 0 var(--accent-color);
       background: color-mix(in srgb, var(--accent-color) 12%, transparent);
     }
+    .treeRow.dropTarget {
+      outline: 1px dashed var(--accent-color);
+      background: color-mix(in srgb, var(--accent-color) 18%, transparent);
+    }
     .indent {
       width: 14px;
       flex: 0 0 14px;

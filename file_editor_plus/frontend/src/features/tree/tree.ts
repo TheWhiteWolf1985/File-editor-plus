@@ -105,6 +105,65 @@ export function closeTreeMenu(this: any) {
   }
 }
 
+export function handleTreeDragStart(this: any, e: DragEvent, item: TreeItem) {
+  if (!e.dataTransfer) return;
+  e.dataTransfer.setData("text/plain", item.path);
+  e.dataTransfer.setData("application/x-fep-type", item.type);
+  this.draggingPath = item.path;
+  this.draggingType = item.type;
+}
+
+export function handleTreeDragOver(this: any, e: DragEvent, item: TreeItem) {
+  if (item.type !== "dir") return;
+  e.preventDefault();
+  this.dropTargetPath = item.path || "/";
+}
+
+export function handleTreeDragLeave(this: any, e: DragEvent, item: TreeItem) {
+  if (this.dropTargetPath === (item.path || "/")) {
+    this.dropTargetPath = null;
+  }
+}
+
+export function handleTreeDrop(this: any, e: DragEvent, item: TreeItem) {
+  if (item.type !== "dir") return;
+  e.preventDefault();
+  const src = e.dataTransfer?.getData("text/plain") || this.draggingPath;
+  const srcType = (e.dataTransfer?.getData("application/x-fep-type") as "file" | "dir" | "") || this.draggingType;
+  this.dropTargetPath = null;
+  if (!src) return;
+  const dstDir = item.path || "/";
+  if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
+    this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+    return;
+  }
+  this.pendingMove = { src, dstDir };
+  this.showToast(`Spostamento: ${src} → ${dstDir} (non ancora applicato)`);
+}
+
+export function handleTreeRootDragOver(this: any, e: DragEvent) {
+  // drop on blank/root
+  if (e.target && (e.target as HTMLElement).closest(".treeRow")) return;
+  e.preventDefault();
+  this.dropTargetPath = "/";
+}
+
+export function handleTreeRootDrop(this: any, e: DragEvent) {
+  if (e.target && (e.target as HTMLElement).closest(".treeRow")) return;
+  e.preventDefault();
+  const src = e.dataTransfer?.getData("text/plain") || this.draggingPath;
+  const srcType = (e.dataTransfer?.getData("application/x-fep-type") as "file" | "dir" | "") || this.draggingType;
+  this.dropTargetPath = null;
+  if (!src) return;
+  const dstDir = "/";
+  if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
+    this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+    return;
+  }
+  this.pendingMove = { src, dstDir };
+  this.showToast(`Spostamento: ${src} → ${dstDir} (non ancora applicato)`);
+}
+
 export function copyTreeItem(this: any) {
   if (!this.treeMenuPath || !this.treeMenuType) return;
   this.treeClipboard = { path: this.treeMenuPath, type: this.treeMenuType };
@@ -320,11 +379,17 @@ export function renderTree(this: any, path: string, depth = 0) {
     const isExpanded = isDir && this.expanded.has(it.path);
     const active = this.activePath === it.path;
     const targetDir = isDir && this.activeDir === it.path;
+    const dropActive = this.dropTargetPath === (it.path || "/");
 
     return html`
       <div
-        class="treeRow ${active ? "active" : ""} ${targetDir ? "targetDir" : ""}"
+        class="treeRow ${active ? "active" : ""} ${targetDir ? "targetDir" : ""} ${dropActive ? "dropTarget" : ""}"
         style="padding-left:${8 + depth * 14}px"
+        draggable="true"
+        @dragstart=${(e: DragEvent) => this.handleTreeDragStart(e, it)}
+        @dragover=${(e: DragEvent) => this.handleTreeDragOver(e, it)}
+        @dragleave=${(e: DragEvent) => this.handleTreeDragLeave(e, it)}
+        @drop=${(e: DragEvent) => this.handleTreeDrop(e, it)}
         @click=${() => {
           if (isDir) {
             this.setActiveSelection(it.path, true);
