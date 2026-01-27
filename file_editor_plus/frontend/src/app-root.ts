@@ -189,6 +189,8 @@ export class AppRoot extends LitElement {
     pendingMove: { state: true },
     dropTargetPath: { state: true },
     moveConfirmOpen: { state: true },
+    conflictDialogOpen: { state: true },
+    conflictData: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -224,6 +226,8 @@ export class AppRoot extends LitElement {
   declare pendingMove: { src: string; dstDir: string } | null;
   declare dropTargetPath: string | null;
   declare moveConfirmOpen: boolean;
+  declare conflictDialogOpen: boolean;
+  declare conflictData: { type: "upload" | "move"; name: string; target: string } | null;
   declare conflictDialogOpen: boolean;
   declare conflictData: { type: "upload" | "move"; name: string; target: string } | null;
   declare showResetSessionModal: boolean;
@@ -333,7 +337,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.36";
+  private readonly appVersion = "0.2.37";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -468,6 +472,10 @@ export class AppRoot extends LitElement {
     this.pendingMove = null;
     this.dropTargetPath = null;
     this.moveConfirmOpen = false;
+    this.conflictDialogOpen = false;
+    this.conflictData = null;
+    this.conflictDialogOpen = false;
+    this.conflictData = null;
     this.conflictDialogOpen = false;
     this.conflictData = null;
     this.conflictDialogOpen = false;
@@ -619,7 +627,10 @@ export class AppRoot extends LitElement {
   }
 
   private openUploadModal() {
-    this.uploadTargetDir = this.normalizeDir(this.activeDir || "/");
+    const defaultDir = this.isDirWritable(this.activeDir || "/")
+      ? this.normalizeDir(this.activeDir || "/")
+      : (this.getDirectoryOptions().find((d) => d.writable)?.path ?? "/");
+    this.uploadTargetDir = defaultDir || "/";
     this.uploadFile = null;
     this.uploadFiles = [];
     this.uploadProgress = null;
@@ -664,6 +675,10 @@ export class AppRoot extends LitElement {
     if (this.uploadInProgress) return;
     if (!this.uploadFiles || this.uploadFiles.length === 0) {
       this.showToast("Seleziona almeno un file da caricare", "error");
+      return;
+    }
+    if (!this.isDirWritable(this.uploadTargetDir)) {
+      this.showToast("Cartella in sola lettura: scegli un'altra destinazione", "error");
       return;
     }
     const dir = this.uploadTargetDir || "/";
@@ -1952,26 +1967,36 @@ export class AppRoot extends LitElement {
     return trimmed || "/";
   }
 
-  private getDirectoryOptions(): string[] {
-    const dirs = new Set<string>();
-    dirs.add("/");
-    dirs.add(this.normalizeDir(this.activeDir || "/"));
+  private getDirectoryOptions(): { path: string; writable: boolean }[] {
+    const dirs = new Map<string, boolean>();
+    dirs.set("/", true);
+    const addDir = (path: string, writable: boolean | undefined | null) => {
+      const norm = this.normalizeDir(path);
+      dirs.set(norm, writable !== false);
+    };
     const scan = (p: string) => {
       const items = this.treeData[p] || [];
       items.forEach((item: TreeItem) => {
         if (item.type === "dir") {
-          const d = this.normalizeDir(item.path);
-          if (!dirs.has(d)) {
-            dirs.add(d);
-            if (this.treeData[item.path]) {
-              scan(item.path);
-            }
+          addDir(item.path, item.writable);
+          if (this.treeData[item.path]) {
+            scan(item.path);
           }
         }
       });
     };
     scan("");
-    return Array.from(dirs).sort((a, b) => a.localeCompare(b));
+    return Array.from(dirs.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([path, writable]) => ({ path, writable }));
+  }
+
+  private isDirWritable(path: string): boolean {
+    const norm = this.normalizeDir(path);
+    if (norm === "/" || norm === "") return true;
+    const allDirs = this.getDirectoryOptions();
+    const entry = allDirs.find((d) => this.normalizeDir(d.path) === norm);
+    return entry ? entry.writable : true;
   }
 
   private setActiveSelection(path: string | null, isDir: boolean) {
@@ -3007,8 +3032,11 @@ export class AppRoot extends LitElement {
                     .value=${this.uploadTargetDir}
                     @change=${(e: Event) => (this.uploadTargetDir = this.normalizeDir((e.target as HTMLSelectElement).value))}
                   >
-                    ${this.getDirectoryOptions().map((dir) =>
-                      html`<option value=${dir}>${dir === "/" ? "/config" : `/config/${dir}`}</option>`
+                    ${this.getDirectoryOptions().map(
+                      (dir) =>
+                        html`<option value=${dir.path} ?disabled=${!dir.writable}>
+                          ${dir.path === "/" ? "/config" : `/config/${dir.path}`} ${dir.writable ? "" : " (readonly)"}
+                        </option>`
                     )}
                   </select>
                 </div>

@@ -1,4 +1,4 @@
-export type TreeItem = { name: string; path: string; type: "dir" | "file"; children?: TreeItem[] };
+export type TreeItem = { name: string; path: string; type: "dir" | "file"; writable?: boolean | null; children?: TreeItem[] };
 export type Tab = {
   path: string;
   name: string;

@@ -36,6 +36,10 @@
 
 - 📝 Add: gestione conflitti upload/move con modale (rinomina/sovrascrivi/annulla) e retry automatico.
 
+## 0.2.37
+
+- 🔒 Add: rilevamento cartelle readonly — upload disabilitato e drop impedito con warning, flag writable nel tree.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

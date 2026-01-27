@@ -1239,11 +1239,19 @@ def tree(path: str = ""):
         except Exception:
             continue
 
+        writable = True
+        if p.is_dir():
+            try:
+                writable = os.access(p, os.W_OK)
+            except Exception:
+                writable = False
+
         items.append(
             {
                 "name": name,
                 "path": rel,
                 "type": "dir" if p.is_dir() else "file",
+                "writable": writable if p.is_dir() else None,
             }
         )
 

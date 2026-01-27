@@ -114,7 +114,10 @@ export function handleTreeDragStart(this: any, e: DragEvent, item: TreeItem) {
 }
 
 export function handleTreeDragOver(this: any, e: DragEvent, item: TreeItem) {
-  if (item.type !== "dir") return;
+  if (item.type !== "dir" || item.writable === false) {
+    this.dropTargetPath = null;
+    return;
+  }
   e.preventDefault();
   this.dropTargetPath = item.path || "/";
 }
@@ -128,6 +131,10 @@ export function handleTreeDragLeave(this: any, e: DragEvent, item: TreeItem) {
 export function handleTreeDrop(this: any, e: DragEvent, item: TreeItem) {
   if (item.type !== "dir") return;
   e.preventDefault();
+  if (item.writable === false) {
+    this.showToast("Cartella in sola lettura", "error");
+    return;
+  }
   const src = e.dataTransfer?.getData("text/plain") || this.draggingPath;
   const srcType = (e.dataTransfer?.getData("application/x-fep-type") as "file" | "dir" | "") || this.draggingType;
   this.dropTargetPath = null;
@@ -377,11 +384,12 @@ export function renderTree(this: any, path: string, depth = 0) {
     const isExpanded = isDir && this.expanded.has(it.path);
     const active = this.activePath === it.path;
     const targetDir = isDir && this.activeDir === it.path;
+    const readonlyDir = isDir && it.writable === false;
     const dropActive = this.dropTargetPath === (it.path || "/");
 
     return html`
       <div
-        class="treeRow ${active ? "active" : ""} ${targetDir ? "targetDir" : ""} ${dropActive ? "dropTarget" : ""}"
+        class="treeRow ${active ? "active" : ""} ${targetDir ? "targetDir" : ""} ${dropActive ? "dropTarget" : ""} ${readonlyDir ? "readonly-dir" : ""}"
         style="padding-left:${8 + depth * 14}px"
         draggable="true"
         @dragstart=${(e: DragEvent) => this.handleTreeDragStart(e, it)}
