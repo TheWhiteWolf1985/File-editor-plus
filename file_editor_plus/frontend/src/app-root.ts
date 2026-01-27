@@ -15,6 +15,7 @@ import {
   renderSearchResults as searchRenderSearchResults,
   replaceAll as searchReplaceAll,
 } from "./features/search/search";
+import "./components/image-preview-modal";
 import {
   closeSnippetModal as snippetCloseSnippetModal,
   deleteSnippet as snippetDeleteSnippet,
@@ -161,6 +162,8 @@ export class AppRoot extends LitElement {
     treeMenuPath: { state: true },
     treeMenuType: { state: true },
     treeMenuFromBlank: { state: true },
+    imagePreview: { state: true },
+    imagePreviewOpen: { state: true },
     imagePreviewRequest: { state: true },
     showTreeDeleteModal: { state: true },
     deleteTargetPath: { state: true },
@@ -248,7 +251,10 @@ export class AppRoot extends LitElement {
   declare treeMenuY: number;
   declare treeMenuPath: string | null;
   declare treeMenuType: "file" | "dir" | null;
+  declare treeMenuSize: number | null;
   declare treeMenuFromBlank: boolean;
+  declare imagePreview: { path: string; url: string; name?: string; size?: number | null } | null;
+  declare imagePreviewOpen: boolean;
   declare imagePreviewRequest: { path: string; url: string; name?: string } | null;
   declare showTreeDeleteModal: boolean;
   declare deleteTargetPath: string | null;
@@ -307,7 +313,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.24";
+  private readonly appVersion = "0.2.25";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -450,7 +456,10 @@ export class AppRoot extends LitElement {
     this.treeMenuY = 0;
     this.treeMenuPath = null;
     this.treeMenuType = null;
+    this.treeMenuSize = null;
     this.treeMenuFromBlank = false;
+    this.imagePreview = null;
+    this.imagePreviewOpen = false;
     this.imagePreviewRequest = null;
     this.showTreeDeleteModal = false;
     this.deleteTargetPath = null;
@@ -1166,14 +1175,15 @@ export class AppRoot extends LitElement {
     return [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"].some((ext) => lower.endsWith(ext));
   }
 
-  private handleImagePreview(path: string | null) {
+  private handleImagePreview(path: string | null, size?: number | null) {
     if (!path) {
       this.showToast("Path immagine non valido", "error");
       return;
     }
     const url = `${this.apiBase}api/file/raw?path=${encodeURIComponent(path)}`;
-    this.imagePreviewRequest = { path, url, name: path.split("/").pop() || path };
-    this.showToast(`Anteprima immagine: ${this.imagePreviewRequest.name || path}`);
+    this.imagePreview = { path, url, name: path.split("/").pop() || path, size: size ?? null };
+    this.imagePreviewOpen = true;
+    this.showToast(`Anteprima immagine: ${this.imagePreview.name || path}`);
     this.closeContextMenu();
   }
 
@@ -1659,6 +1669,8 @@ export class AppRoot extends LitElement {
     this.clearBufferTimer("");
     this.bufferSaveTimers.clear();
     this.dirtySessionToastShown = false;
+    this.imagePreview = null;
+    this.imagePreviewOpen = false;
   }
 
   private normalizeDir(path: string | null | undefined): string {
@@ -2408,7 +2420,7 @@ export class AppRoot extends LitElement {
               ${!this.treeMenuFromBlank
                 ? html`
                     ${this.treeMenuType === "file" && this.isImagePath(this.treeMenuPath)
-                      ? html`<div class="contextMenuItem" @click=${() => this.handleImagePreview(this.treeMenuPath)}>🖼️ Anteprima immagine</div>`
+                      ? html`<div class="contextMenuItem" @click=${() => this.handleImagePreview(this.treeMenuPath, this.treeMenuSize)}>🖼️ Anteprima immagine</div>`
                       : nothing}
                     <div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
                     <div
@@ -2676,6 +2688,16 @@ export class AppRoot extends LitElement {
               </div>
             </div>`
           : nothing}
+
+        <image-preview-modal
+          .open=${this.imagePreviewOpen}
+          .src=${this.imagePreview?.url || null}
+          .path=${this.imagePreview?.path || null}
+          .name=${this.imagePreview?.name || null}
+          .size=${this.imagePreview?.size ?? null}
+          @close=${() => (this.imagePreviewOpen = false)}
+          @error=${() => this.showToast("Impossibile caricare l'immagine", "error")}
+        ></image-preview-modal>
 
         <div class="statusbar">
           <div>${this.status}</div>

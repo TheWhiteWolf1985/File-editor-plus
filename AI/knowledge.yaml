@@ -725,6 +725,20 @@ log:
     verification:
       - "Click destro su .png/.jpg/.jpeg/.webp/.gif/.svg: compare 'Anteprima immagine', toast conferma e state imagePreviewRequest valorizzato"
       - "Click destro su file non immagine o cartella: voce assente"
+  - date: "2026-01-12"
+    actor: "codex"
+    version: "0.2.25"
+    change: "Feature immagini step 3/4: aggiunta modale riutilizzabile per anteprima immagini (img + metadati) con chiusura X/ESC; il context menu ora apre la modale con path/url/size; bump 0.2.25."
+    reason: "Completare la preview immagini lato frontend con un overlay dedicato."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/components/image-preview-modal.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Right-click su immagine → Anteprima: modale mostra immagine, path e metadati; ESC o X chiude."
+      - "img onerror mostra toast ma non rompe l'UI."
   - date: "2026-01-11"
     actor: "codex"
     version: "0.2.4"
