@@ -517,15 +517,6 @@ export const appStyles = css`
     .muted {
       opacity: 0.8;
     }
-    .treeTargetLabel {
-      margin-top: 8px;
-      padding: 4px 8px;
-      font-size: var(--font-size-xs);
-      color: var(--muted-color);
-      background: var(--panel-strong);
-      border-radius: 6px;
-      border: 1px solid var(--border-color);
-    }
 
     /* Editor */
     .editor {

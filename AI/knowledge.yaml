@@ -1860,3 +1860,17 @@ log:
       - "GET /api/file/raw?path=<img> + context menu → Anteprima immagine apre modale; click backdrop/ESC chiude"
       - "File >20MB mostra toast 'File troppo grande per anteprima' e placeholder senza caricare"
       - "Changelog top: 0.2.26"
+  - date: "2026-01-27"
+    actor: "codex"
+    change: "Cleanup: rimossa UI TreeTargetLabel dal file explorer; mantenuta logica activeDir; bump versione 0.2.27."
+    reason: "Snellire la sidebar senza impattare la creazione di file/cartelle annidate."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/styles/app-styles.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "DOM non contiene più .treeTargetLabel"
+      - "New File/New Folder continua a usare activeDir (cartella selezionata o parent del file)"
+      - "Changelog top: 0.2.27"

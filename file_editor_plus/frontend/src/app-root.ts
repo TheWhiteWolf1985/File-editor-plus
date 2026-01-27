@@ -312,7 +312,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.26";
+  private readonly appVersion = "0.2.27";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -1916,7 +1916,6 @@ export class AppRoot extends LitElement {
         <div class="treeScrollable" @contextmenu=${(e: Event) => this.handleTreeBlankContextMenu(e as MouseEvent)}>
           ${this.renderTree("")}
         </div>
-        <div class="treeTargetLabel">Target: ${this.activeDir || "/"}</div>
       </div>`;
     }
     if (this.activeActivity === "search") {

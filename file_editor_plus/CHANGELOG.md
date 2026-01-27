@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.27
+
+- 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).
+
 ## 0.2.26
 
 - 🖼️ Improve: polish anteprima immagini (limite 20MB, chiusura su backdrop/ESC, placeholder pulito, cleanup stato).
