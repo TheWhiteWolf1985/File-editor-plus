@@ -2570,7 +2570,7 @@ export class AppRoot extends LitElement {
             : nothing}
         </div>
 
-        <div class="main" ${ref((el) => (this.mainRef = el))}>
+        <div class="main" ${ref((el) => (this.mainRef = el instanceof HTMLDivElement ? el : null))}>
           <div class="activity">
             <div class="activityGroup">
               <div class="act ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>📁</div>
@@ -2589,7 +2589,7 @@ export class AppRoot extends LitElement {
 
           <div class="sidebarBackdrop ${this.sidebarOpen ? "open" : ""}" @click=${() => (this.sidebarOpen = false)}></div>
 
-          <div class="sidebar ${this.sidebarOpen ? "open" : ""}" ${ref((el) => (this.sidebarRef = el))}>
+          <div class="sidebar ${this.sidebarOpen ? "open" : ""}" ${ref((el) => (this.sidebarRef = el instanceof HTMLDivElement ? el : null))}>
             <div class="sidebarHeader">
               <div class="explorerTitle">
                 ${this.activeActivity === "explorer"
@@ -2652,11 +2652,11 @@ export class AppRoot extends LitElement {
                 ? html`<div class="splitWrap">
                     <div class="splitPane">
                       <div class="editorWrap">
-                        <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
+                        <div class="gutter" ${ref((el) => (this.gutterRef = el instanceof HTMLDivElement ? el : null))}>${renderLineNumbers(this.lineCount)}</div>
                     <div class="codeWrap">
                       <div
                         class="code ${this.showIndentGuides ? "showGuides" : ""}"
-                        ${ref((el) => (this.codeRef = el))}
+                        ${ref((el) => (this.codeRef = el instanceof HTMLDivElement ? el : null))}
                       >
                         ${renderHighlighted(this.content, {
                           diffMap: diffMaps.left,
@@ -2667,7 +2667,7 @@ export class AppRoot extends LitElement {
                         })}
                       </div>
                       <textarea
-                        ${ref((el) => (this.editorRef = el))}
+                        ${ref((el) => (this.editorRef = el instanceof HTMLTextAreaElement ? el : null))}
                         .value=${this.content}
                         placeholder="Seleziona un file a sinistra…"
                         spellcheck="false"
@@ -2688,20 +2688,20 @@ export class AppRoot extends LitElement {
                     </div>
                     <div class="splitPane">
                       <div class="editorWrap">
-                        <div class="gutter" ${ref((el) => (this.baseGutterRef = el))}>${renderLineNumbersFor(this.savedBaseText)}</div>
+                        <div class="gutter" ${ref((el) => (this.baseGutterRef = el instanceof HTMLDivElement ? el : null))}>${renderLineNumbersFor(this.savedBaseText)}</div>
                     <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${renderHighlighted(this.savedBaseText, { diffMap: diffMaps.right })}</div>
-                      <pre class="basePre" ${ref((el) => (this.basePreRef = el))} @scroll=${this.syncBaseScroll}>${this.savedBaseText}</pre>
+                      <div class="code" ${ref((el) => (this.baseCodeRef = el instanceof HTMLDivElement ? el : null))}>${renderHighlighted(this.savedBaseText, { diffMap: diffMaps.right })}</div>
+                      <pre class="basePre" ${ref((el) => (this.basePreRef = el instanceof HTMLPreElement ? el : null))} @scroll=${this.syncBaseScroll}>${this.savedBaseText}</pre>
                     </div>
                       </div>
                     </div>
                   </div>`
                 : html`<div class="editorWrap">
-                    <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
+                    <div class="gutter" ${ref((el) => (this.gutterRef = el instanceof HTMLDivElement ? el : null))}>${renderLineNumbers(this.lineCount)}</div>
                     <div class="codeWrap">
                       <div
                         class="code ${this.showIndentGuides ? "showGuides" : ""}"
-                        ${ref((el) => (this.codeRef = el))}
+                        ${ref((el) => (this.codeRef = el instanceof HTMLDivElement ? el : null))}
                       >
                         ${renderHighlighted(this.content, {
                           showGuides: this.showIndentGuides,
@@ -2711,7 +2711,7 @@ export class AppRoot extends LitElement {
                         })}
                       </div>
                       <textarea
-                        ${ref((el) => (this.editorRef = el))}
+                        ${ref((el) => (this.editorRef = el instanceof HTMLTextAreaElement ? el : null))}
                         .value=${this.content}
                         placeholder="Seleziona un file a sinistra…"
                         spellcheck="false"

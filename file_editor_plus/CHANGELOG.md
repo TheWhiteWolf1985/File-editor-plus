@@ -56,6 +56,10 @@
 
 - 🧩 Fix: build frontend (typing) — performMove tipizzato, tab lastEditAt camelCase opzionale.
 
+## 0.2.42
+
+- 🛠️ Fix: build frontend (ref safety) — guard `ref` assignments per evitare TS2322 su elementi null/undefined.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).
