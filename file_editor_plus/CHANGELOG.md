@@ -48,6 +48,10 @@
 
 - 🔧 Fix: build frontend — rimosse dichiarazioni duplicate di state (conflictDialogOpen/conflictData/treeDirty).
 
+## 0.2.40
+
+- 🛠️ Fix: build frontend (handler drag&drop referenziati) — binding corretto ai metodi di classe.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

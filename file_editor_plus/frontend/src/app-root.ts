@@ -375,12 +375,6 @@ export class AppRoot extends LitElement {
   private createNewItem = treeCreateNewItem.bind(this);
   private cancelNewItem = treeCancelNewItem.bind(this);
   private renderTree = treeRenderTree.bind(this);
-  private handleTreeDragStart = treeHandleTreeDragStart.bind(this);
-  private handleTreeDragOver = treeHandleTreeDragOver.bind(this);
-  private handleTreeDragLeave = treeHandleTreeDragLeave.bind(this);
-  private handleTreeDrop = treeHandleTreeDrop.bind(this);
-  private handleTreeRootDragOver = treeHandleTreeRootDragOver.bind(this);
-  private handleTreeRootDrop = treeHandleTreeRootDrop.bind(this);
   private queueMove = (src: string, dstDir: string) => {
     this.pendingMove = { src, dstDir };
     this.moveConfirmOpen = true;
@@ -398,6 +392,24 @@ export class AppRoot extends LitElement {
     }
     const { src, dstDir } = this.pendingMove;
     await this.performMove(src, dstDir);
+  }
+  private handleTreeDragStart(e: DragEvent, item: TreeItem) {
+    return treeHandleTreeDragStart.call(this, e, item);
+  }
+  private handleTreeDragOver(e: DragEvent, item: TreeItem) {
+    return treeHandleTreeDragOver.call(this, e, item);
+  }
+  private handleTreeDragLeave(e: DragEvent, item: TreeItem) {
+    return treeHandleTreeDragLeave.call(this, e, item);
+  }
+  private handleTreeDrop(e: DragEvent, item: TreeItem) {
+    return treeHandleTreeDrop.call(this, e, item);
+  }
+  private handleTreeRootDragOver(e: DragEvent) {
+    return treeHandleTreeRootDragOver.call(this, e);
+  }
+  private handleTreeRootDrop(e: DragEvent) {
+    return treeHandleTreeRootDrop.call(this, e);
   }
   private performSearch = searchPerformSearch.bind(this);
   private replaceAll = searchReplaceAll.bind(this);
@@ -470,8 +482,6 @@ export class AppRoot extends LitElement {
     this.pendingMove = null;
     this.dropTargetPath = null;
     this.moveConfirmOpen = false;
-    this.conflictDialogOpen = false;
-    this.conflictData = null;
     this.conflictDialogOpen = false;
     this.conflictData = null;
     this.conflictDialogOpen = false;

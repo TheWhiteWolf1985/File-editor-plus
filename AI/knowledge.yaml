@@ -2051,3 +2051,15 @@ log:
     verification:
       - "npm run build nel frontend completa senza errori"
       - "Changelog top: 0.2.39"
+  - date: "2026-01-28"
+    actor: "codex"
+    change: "Fix build: handler drag&drop referenziati come metodi di classe, eliminati riferimenti mancanti; bump 0.2.40."
+    reason: "TS2304 sui handler drag&drop inesistenti nel template."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "npm run build nel frontend passa senza TS2304"
+      - "Changelog top: 0.2.40"
