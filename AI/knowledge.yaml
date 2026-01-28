@@ -2063,3 +2063,17 @@ log:
     verification:
       - "npm run build nel frontend passa senza TS2304"
       - "Changelog top: 0.2.40"
+  - date: "2026-01-28"
+    actor: "codex"
+    change: "Fix build typing: performMove tipizzato, campo tab lastEditAt camelCase opzionale; bump 0.2.41."
+    reason: "Rimuovere TS7023/TS2339 su performMove e lastEditAt."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/types/editor.ts"
+      - "file_editor_plus/frontend/src/services/api.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "npm run build nel frontend completa senza TS7023/TS2339"
+      - "Changelog top: 0.2.41"

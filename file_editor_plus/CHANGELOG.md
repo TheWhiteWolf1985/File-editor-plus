@@ -52,6 +52,10 @@
 
 - 🛠️ Fix: build frontend (handler drag&drop referenziati) — binding corretto ai metodi di classe.
 
+## 0.2.41
+
+- 🧩 Fix: build frontend (typing) — performMove tipizzato, tab lastEditAt camelCase opzionale.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

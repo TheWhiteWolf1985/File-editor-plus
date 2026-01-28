@@ -760,7 +760,7 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private async performMove(src: string, dstDir: string, mode: "fail" | "overwrite" | "autorename" = "fail") {
+  private async performMove(src: string, dstDir: string, mode: "fail" | "overwrite" | "autorename" = "fail"): Promise<void> {
     const payloadDst = dstDir === "/" ? "" : dstDir;
     try {
       const res = await apiMovePath(this.apiBase, src, payloadDst, mode);
@@ -1008,7 +1008,7 @@ export class AppRoot extends LitElement {
       }
       const bufferId = data?.buffer_id || data?.bufferId;
       const bufferSize = data?.size ?? size;
-      const lastEditAt = new Date().toISOString();
+      const lastEditAt = Date.now();
       this.tabs = this.tabs.map((t) =>
         t.path === path ? { ...t, bufferId, bufferSize, lastEditAt } : t
       );
@@ -2036,7 +2036,7 @@ export class AppRoot extends LitElement {
         dirty: !!t.dirty,
         buffer_id: t.bufferId || null,
         buffer_size: t.bufferSize ?? null,
-        last_edit_at: t.lastEditAt || null,
+        lastEditAt: t.lastEditAt ?? null,
         view: t.view || null,
       })),
       active: this.activePath ?? null,
@@ -2059,7 +2059,7 @@ export class AppRoot extends LitElement {
     savedBase?: string,
     bufferId?: string,
     bufferSize?: number,
-    lastEditAt?: string,
+    lastEditAt?: number,
     view?: { scrollTop?: number; selStart?: number; selEnd?: number }
   ) {
     const name = path.split("/").pop() || path;
@@ -2149,7 +2149,13 @@ export class AppRoot extends LitElement {
               console.warn("restoreSession: errore buffer", path, bufErr);
             }
           }
-          this.addRestoredTab(path, effectiveContent, wasDirty, diskContent, usedBufferId, usedBufferSize, entry.last_edit_at || entry.lastEditAt);
+          const restoredLastEdit =
+            typeof entry.lastEditAt === "number"
+              ? entry.lastEditAt
+              : entry.last_edit_at
+                ? Number(entry.last_edit_at)
+                : undefined;
+          this.addRestoredTab(path, effectiveContent, wasDirty, diskContent, usedBufferId, usedBufferSize, restoredLastEdit);
           restored.push(path);
           if (wasDirty) hadDirty = true;
         } catch (err) {

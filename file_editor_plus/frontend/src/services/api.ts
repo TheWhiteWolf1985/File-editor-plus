@@ -185,7 +185,21 @@ export const apiGetSession = (apiBase: string) => {
 
 export const apiPutSession = (
   apiBase: string,
-  session: { tabs: Array<string | { path: string; dirty?: boolean; buffer_id?: string | null; buffer_size?: number | null; last_edit_at?: string | null }>; active: string | null; split: boolean }
+  session: {
+    tabs: Array<
+      | string
+      | {
+          path: string;
+          dirty?: boolean;
+          buffer_id?: string | null;
+          buffer_size?: number | null;
+          last_edit_at?: number | string | null;
+          lastEditAt?: number | null;
+        }
+    >;
+    active: string | null;
+    split: boolean;
+  }
 ) => {
   const url = `${apiBase}api/session`;
   return fetch(url, {

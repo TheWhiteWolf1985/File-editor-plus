@@ -5,7 +5,7 @@ export type Tab = {
   dirty: boolean;
   bufferId?: string;
   bufferSize?: number;
-  lastEditAt?: string;
+  lastEditAt?: number;
   view?: { scrollTop?: number; selStart?: number; selEnd?: number };
 };
 export type DiffHunk = {
