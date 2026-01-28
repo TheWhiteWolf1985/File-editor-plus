@@ -40,6 +40,14 @@
 
 - 🔒 Add: rilevamento cartelle readonly — upload disabilitato e drop impedito con warning, flag writable nel tree.
 
+## 0.2.38
+
+- 🐛 Fix: aggiunta dipendenza python-multipart per gestire le form upload (addon ora avvia correttamente l’API upload/move).
+
+## 0.2.39
+
+- 🔧 Fix: build frontend — rimosse dichiarazioni duplicate di state (conflictDialogOpen/conflictData/treeDirty).
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

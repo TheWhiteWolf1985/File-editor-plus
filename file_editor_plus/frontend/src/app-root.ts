@@ -228,8 +228,6 @@ export class AppRoot extends LitElement {
   declare moveConfirmOpen: boolean;
   declare conflictDialogOpen: boolean;
   declare conflictData: { type: "upload" | "move"; name: string; target: string } | null;
-  declare conflictDialogOpen: boolean;
-  declare conflictData: { type: "upload" | "move"; name: string; target: string } | null;
   declare showResetSessionModal: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
@@ -337,7 +335,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.37";
+  private readonly appVersion = "0.2.38";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
