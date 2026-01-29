@@ -2077,3 +2077,15 @@ log:
     verification:
       - "npm run build nel frontend completa senza TS7023/TS2339"
       - "Changelog top: 0.2.41"
+  - date: "2026-01-28"
+    actor: "codex"
+    change: "Hotfix DnD: eliminato riferimento undefined a treeHandleTreeDragLeave, metodi DnD in app-root.ts ora inline; bump 0.2.45."
+    reason: "ReferenceError in console sui dragleave, blocco DnD."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "npm run build passa; nessun ReferenceError dragleave in console"
+      - "Changelog top: 0.2.45"

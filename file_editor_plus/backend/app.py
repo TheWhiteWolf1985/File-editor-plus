@@ -1758,6 +1758,7 @@ async def diff_endpoint(body: dict):
 # ---- Frontend (Ingress friendly): serve static + SPA fallback
 if FRONTEND_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR / "assets")), name="assets")
+    app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 
 
 @app.get("/")
@@ -1771,7 +1772,7 @@ def index():
 @app.get("/{full_path:path}")
 def spa_fallback(full_path: str):
     # lascia passare API e assets
-    if full_path.startswith("api/") or full_path.startswith("assets/"):
+    if full_path.startswith("api/") or full_path.startswith("assets/") or full_path.startswith("frontend/"):
         raise HTTPException(404)
     idx = FRONTEND_DIR / "index.html"
     if not idx.exists():

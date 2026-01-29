@@ -335,7 +335,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.38";
+  private readonly appVersion = "0.2.45";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -394,22 +394,75 @@ export class AppRoot extends LitElement {
     await this.performMove(src, dstDir);
   }
   private handleTreeDragStart(e: DragEvent, item: TreeItem) {
-    return treeHandleTreeDragStart.call(this, e, item);
+    if (!e.dataTransfer) return;
+    e.dataTransfer.setData("application/json", JSON.stringify({ path: item.path, isDir: item.type === "dir" }));
+    e.dataTransfer.effectAllowed = "move";
+    this.draggingPath = item.path;
+    this.draggingType = item.type;
   }
   private handleTreeDragOver(e: DragEvent, item: TreeItem) {
-    return treeHandleTreeDragOver.call(this, e, item);
+    if (item.type !== "dir" || item.writable === false) {
+      this.dropTargetPath = null;
+      return;
+    }
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    this.dropTargetPath = item.path || "/";
   }
-  private handleTreeDragLeave(e: DragEvent, item: TreeItem) {
-    return treeHandleTreeDragLeave.call(this, e, item);
+  private handleTreeDragLeave(_e: DragEvent, item: TreeItem) {
+    if (this.dropTargetPath === (item.path || "/")) {
+      this.dropTargetPath = null;
+    }
   }
   private handleTreeDrop(e: DragEvent, item: TreeItem) {
-    return treeHandleTreeDrop.call(this, e, item);
+    if (item.type !== "dir") return;
+    e.preventDefault();
+    if (item.writable === false) {
+      this.showToast("Cartella in sola lettura", "error");
+      return;
+    }
+    let payload: { path?: string; isDir?: boolean } | null = null;
+    try {
+      payload = e.dataTransfer?.getData("application/json") ? JSON.parse(e.dataTransfer.getData("application/json")) : null;
+    } catch {
+      payload = null;
+    }
+    const src = payload?.path || this.draggingPath;
+    const srcType = payload?.isDir ? "dir" : this.draggingType;
+    this.dropTargetPath = null;
+    if (!src) return;
+    const dstDir = item.path || "/";
+    if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
+      this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+      return;
+    }
+    this.queueMove(src, dstDir);
   }
   private handleTreeRootDragOver(e: DragEvent) {
-    return treeHandleTreeRootDragOver.call(this, e);
+    if (e.target && (e.target as HTMLElement).closest(".treeRow")) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    this.dropTargetPath = "/";
   }
   private handleTreeRootDrop(e: DragEvent) {
-    return treeHandleTreeRootDrop.call(this, e);
+    if (e.target && (e.target as HTMLElement).closest(".treeRow")) return;
+    e.preventDefault();
+    let payload: { path?: string; isDir?: boolean } | null = null;
+    try {
+      payload = e.dataTransfer?.getData("application/json") ? JSON.parse(e.dataTransfer.getData("application/json")) : null;
+    } catch {
+      payload = null;
+    }
+    const src = payload?.path || this.draggingPath;
+    const srcType = payload?.isDir ? "dir" : this.draggingType;
+    this.dropTargetPath = null;
+    if (!src) return;
+    const dstDir = "/";
+    if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
+      this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+      return;
+    }
+    this.queueMove(src, dstDir);
   }
   private performSearch = searchPerformSearch.bind(this);
   private replaceAll = searchReplaceAll.bind(this);

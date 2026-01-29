@@ -107,8 +107,8 @@ export function closeTreeMenu(this: any) {
 
 export function handleTreeDragStart(this: any, e: DragEvent, item: TreeItem) {
   if (!e.dataTransfer) return;
-  e.dataTransfer.setData("text/plain", item.path);
-  e.dataTransfer.setData("application/x-fep-type", item.type);
+  e.dataTransfer.setData("application/json", JSON.stringify({ path: item.path, isDir: item.type === "dir" }));
+  e.dataTransfer.effectAllowed = "move";
   this.draggingPath = item.path;
   this.draggingType = item.type;
 }
@@ -119,6 +119,7 @@ export function handleTreeDragOver(this: any, e: DragEvent, item: TreeItem) {
     return;
   }
   e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
   this.dropTargetPath = item.path || "/";
 }
 
@@ -135,8 +136,14 @@ export function handleTreeDrop(this: any, e: DragEvent, item: TreeItem) {
     this.showToast("Cartella in sola lettura", "error");
     return;
   }
-  const src = e.dataTransfer?.getData("text/plain") || this.draggingPath;
-  const srcType = (e.dataTransfer?.getData("application/x-fep-type") as "file" | "dir" | "") || this.draggingType;
+  let payload: { path?: string; isDir?: boolean } | null = null;
+  try {
+    payload = e.dataTransfer?.getData("application/json") ? JSON.parse(e.dataTransfer.getData("application/json")) : null;
+  } catch {
+    payload = null;
+  }
+  const src = payload?.path || this.draggingPath;
+  const srcType = payload?.isDir ? "dir" : this.draggingType;
   this.dropTargetPath = null;
   if (!src) return;
   const dstDir = item.path || "/";
@@ -151,14 +158,21 @@ export function handleTreeRootDragOver(this: any, e: DragEvent) {
   // drop on blank/root
   if (e.target && (e.target as HTMLElement).closest(".treeRow")) return;
   e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
   this.dropTargetPath = "/";
 }
 
 export function handleTreeRootDrop(this: any, e: DragEvent) {
   if (e.target && (e.target as HTMLElement).closest(".treeRow")) return;
   e.preventDefault();
-  const src = e.dataTransfer?.getData("text/plain") || this.draggingPath;
-  const srcType = (e.dataTransfer?.getData("application/x-fep-type") as "file" | "dir" | "") || this.draggingType;
+  let payload: { path?: string; isDir?: boolean } | null = null;
+  try {
+    payload = e.dataTransfer?.getData("application/json") ? JSON.parse(e.dataTransfer.getData("application/json")) : null;
+  } catch {
+    payload = null;
+  }
+  const src = payload?.path || this.draggingPath;
+  const srcType = payload?.isDir ? "dir" : this.draggingType;
   this.dropTargetPath = null;
   if (!src) return;
   const dstDir = "/";

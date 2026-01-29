@@ -60,6 +60,18 @@
 
 - 🛠️ Fix: build frontend (ref safety) — guard `ref` assignments per evitare TS2322 su elementi null/undefined.
 
+## 0.2.43
+
+- 🌐 Fix: asset path ingress — serve la UI da /app/frontend, mount static /frontend + assets, base Vite relativa (no più richieste a /frontend_latest).
+
+## 0.2.44
+
+- 🖱️ Fix: drag&drop file explorer — draggable abilitato, payload dataTransfer JSON, dropEffect move, blocchi rimossi e drop su root/cartelle funzionante.
+
+## 0.2.45
+
+- 🧹 Fix: DnD dragleave handler undefined (console spam) — tutte le chiamate usano metodi di classe e payload JSON move.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).
