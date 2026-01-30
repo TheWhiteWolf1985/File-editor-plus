@@ -72,6 +72,14 @@
 
 - 🧹 Fix: DnD dragleave handler undefined (console spam) — tutte le chiamate usano metodi di classe e payload JSON move.
 
+## 0.2.46
+
+- 🪝 Fix: drop su root → dst_dir sempre “/” (niente 400) con guard su src mancante.
+
+## 0.2.47
+
+- 🪝 Fix: drag&drop verso root — dst_dir ora passa sempre root (""), backend non risponde più “src and dst_dir are required”.
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

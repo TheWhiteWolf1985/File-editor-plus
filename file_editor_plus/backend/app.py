@@ -1426,18 +1426,27 @@ async def move_path(request: Request):
     except Exception:
         raise HTTPException(400, "Invalid JSON")
     src_raw = (payload.get("src") or "").strip()
-    dst_dir_raw = (payload.get("dst_dir") or "").strip()
+    dst_dir_raw_raw = payload.get("dst_dir")
+    if dst_dir_raw_raw is None:
+        dst_dir_raw = None
+    else:
+        dst_dir_raw = str(dst_dir_raw_raw)
+    dst_dir_raw = dst_dir_raw.strip() if dst_dir_raw is not None else None
     mode = (payload.get("mode") or "fail").lower() if isinstance(payload, dict) else "fail"
     if mode not in CONFLICT_MODES:
         mode = "fail"
 
-    if not src_raw or not dst_dir_raw:
-        raise HTTPException(400, "src and dst_dir are required")
+    if not src_raw:
+        raise HTTPException(400, "src is required")
+    if dst_dir_raw is None:
+        raise HTTPException(400, "dst_dir is required")
 
     if src_raw.startswith("/config/"):
         src_raw = src_raw[len("/config/") :]
     if src_raw == "/config":
         src_raw = ""
+    if dst_dir_raw in ("/config", "/config/", "/", ".", ""):
+        dst_dir_raw = ""
     if dst_dir_raw.startswith("/config/"):
         dst_dir_raw = dst_dir_raw[len("/config/") :]
     if dst_dir_raw == "/config":

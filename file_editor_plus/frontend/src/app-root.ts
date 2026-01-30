@@ -335,7 +335,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.45";
+  private readonly appVersion = "0.2.47";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -456,8 +456,11 @@ export class AppRoot extends LitElement {
     const src = payload?.path || this.draggingPath;
     const srcType = payload?.isDir ? "dir" : this.draggingType;
     this.dropTargetPath = null;
-    if (!src) return;
-    const dstDir = "/";
+    if (!src) {
+      this.showToast("Spostamento non valido (origine mancante)", "error");
+      return;
+    }
+    const dstDir = "";
     if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
       this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
       return;
