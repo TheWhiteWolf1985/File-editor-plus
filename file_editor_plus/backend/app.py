@@ -1298,6 +1298,24 @@ def read_file_raw(path: str):
     )
 
 
+@app.get("/api/fs/download")
+def download_file(path: str):
+    # Support absolute /config/... too
+    if path.startswith("/config/"):
+        path = path[len("/config/") :]
+    f = safe_path(path)
+    if not f.exists():
+        raise HTTPException(404, "File not found")
+    if not f.is_file():
+        raise HTTPException(400, "Not a file")
+    media_type, _ = mimetypes.guess_type(f.name)
+    return FileResponse(
+        str(f),
+        media_type=media_type or "application/octet-stream",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.post("/api/upload")
 async def upload_file(
     file: UploadFile = File(...),

@@ -80,6 +80,14 @@
 
 - 🪝 Fix: drag&drop verso root — dst_dir ora passa sempre root (""), backend non risponde più “src and dst_dir are required”.
 
+## 0.2.48
+
+- 🖼️ Add: endpoint /api/fs/download per servire file (bytes) con Content-Type corretto, utile per anteprima immagini.
+
+## 0.2.49
+
+- 🖼️ Add: overlay anteprima immagini lato frontend (JS top-level, senza custom element).
+
 ## 0.2.27
 
 - 🧹 Chore: rimosso il label TreeTargetLabel dal file explorer (cleanup UI).

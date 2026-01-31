@@ -2089,3 +2089,29 @@ log:
     verification:
       - "npm run build passa; nessun ReferenceError dragleave in console"
       - "Changelog top: 0.2.45"
+  - date: "2026-01-28"
+    actor: "codex"
+    change: "Endpoint download: aggiunto GET /api/fs/download con Content-Type corretto per servire bytes da /config; bump 0.2.48."
+    reason: "Abilitare anteprima immagini senza leggere binari nella textarea."
+    touched_files:
+      - "file_editor_plus/backend/app.py"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "curl /api/fs/download?path=/config/file.png -> 200 con image/png"
+      - "Changelog top: 0.2.48"
+  - date: "2026-01-28"
+    actor: "codex"
+    change: "Overlay anteprima immagini: aggiunto componente JS standalone (image_preview_overlay.ts) per mostrare immagini con chiusura ESC/backdrop; bump 0.2.49."
+    reason: "Preparare UI overlay senza custom element."
+    touched_files:
+      - "file_editor_plus/frontend/src/components/image_preview_overlay.ts"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "build frontend ok; overlay disponibile per uso successivo"
+      - "Changelog top: 0.2.49"

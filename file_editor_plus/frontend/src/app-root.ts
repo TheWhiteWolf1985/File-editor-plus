@@ -1,6 +1,7 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
+import { openImagePreviewOverlay } from "./components/image_preview_overlay";
 import type { HAClient, HassState } from "./ha-client";
 import { appStyles } from "./styles/app-styles";
 import {
@@ -15,7 +16,6 @@ import {
   renderSearchResults as searchRenderSearchResults,
   replaceAll as searchReplaceAll,
 } from "./features/search/search";
-import "./components/image-preview-modal";
 import {
   closeSnippetModal as snippetCloseSnippetModal,
   deleteSnippet as snippetDeleteSnippet,
@@ -335,7 +335,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.47";
+  private readonly appVersion = "0.2.49";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -645,6 +645,20 @@ export class AppRoot extends LitElement {
   }
 
   private requestOpenFile(path: string) {
+    if (this.isImagePath(path)) {
+      const url = `${this.apiBase}api/fs/download?path=${encodeURIComponent(path)}`;
+      const filename = path.split("/").pop() || path;
+      const size = this.treeMenuSize ?? null;
+      openImagePreviewOverlay({ srcUrl: url, filename, sizeBytes: size ?? undefined });
+      return;
+    }
+    if (this.isImagePath(path)) {
+      const url = `${this.apiBase}api/fs/download?path=${encodeURIComponent(path)}`;
+      const filename = path.split("/").pop() || path;
+      const size = this.treeMenuSize ?? null;
+      openImagePreviewOverlay({ srcUrl: url, filename, sizeBytes: size ?? undefined });
+      return;
+    }
     if (this.activePath === path) {
       if (!this.tabs.find((t) => t.path === path)) {
         this.openFile(path);
@@ -1504,37 +1518,7 @@ export class AppRoot extends LitElement {
   private isImagePath(path: string | null): boolean {
     if (!path) return false;
     const lower = path.toLowerCase();
-    return [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"].some((ext) => lower.endsWith(ext));
-  }
-
-  private formatBytes(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    const kb = bytes / 1024;
-    if (kb < 1024) return `${kb.toFixed(kb < 10 ? 2 : 1)} KB`;
-    const mb = kb / 1024;
-    return `${mb.toFixed(mb < 10 ? 2 : 1)} MB`;
-  }
-
-  private handleImagePreview(path: string | null, size?: number | null) {
-    if (!path) {
-      this.showToast("Path immagine non valido", "error");
-      return;
-    }
-    const normalizedSize = size ?? null;
-    const tooLarge = normalizedSize !== null && normalizedSize > this.maxPreviewBytes;
-    const url = tooLarge ? null : `${this.apiBase}api/file/raw?path=${encodeURIComponent(path)}`;
-    const message = tooLarge
-      ? `File troppo grande per anteprima (${this.formatBytes(normalizedSize)})`
-      : null;
-    const name = path.split("/").pop() || path;
-    this.imagePreview = { path, url, name, size: normalizedSize, message };
-    this.imagePreviewOpen = true;
-    if (tooLarge) {
-      this.showToast("File troppo grande per anteprima (>20MB)", "error");
-    } else {
-      this.showToast(`Anteprima immagine: ${name}`);
-    }
-    this.closeContextMenu();
+    return [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".svg"].some((ext) => lower.endsWith(ext));
   }
 
   private async handleCopyCut(action: "copy" | "cut") {
