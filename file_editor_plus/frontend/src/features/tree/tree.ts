@@ -415,7 +415,7 @@ export function renderTree(this: any, path: string, depth = 0) {
             this.setActiveSelection(it.path, true);
             this.toggleDir(it.path);
           } else {
-            this.requestOpenFile(it.path);
+            this.requestOpenFile(it.path, (it as any).size);
           }
         }}
         @contextmenu=${(e: MouseEvent) => this.handleTreeContextMenu(e, it)}

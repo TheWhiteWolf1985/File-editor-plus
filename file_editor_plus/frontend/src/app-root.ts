@@ -164,8 +164,6 @@ export class AppRoot extends LitElement {
     treeMenuPath: { state: true },
     treeMenuType: { state: true },
     treeMenuFromBlank: { state: true },
-    imagePreview: { state: true },
-    imagePreviewOpen: { state: true },
     showTreeDeleteModal: { state: true },
     deleteTargetPath: { state: true },
     deleteTargetType: { state: true },
@@ -275,8 +273,6 @@ export class AppRoot extends LitElement {
   declare treeMenuType: "file" | "dir" | null;
   declare treeMenuSize: number | null;
   declare treeMenuFromBlank: boolean;
-  declare imagePreview: { path: string; url: string | null; name?: string; size?: number | null; message?: string | null } | null;
-  declare imagePreviewOpen: boolean;
   declare showTreeDeleteModal: boolean;
   declare deleteTargetPath: string | null;
   declare deleteTargetType: "file" | "dir" | null;
@@ -335,7 +331,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.49";
+  private readonly appVersion = "0.2.50";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -590,8 +586,6 @@ export class AppRoot extends LitElement {
     this.treeMenuType = null;
     this.treeMenuSize = null;
     this.treeMenuFromBlank = false;
-    this.imagePreview = null;
-    this.imagePreviewOpen = false;
     this.showTreeDeleteModal = false;
     this.deleteTargetPath = null;
     this.deleteTargetType = null;
@@ -644,19 +638,18 @@ export class AppRoot extends LitElement {
     super.disconnectedCallback();
   }
 
-  private requestOpenFile(path: string) {
+  private requestOpenFile(path: string, sizeBytes?: number) {
     if (this.isImagePath(path)) {
       const url = `${this.apiBase}api/fs/download?path=${encodeURIComponent(path)}`;
       const filename = path.split("/").pop() || path;
-      const size = this.treeMenuSize ?? null;
-      openImagePreviewOverlay({ srcUrl: url, filename, sizeBytes: size ?? undefined });
-      return;
-    }
-    if (this.isImagePath(path)) {
-      const url = `${this.apiBase}api/fs/download?path=${encodeURIComponent(path)}`;
-      const filename = path.split("/").pop() || path;
-      const size = this.treeMenuSize ?? null;
-      openImagePreviewOverlay({ srcUrl: url, filename, sizeBytes: size ?? undefined });
+      const ext = (filename.split(".").pop() || "").toLowerCase();
+      openImagePreviewOverlay({
+        srcUrl: url,
+        filename,
+        sizeBytes,
+        ext,
+        onError: (msg?: string) => this.showToast(msg || "Impossibile caricare anteprima immagine", "error"),
+      });
       return;
     }
     if (this.activePath === path) {
@@ -1484,11 +1477,6 @@ export class AppRoot extends LitElement {
     }
   }
 
-  private closeImagePreview() {
-    this.imagePreviewOpen = false;
-    this.imagePreview = null;
-  }
-
   private createFromContext(kind: "file" | "folder") {
     if (!this.treeMenuPath || this.treeMenuType !== "dir") return;
     this.setActiveSelection(this.treeMenuPath, true);
@@ -2003,8 +1991,6 @@ export class AppRoot extends LitElement {
     this.clearBufferTimer("");
     this.bufferSaveTimers.clear();
     this.dirtySessionToastShown = false;
-    this.imagePreview = null;
-    this.imagePreviewOpen = false;
     this.showUploadModal = false;
     this.uploadFile = null;
   }
@@ -2804,9 +2790,6 @@ export class AppRoot extends LitElement {
                 : nothing}
               ${!this.treeMenuFromBlank
                 ? html`
-                    ${this.treeMenuType === "file" && this.isImagePath(this.treeMenuPath)
-                      ? html`<div class="contextMenuItem" @click=${() => this.handleImagePreview(this.treeMenuPath, this.treeMenuSize)}>🖼️ Anteprima immagine</div>`
-                      : nothing}
                     <div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
                     <div
                       class="contextMenuItem ${this.treeClipboard ? "" : "disabled"}"
@@ -3158,22 +3141,6 @@ export class AppRoot extends LitElement {
               </div>
             </div>`
           : nothing}
-
-        <image-preview-modal
-          .open=${this.imagePreviewOpen}
-          .src=${this.imagePreview?.url || null}
-          .path=${this.imagePreview?.path || null}
-          .name=${this.imagePreview?.name || null}
-          .size=${this.imagePreview?.size ?? null}
-          .message=${this.imagePreview?.message ?? null}
-          @close=${this.closeImagePreview}
-          @error=${() => {
-            this.showToast("Impossibile caricare l'immagine", "error");
-            if (this.imagePreview) {
-              this.imagePreview = { ...this.imagePreview, url: null, message: "Anteprima non disponibile" };
-            }
-          }}
-        ></image-preview-modal>
 
         <div class="statusbar">
           <div>${this.status}</div>

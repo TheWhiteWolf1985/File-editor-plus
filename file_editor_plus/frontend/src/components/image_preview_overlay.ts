@@ -3,6 +3,7 @@ export type ImagePreviewOverlayOptions = {
   filename: string;
   sizeBytes?: number;
   ext?: string;
+  onError?: (message?: string) => void;
 };
 
 const STYLE = `
@@ -20,7 +21,7 @@ const STYLE = `
 `;
 
 export function openImagePreviewOverlay(opts: ImagePreviewOverlayOptions): void {
-  const { srcUrl, filename, sizeBytes, ext } = opts;
+  const { srcUrl, filename, sizeBytes, ext, onError } = opts;
 
   const overlay = document.createElement("div");
   overlay.className = "fep-img-overlay";
@@ -78,16 +79,20 @@ export function openImagePreviewOverlay(opts: ImagePreviewOverlayOptions): void 
   body.appendChild(meta);
   panel.appendChild(body);
 
+  const close = (reason?: string) => {
+    window.removeEventListener("keydown", escListener, true);
+    overlay.remove();
+    if (reason && onError) {
+      onError(reason);
+    }
+  };
+
   img.onload = () => {
     valueEls[2].textContent = `${img.naturalWidth}×${img.naturalHeight}px`;
   };
   img.onerror = () => {
     valueEls[2].textContent = "Errore";
-  };
-
-  const close = () => {
-    window.removeEventListener("keydown", escListener, true);
-    overlay.remove();
+    close("Impossibile caricare anteprima immagine");
   };
   const escListener = (e: KeyboardEvent) => {
     if (e.key === "Escape") {

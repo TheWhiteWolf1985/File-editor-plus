@@ -2,7 +2,7 @@
 schema:
   name: "ai-knowledge"
   version: 2
-  updated_at: "2026-01-27"
+  updated_at: "2026-01-29"
   updated_by: "codex"
   update_policy:
     rulebook: "AI/agents.md"
@@ -2115,3 +2115,18 @@ log:
     verification:
       - "build frontend ok; overlay disponibile per uso successivo"
       - "Changelog top: 0.2.49"
+  - date: "2026-01-29"
+    actor: "codex"
+    change: "Anteprima immagini automatica su click: rimossa voce context menu, intercettato click file immagine per aprire overlay JS con gestione errori; passata size dal tree; bump 0.2.50."
+    reason: "Evitare apertura binari nel textarea e mostrare preview robusta con toast in caso di errore."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/features/tree/tree.ts"
+      - "file_editor_plus/frontend/src/components/image_preview_overlay.ts"
+      - "file_editor_plus/frontend/src/types/editor.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "npm run build (frontend) ok"
+      - "Click su png apre overlay; file testuale continua su editor; toast su errore download"

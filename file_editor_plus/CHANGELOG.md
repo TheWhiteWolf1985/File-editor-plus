@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.50
+
+- 🖼️ Fix: anteprima immagini automatica (cleanup menu + error handling + no-freeze editor).
+
 ## 0.2.28
 
 - 🛠️ Fix: Utility buttons “Genera debug log” e “Reset session” ora chiamano le azioni corrette e rinfrescano il tree.
