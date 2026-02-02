@@ -2178,3 +2178,15 @@ log:
     verification:
       - "npm run build (frontend) ok"
       - "PUT /api/session con view mancante/non dict accettato e normalizzato"
+  - date: "2026-01-31"
+    actor: "codex"
+    change: "Sanitizzazione step 1: rimosso codice morto (treeMenuSize, duplicato appVersion), build green; bump 0.2.56."
+    reason: "Pulizia minima post feature e prevenzione warning/TS."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/features/tree/tree.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "npm run build (frontend) ok"

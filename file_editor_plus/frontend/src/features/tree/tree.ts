@@ -92,7 +92,6 @@ export function handleTreeContextMenu(this: any, e: MouseEvent, item: TreeItem) 
   this.treeMenuY = e.clientY;
   this.treeMenuPath = item.path;
   this.treeMenuType = item.type;
-  this.treeMenuSize = (item as any).size ?? null;
   this.treeMenuFromBlank = false;
   this.contextMenuOpen = false;
   this.openMenu = null;

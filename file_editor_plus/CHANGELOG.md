@@ -20,6 +20,7 @@
 
 - Hardening generale upload/move: validazioni filename/size, messaggi conflitto più chiari, refresh più coerente, warning su tab coinvolti dallo spostamento.
 - Cleanup UI Explorer: rimosso `TreeTargetLabel` (pulizia/semplificazione DOM e logica).
+- Maintenance: sanitizzazione step 1 (build green + cleanup).
 
 ## 📚 Documentation
 
