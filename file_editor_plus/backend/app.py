@@ -1667,24 +1667,29 @@ async def put_session(request: Request):
         raise HTTPException(400, "Body JSON richiesto")
     if not isinstance(payload, dict):
         raise HTTPException(400, "Session deve essere un oggetto")
+
+    def normalize_view(raw: Any):
+        if isinstance(raw, dict):
+            return {
+                "scrollTop": int(raw.get("scrollTop") or 0),
+                "selStart": int(raw.get("selStart") or 0),
+                "selEnd": int(raw.get("selEnd") or 0),
+            }
+        return {"scrollTop": 0, "selStart": 0, "selEnd": 0}
+
     tabs = payload.get("tabs")
     if tabs is not None:
         if not isinstance(tabs, list):
             raise HTTPException(400, "tabs deve essere una lista")
-        for item in tabs:
+        for idx, item in enumerate(tabs):
             if isinstance(item, str):
+                tabs[idx] = {"path": item, "dirty": False, "view": {"scrollTop": 0, "selStart": 0, "selEnd": 0}}
                 continue
             if not isinstance(item, dict) or not isinstance(item.get("path"), str):
                 raise HTTPException(400, "Ogni tab deve essere string o object {path,dirty}")
             if "dirty" in item and not isinstance(item.get("dirty"), bool):
                 raise HTTPException(400, "dirty deve essere boolean")
-            if "view" in item and not isinstance(item.get("view"), dict):
-                raise HTTPException(400, "view deve essere un oggetto")
-            if isinstance(item.get("view"), dict):
-                v = item.get("view")
-                for key in ("scrollTop", "selStart", "selEnd"):
-                    if key in v and not isinstance(v.get(key), int):
-                        raise HTTPException(400, f"view.{key} deve essere int")
+            item["view"] = normalize_view(item.get("view"))
     active = payload.get("active")
     if active is not None and not isinstance(active, str):
         raise HTTPException(400, "active deve essere string o null")

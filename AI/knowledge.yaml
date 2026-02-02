@@ -2130,3 +2130,51 @@ log:
     verification:
       - "npm run build (frontend) ok"
       - "Click su png apre overlay; file testuale continua su editor; toast su errore download"
+  - date: "2026-01-30"
+    actor: "codex"
+    change: "Fix restore session: se il load fallisce/404 non salva uno stato vuoto; scheduleSaveSession ora parte solo quando il restore ha dati validi; bump 0.2.52."
+    reason: "Evitare che session.json venga sovrascritto con tabs vuote dopo un restore fallito."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "npm run build (frontend) ok"
+      - "Restore 404 non crea session.json vuoto; aprendo un file viene salvata la sessione"
+  - date: "2026-01-30"
+    actor: "codex"
+    change: "Persistenza tab: saveSession calcola snapshot e invia PUT solo se lo stato è cambiato (anti-overwrite/anti-spam); bump 0.2.53."
+    reason: "Ridurre salvataggi ridondanti e prevenire overwrite accidentali."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "npm run build (frontend) ok"
+      - "Snapshot invariato => nessuna chiamata PUT /api/session"
+  - date: "2026-01-30"
+    actor: "codex"
+    change: "Session save: view sempre oggetto (scrollTop/selStart/selEnd numerici) per evitare 400; bump 0.2.54."
+    reason: "Backend richiede view come oggetto, non null/string."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Payload PUT /api/session: view presente come oggetto {scrollTop, selStart, selEnd}"
+  - date: "2026-01-30"
+    actor: "codex"
+    change: "Hardening backend /api/session: view default/normalizzato se mancante o invalido, niente 400; bump 0.2.55."
+    reason: "Permettere salvataggio sessione anche senza view valida."
+    touched_files:
+      - "file_editor_plus/backend/app.py"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "npm run build (frontend) ok"
+      - "PUT /api/session con view mancante/non dict accettato e normalizzato"

@@ -313,6 +313,14 @@ export class AppRoot extends LitElement {
   private basePreRef: HTMLPreElement | null = null;
   private cursorRaf: number | null = null;
   private sessionSaveTimer: number | null = null;
+  private lastSessionSnapshot: string | null = null;
+  private safeView(v: any) {
+    return {
+      scrollTop: Number(v?.scrollTop ?? 0),
+      selStart: Number(v?.selStart ?? 0),
+      selEnd: Number(v?.selEnd ?? 0),
+    };
+  }
   private restoringSession = false;
   private bufferSaveTimers: Map<string, number> = new Map();
   private restoredBufferCount = 0;
@@ -331,7 +339,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.51";
+  private readonly appVersion = "0.2.55";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -1991,6 +1999,7 @@ export class AppRoot extends LitElement {
     this.clearBufferTimer("");
     this.bufferSaveTimers.clear();
     this.dirtySessionToastShown = false;
+    this.lastSessionSnapshot = null;
     this.showUploadModal = false;
     this.uploadFile = null;
   }
@@ -2055,6 +2064,15 @@ export class AppRoot extends LitElement {
     }, 450);
   }
 
+  private buildSessionSnapshot(): string {
+    const minimal = {
+      tabs: this.tabs.map((t) => ({ path: t.path, dirty: !!t.dirty })),
+      active: this.activePath ?? null,
+      split: !!this.splitViewEnabled,
+    };
+    return JSON.stringify(minimal);
+  }
+
   private async saveSession() {
     const payload = {
       tabs: this.tabs.map((t) => ({
@@ -2063,16 +2081,19 @@ export class AppRoot extends LitElement {
         buffer_id: t.bufferId || null,
         buffer_size: t.bufferSize ?? null,
         lastEditAt: t.lastEditAt ?? null,
-        view: t.view || null,
+        view: this.safeView(t.view),
       })),
       active: this.activePath ?? null,
       split: !!this.splitViewEnabled,
     };
+    const snapshot = this.buildSessionSnapshot();
+    if (snapshot === this.lastSessionSnapshot) return;
     try {
       const res = await apiPutSession(this.apiBase, payload);
       if (!res.ok) {
         throw new Error(`session save ${res.status}`);
       }
+      this.lastSessionSnapshot = snapshot;
     } catch (err) {
       console.warn("saveSession failed", err);
     }
@@ -2123,12 +2144,17 @@ export class AppRoot extends LitElement {
   private async restoreSession() {
     if (this.restoringSession) return;
     this.restoringSession = true;
+    let restoreSucceeded = false;
     try {
       const res = await apiGetSession(this.apiBase);
       if (!res.ok) {
         throw new Error(`session load ${res.status}`);
       }
       const data = await res.json();
+      const hasContent =
+        (Array.isArray(data?.tabs) && data.tabs.length > 0) ||
+        (typeof data?.active === "string" && data.active.length > 0) ||
+        typeof data?.split === "boolean";
       const rawTabs = Array.isArray(data?.tabs) ? data.tabs : [];
       const tabs = rawTabs
         .map((t: any) => {
@@ -2188,6 +2214,7 @@ export class AppRoot extends LitElement {
           console.warn("restoreSession: errore su file", path, err);
         }
       }
+      restoreSucceeded = hasContent;
       if (split) {
         this.splitViewEnabled = true;
       }
@@ -2210,7 +2237,9 @@ export class AppRoot extends LitElement {
       this.showToast("Sessione ripristinata ai valori predefiniti (errore)", "error");
     } finally {
       this.restoringSession = false;
-      this.scheduleSaveSession();
+      if (restoreSucceeded) {
+        this.scheduleSaveSession();
+      }
     }
   }
 

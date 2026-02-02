@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.2.51
+## 0.2.55
 
-- 🖼️ Fix: toast errato in chiusura anteprima immagini (niente più [Object PointerEvent]).
+- 🧷 Fix: /api/session ora normalizza view mancante o invalida (default oggetto, niente 400).
 
 ## 0.2.28
 
