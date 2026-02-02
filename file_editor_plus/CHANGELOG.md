@@ -19,7 +19,7 @@
 
 ## 🧪 Dev / API
 
-- Add: endpoint `/api/search/replace/one` per sostituire una singola occorrenza (backend).
+- Add: endpoint `/api/search/replace/one` per sostituire una singola occorrenza (backend). UI inline per replace singolo in corso.
 
 ## 🧰 Maintenance
 
