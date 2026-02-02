@@ -15,6 +15,11 @@
 - Drag&Drop nel file explorer: spostamento file/cartelle con endpoint `/api/fs/move` + modale di conferma prima di eseguire il move.
 - Read-only awareness: rilevamento cartelle non scrivibili, upload disabilitato e drop impedito con warning (flag writable nel tree).
 - Anteprima immagini: endpoint download con Content-Type corretto + overlay preview frontend (top-level JS) + UX (ESC/backdrop, limite 20MB, cleanup).
+- Maintenance: sanitizzazione step 1 (build green + cleanup).
+
+## 🧪 Dev / API
+
+- Add: endpoint `/api/search/replace/one` per sostituire una singola occorrenza (backend).
 
 ## 🧰 Maintenance
 
