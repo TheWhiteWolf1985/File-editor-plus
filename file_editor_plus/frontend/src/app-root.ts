@@ -1,6 +1,7 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
+import { openImagePreviewOverlay } from "./components/image_preview_overlay";
 import type { HAClient, HassState } from "./ha-client";
 import { appStyles } from "./styles/app-styles";
 import {
@@ -74,6 +75,8 @@ import {
   apiPostDiff,
   apiSaveFile,
   apiGenerateDebugLog,
+  apiUpload,
+  apiMovePath,
   apiPutSession,
   apiPutSessionBuffer,
   apiGetSessionBuffer,
@@ -176,6 +179,16 @@ export class AppRoot extends LitElement {
     activeIndentSegmentId: { state: true },
     showUnsavedModal: { state: true },
     utilityGenerating: { state: true },
+    showUploadModal: { state: true },
+    uploadTargetDir: { state: true },
+    uploadInProgress: { state: true },
+    uploadFiles: { state: true },
+    uploadProgress: { state: true },
+    pendingMove: { state: true },
+    dropTargetPath: { state: true },
+    moveConfirmOpen: { state: true },
+    conflictDialogOpen: { state: true },
+    conflictData: { state: true },
   };
 
   declare expanded: Set<string>; // root expanded
@@ -202,6 +215,17 @@ export class AppRoot extends LitElement {
   declare activeIndentSegmentId: string | null;
   declare showUnsavedModal: boolean;
   declare utilityGenerating: boolean;
+  declare showUploadModal: boolean;
+  declare uploadTargetDir: string;
+  declare uploadFile: File | null;
+  declare uploadFiles: File[];
+  declare uploadInProgress: boolean;
+  declare uploadProgress: { done: number; total: number } | null;
+  declare pendingMove: { src: string; dstDir: string } | null;
+  declare dropTargetPath: string | null;
+  declare moveConfirmOpen: boolean;
+  declare conflictDialogOpen: boolean;
+  declare conflictData: { type: "upload" | "move"; name: string; target: string } | null;
   declare showResetSessionModal: boolean;
   declare contextMenuOpen: boolean;
   declare contextMenuX: number;
@@ -247,6 +271,7 @@ export class AppRoot extends LitElement {
   declare treeMenuY: number;
   declare treeMenuPath: string | null;
   declare treeMenuType: "file" | "dir" | null;
+  declare treeMenuSize: number | null;
   declare treeMenuFromBlank: boolean;
   declare showTreeDeleteModal: boolean;
   declare deleteTargetPath: string | null;
@@ -288,6 +313,14 @@ export class AppRoot extends LitElement {
   private basePreRef: HTMLPreElement | null = null;
   private cursorRaf: number | null = null;
   private sessionSaveTimer: number | null = null;
+  private lastSessionSnapshot: string | null = null;
+  private safeView(v: any) {
+    return {
+      scrollTop: Number(v?.scrollTop ?? 0),
+      selStart: Number(v?.selStart ?? 0),
+      selEnd: Number(v?.selEnd ?? 0),
+    };
+  }
   private restoringSession = false;
   private bufferSaveTimers: Map<string, number> = new Map();
   private restoredBufferCount = 0;
@@ -296,6 +329,7 @@ export class AppRoot extends LitElement {
   private pendingViewApply: Record<string, { scrollTop?: number; selStart?: number; selEnd?: number }> = {};
   private readonly indentUnit = "  ";
   private dirtySessionToastShown = false;
+  private readonly maxPreviewBytes = 20 * 1024 * 1024;
   private lastCursorLine = 1;
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
@@ -305,7 +339,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.22";
+  private readonly appVersion = "0.2.55";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -316,12 +350,15 @@ export class AppRoot extends LitElement {
   private pendingJump: { path: string; line: number; col: number } | null = null;
   private pendingUnsavedAction: { type: "open" | "close"; path: string } | null = null;
   private treeClipboard: { path: string; type: "file" | "dir" } | null = null;
+  private draggingPath: string | null = null;
+  private draggingType: "file" | "dir" | null = null;
   private beforeUnloadHandler = (e: BeforeUnloadEvent) => {
     if (this.isActiveDirty()) {
       e.preventDefault();
       e.returnValue = "";
     }
   };
+  private conflictResolver: ((choice: "skip" | "overwrite" | "autorename") => void) | null = null;
   private selectionListener = () => {
     if (!this.editorRef) return;
     const active = this.shadowRoot?.activeElement || document.activeElement;
@@ -342,6 +379,98 @@ export class AppRoot extends LitElement {
   private createNewItem = treeCreateNewItem.bind(this);
   private cancelNewItem = treeCancelNewItem.bind(this);
   private renderTree = treeRenderTree.bind(this);
+  private queueMove = (src: string, dstDir: string) => {
+    this.pendingMove = { src, dstDir };
+    this.moveConfirmOpen = true;
+  };
+
+  private cancelMoveConfirm() {
+    this.pendingMove = null;
+    this.moveConfirmOpen = false;
+  }
+
+  private async confirmMove() {
+    if (!this.pendingMove) {
+      this.moveConfirmOpen = false;
+      return;
+    }
+    const { src, dstDir } = this.pendingMove;
+    await this.performMove(src, dstDir);
+  }
+  private handleTreeDragStart(e: DragEvent, item: TreeItem) {
+    if (!e.dataTransfer) return;
+    e.dataTransfer.setData("application/json", JSON.stringify({ path: item.path, isDir: item.type === "dir" }));
+    e.dataTransfer.effectAllowed = "move";
+    this.draggingPath = item.path;
+    this.draggingType = item.type;
+  }
+  private handleTreeDragOver(e: DragEvent, item: TreeItem) {
+    if (item.type !== "dir" || item.writable === false) {
+      this.dropTargetPath = null;
+      return;
+    }
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    this.dropTargetPath = item.path || "/";
+  }
+  private handleTreeDragLeave(_e: DragEvent, item: TreeItem) {
+    if (this.dropTargetPath === (item.path || "/")) {
+      this.dropTargetPath = null;
+    }
+  }
+  private handleTreeDrop(e: DragEvent, item: TreeItem) {
+    if (item.type !== "dir") return;
+    e.preventDefault();
+    if (item.writable === false) {
+      this.showToast("Cartella in sola lettura", "error");
+      return;
+    }
+    let payload: { path?: string; isDir?: boolean } | null = null;
+    try {
+      payload = e.dataTransfer?.getData("application/json") ? JSON.parse(e.dataTransfer.getData("application/json")) : null;
+    } catch {
+      payload = null;
+    }
+    const src = payload?.path || this.draggingPath;
+    const srcType = payload?.isDir ? "dir" : this.draggingType;
+    this.dropTargetPath = null;
+    if (!src) return;
+    const dstDir = item.path || "/";
+    if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
+      this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+      return;
+    }
+    this.queueMove(src, dstDir);
+  }
+  private handleTreeRootDragOver(e: DragEvent) {
+    if (e.target && (e.target as HTMLElement).closest(".treeRow")) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    this.dropTargetPath = "/";
+  }
+  private handleTreeRootDrop(e: DragEvent) {
+    if (e.target && (e.target as HTMLElement).closest(".treeRow")) return;
+    e.preventDefault();
+    let payload: { path?: string; isDir?: boolean } | null = null;
+    try {
+      payload = e.dataTransfer?.getData("application/json") ? JSON.parse(e.dataTransfer.getData("application/json")) : null;
+    } catch {
+      payload = null;
+    }
+    const src = payload?.path || this.draggingPath;
+    const srcType = payload?.isDir ? "dir" : this.draggingType;
+    this.dropTargetPath = null;
+    if (!src) {
+      this.showToast("Spostamento non valido (origine mancante)", "error");
+      return;
+    }
+    const dstDir = "";
+    if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
+      this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+      return;
+    }
+    this.queueMove(src, dstDir);
+  }
   private performSearch = searchPerformSearch.bind(this);
   private replaceAll = searchReplaceAll.bind(this);
   private openSearchMatch = searchOpenSearchMatch.bind(this);
@@ -404,6 +533,21 @@ export class AppRoot extends LitElement {
     this.activeIndentSegmentId = null;
     this.showUnsavedModal = false;
     this.utilityGenerating = false;
+    this.showUploadModal = false;
+    this.uploadTargetDir = "/";
+    this.uploadFile = null;
+    this.uploadFiles = [];
+    this.uploadInProgress = false;
+    this.uploadProgress = null;
+    this.pendingMove = null;
+    this.dropTargetPath = null;
+    this.moveConfirmOpen = false;
+    this.conflictDialogOpen = false;
+    this.conflictData = null;
+    this.conflictDialogOpen = false;
+    this.conflictData = null;
+    this.conflictDialogOpen = false;
+    this.conflictData = null;
     this.contextMenuOpen = false;
     this.contextMenuX = 0;
     this.contextMenuY = 0;
@@ -448,6 +592,7 @@ export class AppRoot extends LitElement {
     this.treeMenuY = 0;
     this.treeMenuPath = null;
     this.treeMenuType = null;
+    this.treeMenuSize = null;
     this.treeMenuFromBlank = false;
     this.showTreeDeleteModal = false;
     this.deleteTargetPath = null;
@@ -501,7 +646,20 @@ export class AppRoot extends LitElement {
     super.disconnectedCallback();
   }
 
-  private requestOpenFile(path: string) {
+  private requestOpenFile(path: string, sizeBytes?: number) {
+    if (this.isImagePath(path)) {
+      const url = `${this.apiBase}api/fs/download?path=${encodeURIComponent(path)}`;
+      const filename = path.split("/").pop() || path;
+      const ext = (filename.split(".").pop() || "").toLowerCase();
+      openImagePreviewOverlay({
+        srcUrl: url,
+        filename,
+        sizeBytes,
+        ext,
+        onError: (msg?: string) => this.showToast(msg || "Impossibile caricare anteprima immagine", "error"),
+      });
+      return;
+    }
     if (this.activePath === path) {
       if (!this.tabs.find((t) => t.path === path)) {
         this.openFile(path);
@@ -544,6 +702,202 @@ export class AppRoot extends LitElement {
       if (this.status === "Errore debug log") {
         setTimeout(() => (this.status = "Ready"), 1200);
       }
+    }
+  }
+
+  private openUploadModal() {
+    const defaultDir = this.isDirWritable(this.activeDir || "/")
+      ? this.normalizeDir(this.activeDir || "/")
+      : (this.getDirectoryOptions().find((d) => d.writable)?.path ?? "/");
+    this.uploadTargetDir = defaultDir || "/";
+    this.uploadFile = null;
+    this.uploadFiles = [];
+    this.uploadProgress = null;
+    this.showUploadModal = true;
+  }
+
+  private closeUploadModal() {
+    if (this.uploadInProgress) return;
+    this.showUploadModal = false;
+    this.uploadFile = null;
+    this.uploadFiles = [];
+    this.uploadInProgress = false;
+    this.uploadProgress = null;
+    this.uploadTargetDir = this.normalizeDir(this.activeDir || "/");
+  }
+
+  private handleUploadFileChange(e: Event) {
+    const input = e.target as HTMLInputElement | null;
+    const files = input?.files ? Array.from(input.files) : [];
+    this.uploadFiles = files;
+    this.uploadFile = files[0] ?? null;
+  }
+
+  private promptConflict(type: "upload" | "move", name: string, target: string) {
+    this.conflictData = { type, name, target };
+    this.conflictDialogOpen = true;
+    return new Promise<"skip" | "overwrite" | "autorename">((resolve) => {
+      this.conflictResolver = resolve;
+    });
+  }
+
+  private resolveConflict(choice: "skip" | "overwrite" | "autorename") {
+    if (this.conflictResolver) {
+      this.conflictResolver(choice);
+    }
+    this.conflictResolver = null;
+    this.conflictDialogOpen = false;
+    this.conflictData = null;
+  }
+
+  private async submitUpload() {
+    if (this.uploadInProgress) return;
+    if (!this.uploadFiles || this.uploadFiles.length === 0) {
+      this.showToast("Seleziona almeno un file da caricare", "error");
+      return;
+    }
+    if (!this.isDirWritable(this.uploadTargetDir)) {
+      this.showToast("Cartella in sola lettura: scegli un'altra destinazione", "error");
+      return;
+    }
+    const dir = this.uploadTargetDir || "/";
+    const targetDir = dir === "/" ? "/config" : dir;
+    this.uploadInProgress = true;
+    this.uploadProgress = { done: 0, total: this.uploadFiles.length };
+    let success = 0;
+    try {
+      for (const file of this.uploadFiles) {
+        let res: Response | null = null;
+        let payload: any = null;
+        try {
+          res = await apiUpload(this.apiBase, file, targetDir, "fail");
+          try {
+            payload = await res.json();
+          } catch {
+            payload = null;
+          }
+        } catch (e) {
+          this.showToast(`Errore upload ${file.name}`, "error");
+          this.uploadProgress = { done: (this.uploadProgress?.done ?? 0) + 1, total: this.uploadFiles.length };
+          continue;
+        }
+
+        if (!res.ok || payload?.ok !== true) {
+          if (res.status === 409) {
+            const choice = await this.promptConflict("upload", file.name, targetDir);
+            if (choice !== "skip") {
+              const retry = await apiUpload(this.apiBase, file, targetDir, choice);
+              let retryPayload: any = null;
+              try {
+                retryPayload = await retry.json();
+              } catch {
+                retryPayload = null;
+              }
+              if (retry.ok && retryPayload?.ok === true) {
+                const fname = retryPayload?.path || file.name;
+                this.showToast(`Caricato: ${fname}`);
+                success += 1;
+              } else {
+                this.showToast(`Errore upload ${file.name}`, "error");
+              }
+            }
+          } else if (res.status === 413) {
+            this.showToast(`File troppo grande: ${file.name}`, "error");
+          } else if (res.status === 404) {
+            this.showToast("Cartella di destinazione non trovata", "error");
+          } else if (res.status === 400 || res.status === 415) {
+            this.showToast(`Nome non valido: ${file.name}`, "error");
+          } else {
+            const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
+            this.showToast(`${file.name}: ${msg}`, "error");
+          }
+        } else {
+          const fname = payload?.path || file.name;
+          this.showToast(`Caricato: ${fname}`);
+          success += 1;
+        }
+
+        this.uploadProgress = { done: (this.uploadProgress?.done ?? 0) + 1, total: this.uploadFiles.length };
+      }
+
+      this.showToast(`Upload completato: ${success}/${this.uploadFiles.length}`);
+      if (success > 0) {
+        await this.notifyFsChanged();
+      }
+      this.closeUploadModal();
+    } finally {
+      this.uploadInProgress = false;
+      this.uploadProgress = null;
+    }
+  }
+
+  private async performMove(src: string, dstDir: string, mode: "fail" | "overwrite" | "autorename" = "fail"): Promise<void> {
+    const payloadDst = dstDir === "/" ? "" : dstDir;
+    try {
+      const res = await apiMovePath(this.apiBase, src, payloadDst, mode);
+      let body: any = null;
+      try {
+        body = await res.json();
+      } catch {
+        body = null;
+      }
+      if (!res.ok || body?.ok !== true) {
+        if (res.status === 409) {
+          if (mode !== "fail") {
+            this.showToast("Esiste già un elemento con lo stesso nome nella destinazione", "error");
+            return;
+          }
+          const choice = await this.promptConflict("move", src.split("/").pop() || src, dstDir || "/");
+          if (choice === "skip") return;
+          return await this.performMove(src, dstDir, choice);
+        } else if (res.status === 400) {
+          this.showToast(body?.detail || "Spostamento non valido", "error");
+        } else if (res.status === 404) {
+          this.showToast("Origine o destinazione non trovata", "error");
+        } else {
+          this.showToast(`Errore move (HTTP ${res.status})`, "error");
+        }
+        return;
+      }
+      const dstPath = (body?.dst as string) || null;
+      this.showToast(`Spostato: ${src.split("/").pop() || src}`);
+
+      if (dstPath) {
+        // Aggiorna tab aperti che puntavano al vecchio path
+        const updatedTabs = this.tabs.map((t) => (t.path === src ? { ...t, path: dstPath, name: dstPath.split("/").pop() || dstPath } : t));
+        const activeChanged = this.activePath === src;
+        if (activeChanged) {
+          this.activePath = dstPath;
+          const cached = this.fileCache[src];
+          if (cached !== undefined) {
+            delete this.fileCache[src];
+            this.fileCache[dstPath] = cached;
+          }
+          const savedBase = this.savedBaseByPath[src];
+          if (savedBase !== undefined) {
+            delete this.savedBaseByPath[src];
+            this.savedBaseByPath[dstPath] = savedBase;
+          }
+          const snap = this.openSnapshotByPath[src];
+          if (snap !== undefined) {
+            delete this.openSnapshotByPath[src];
+            this.openSnapshotByPath[dstPath] = snap;
+          }
+        }
+        this.tabs = updatedTabs;
+        if (activeChanged) {
+          this.status = "File spostato: riaperto dal nuovo percorso";
+        }
+      } else if (this.activePath === src) {
+        this.showToast("File spostato: riaprilo dalla nuova posizione", "error");
+      }
+
+      await this.notifyFsChanged();
+    } catch (e) {
+      this.showToast("Errore spostamento", "error");
+    } finally {
+      this.pendingMove = null;
+      this.moveConfirmOpen = false;
     }
   }
 
@@ -725,7 +1079,7 @@ export class AppRoot extends LitElement {
       }
       const bufferId = data?.buffer_id || data?.bufferId;
       const bufferSize = data?.size ?? size;
-      const lastEditAt = new Date().toISOString();
+      const lastEditAt = Date.now();
       this.tabs = this.tabs.map((t) =>
         t.path === path ? { ...t, bufferId, bufferSize, lastEditAt } : t
       );
@@ -1155,6 +1509,12 @@ export class AppRoot extends LitElement {
     this.contextMenuOpen = false;
     this.openMenu = null;
     this.closeSuggestions();
+  }
+
+  private isImagePath(path: string | null): boolean {
+    if (!path) return false;
+    const lower = path.toLowerCase();
+    return [".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".svg"].some((ext) => lower.endsWith(ext));
   }
 
   private async handleCopyCut(action: "copy" | "cut") {
@@ -1639,12 +1999,47 @@ export class AppRoot extends LitElement {
     this.clearBufferTimer("");
     this.bufferSaveTimers.clear();
     this.dirtySessionToastShown = false;
+    this.lastSessionSnapshot = null;
+    this.showUploadModal = false;
+    this.uploadFile = null;
   }
 
   private normalizeDir(path: string | null | undefined): string {
     if (!path || path === "/") return "/";
     const trimmed = path.endsWith("/") ? path.slice(0, -1) : path;
     return trimmed || "/";
+  }
+
+  private getDirectoryOptions(): { path: string; writable: boolean }[] {
+    const dirs = new Map<string, boolean>();
+    dirs.set("/", true);
+    const addDir = (path: string, writable: boolean | undefined | null) => {
+      const norm = this.normalizeDir(path);
+      dirs.set(norm, writable !== false);
+    };
+    const scan = (p: string) => {
+      const items = this.treeData[p] || [];
+      items.forEach((item: TreeItem) => {
+        if (item.type === "dir") {
+          addDir(item.path, item.writable);
+          if (this.treeData[item.path]) {
+            scan(item.path);
+          }
+        }
+      });
+    };
+    scan("");
+    return Array.from(dirs.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([path, writable]) => ({ path, writable }));
+  }
+
+  private isDirWritable(path: string): boolean {
+    const norm = this.normalizeDir(path);
+    if (norm === "/" || norm === "") return true;
+    const allDirs = this.getDirectoryOptions();
+    const entry = allDirs.find((d) => this.normalizeDir(d.path) === norm);
+    return entry ? entry.writable : true;
   }
 
   private setActiveSelection(path: string | null, isDir: boolean) {
@@ -1669,6 +2064,15 @@ export class AppRoot extends LitElement {
     }, 450);
   }
 
+  private buildSessionSnapshot(): string {
+    const minimal = {
+      tabs: this.tabs.map((t) => ({ path: t.path, dirty: !!t.dirty })),
+      active: this.activePath ?? null,
+      split: !!this.splitViewEnabled,
+    };
+    return JSON.stringify(minimal);
+  }
+
   private async saveSession() {
     const payload = {
       tabs: this.tabs.map((t) => ({
@@ -1676,17 +2080,20 @@ export class AppRoot extends LitElement {
         dirty: !!t.dirty,
         buffer_id: t.bufferId || null,
         buffer_size: t.bufferSize ?? null,
-        last_edit_at: t.lastEditAt || null,
-        view: t.view || null,
+        lastEditAt: t.lastEditAt ?? null,
+        view: this.safeView(t.view),
       })),
       active: this.activePath ?? null,
       split: !!this.splitViewEnabled,
     };
+    const snapshot = this.buildSessionSnapshot();
+    if (snapshot === this.lastSessionSnapshot) return;
     try {
       const res = await apiPutSession(this.apiBase, payload);
       if (!res.ok) {
         throw new Error(`session save ${res.status}`);
       }
+      this.lastSessionSnapshot = snapshot;
     } catch (err) {
       console.warn("saveSession failed", err);
     }
@@ -1699,7 +2106,7 @@ export class AppRoot extends LitElement {
     savedBase?: string,
     bufferId?: string,
     bufferSize?: number,
-    lastEditAt?: string,
+    lastEditAt?: number,
     view?: { scrollTop?: number; selStart?: number; selEnd?: number }
   ) {
     const name = path.split("/").pop() || path;
@@ -1737,12 +2144,17 @@ export class AppRoot extends LitElement {
   private async restoreSession() {
     if (this.restoringSession) return;
     this.restoringSession = true;
+    let restoreSucceeded = false;
     try {
       const res = await apiGetSession(this.apiBase);
       if (!res.ok) {
         throw new Error(`session load ${res.status}`);
       }
       const data = await res.json();
+      const hasContent =
+        (Array.isArray(data?.tabs) && data.tabs.length > 0) ||
+        (typeof data?.active === "string" && data.active.length > 0) ||
+        typeof data?.split === "boolean";
       const rawTabs = Array.isArray(data?.tabs) ? data.tabs : [];
       const tabs = rawTabs
         .map((t: any) => {
@@ -1789,13 +2201,20 @@ export class AppRoot extends LitElement {
               console.warn("restoreSession: errore buffer", path, bufErr);
             }
           }
-          this.addRestoredTab(path, effectiveContent, wasDirty, diskContent, usedBufferId, usedBufferSize, entry.last_edit_at || entry.lastEditAt);
+          const restoredLastEdit =
+            typeof entry.lastEditAt === "number"
+              ? entry.lastEditAt
+              : entry.last_edit_at
+                ? Number(entry.last_edit_at)
+                : undefined;
+          this.addRestoredTab(path, effectiveContent, wasDirty, diskContent, usedBufferId, usedBufferSize, restoredLastEdit);
           restored.push(path);
           if (wasDirty) hadDirty = true;
         } catch (err) {
           console.warn("restoreSession: errore su file", path, err);
         }
       }
+      restoreSucceeded = hasContent;
       if (split) {
         this.splitViewEnabled = true;
       }
@@ -1818,7 +2237,9 @@ export class AppRoot extends LitElement {
       this.showToast("Sessione ripristinata ai valori predefiniti (errore)", "error");
     } finally {
       this.restoringSession = false;
-      this.scheduleSaveSession();
+      if (restoreSucceeded) {
+        this.scheduleSaveSession();
+      }
     }
   }
 
@@ -1851,6 +2272,7 @@ export class AppRoot extends LitElement {
       this.resetSessionStateInMemory();
       this.status = "Session reset";
       this.showToast("Sessione resettata");
+      await this.notifyFsChanged();
       this.reloadTree(true);
     } catch (err) {
       this.showToast("Errore reset sessione", "error");
@@ -1860,10 +2282,20 @@ export class AppRoot extends LitElement {
   private renderSidebarContent() {
     if (this.activeActivity === "explorer") {
       return html`<div class="tree">
-        <div class="treeScrollable" @contextmenu=${(e: Event) => this.handleTreeBlankContextMenu(e as MouseEvent)}>
+        <div class="treeHeader">
+          <button class="btn" type="button" @click=${() => this.openUploadModal()}>⬆️ Upload</button>
+        </div>
+        <div
+          class="treeScrollable"
+          @contextmenu=${(e: Event) => this.handleTreeBlankContextMenu(e as MouseEvent)}
+          @dragover=${(e: DragEvent) => this.handleTreeRootDragOver(e)}
+          @drop=${(e: DragEvent) => this.handleTreeRootDrop(e)}
+          @dragleave=${() => {
+            if (this.dropTargetPath === "/") this.dropTargetPath = null;
+          }}
+        >
           ${this.renderTree("")}
         </div>
-        <div class="treeTargetLabel">Target: ${this.activeDir || "/"}</div>
       </div>`;
     }
     if (this.activeActivity === "search") {
@@ -2193,7 +2625,7 @@ export class AppRoot extends LitElement {
             : nothing}
         </div>
 
-        <div class="main" ${ref((el) => (this.mainRef = el))}>
+        <div class="main" ${ref((el) => (this.mainRef = el instanceof HTMLDivElement ? el : null))}>
           <div class="activity">
             <div class="activityGroup">
               <div class="act ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>📁</div>
@@ -2212,7 +2644,7 @@ export class AppRoot extends LitElement {
 
           <div class="sidebarBackdrop ${this.sidebarOpen ? "open" : ""}" @click=${() => (this.sidebarOpen = false)}></div>
 
-          <div class="sidebar ${this.sidebarOpen ? "open" : ""}" ${ref((el) => (this.sidebarRef = el))}>
+          <div class="sidebar ${this.sidebarOpen ? "open" : ""}" ${ref((el) => (this.sidebarRef = el instanceof HTMLDivElement ? el : null))}>
             <div class="sidebarHeader">
               <div class="explorerTitle">
                 ${this.activeActivity === "explorer"
@@ -2275,11 +2707,11 @@ export class AppRoot extends LitElement {
                 ? html`<div class="splitWrap">
                     <div class="splitPane">
                       <div class="editorWrap">
-                        <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
+                        <div class="gutter" ${ref((el) => (this.gutterRef = el instanceof HTMLDivElement ? el : null))}>${renderLineNumbers(this.lineCount)}</div>
                     <div class="codeWrap">
                       <div
                         class="code ${this.showIndentGuides ? "showGuides" : ""}"
-                        ${ref((el) => (this.codeRef = el))}
+                        ${ref((el) => (this.codeRef = el instanceof HTMLDivElement ? el : null))}
                       >
                         ${renderHighlighted(this.content, {
                           diffMap: diffMaps.left,
@@ -2290,7 +2722,7 @@ export class AppRoot extends LitElement {
                         })}
                       </div>
                       <textarea
-                        ${ref((el) => (this.editorRef = el))}
+                        ${ref((el) => (this.editorRef = el instanceof HTMLTextAreaElement ? el : null))}
                         .value=${this.content}
                         placeholder="Seleziona un file a sinistra…"
                         spellcheck="false"
@@ -2311,20 +2743,20 @@ export class AppRoot extends LitElement {
                     </div>
                     <div class="splitPane">
                       <div class="editorWrap">
-                        <div class="gutter" ${ref((el) => (this.baseGutterRef = el))}>${renderLineNumbersFor(this.savedBaseText)}</div>
+                        <div class="gutter" ${ref((el) => (this.baseGutterRef = el instanceof HTMLDivElement ? el : null))}>${renderLineNumbersFor(this.savedBaseText)}</div>
                     <div class="codeWrap">
-                      <div class="code" ${ref((el) => (this.baseCodeRef = el))}>${renderHighlighted(this.savedBaseText, { diffMap: diffMaps.right })}</div>
-                      <pre class="basePre" ${ref((el) => (this.basePreRef = el))} @scroll=${this.syncBaseScroll}>${this.savedBaseText}</pre>
+                      <div class="code" ${ref((el) => (this.baseCodeRef = el instanceof HTMLDivElement ? el : null))}>${renderHighlighted(this.savedBaseText, { diffMap: diffMaps.right })}</div>
+                      <pre class="basePre" ${ref((el) => (this.basePreRef = el instanceof HTMLPreElement ? el : null))} @scroll=${this.syncBaseScroll}>${this.savedBaseText}</pre>
                     </div>
                       </div>
                     </div>
                   </div>`
                 : html`<div class="editorWrap">
-                    <div class="gutter" ${ref((el) => (this.gutterRef = el))}>${renderLineNumbers(this.lineCount)}</div>
+                    <div class="gutter" ${ref((el) => (this.gutterRef = el instanceof HTMLDivElement ? el : null))}>${renderLineNumbers(this.lineCount)}</div>
                     <div class="codeWrap">
                       <div
                         class="code ${this.showIndentGuides ? "showGuides" : ""}"
-                        ${ref((el) => (this.codeRef = el))}
+                        ${ref((el) => (this.codeRef = el instanceof HTMLDivElement ? el : null))}
                       >
                         ${renderHighlighted(this.content, {
                           showGuides: this.showIndentGuides,
@@ -2334,7 +2766,7 @@ export class AppRoot extends LitElement {
                         })}
                       </div>
                       <textarea
-                        ${ref((el) => (this.editorRef = el))}
+                        ${ref((el) => (this.editorRef = el instanceof HTMLTextAreaElement ? el : null))}
                         .value=${this.content}
                         placeholder="Seleziona un file a sinistra…"
                         spellcheck="false"
@@ -2386,14 +2818,16 @@ export class AppRoot extends LitElement {
                     </div>`
                 : nothing}
               ${!this.treeMenuFromBlank
-                ? html`<div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
+                ? html`
+                    <div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
                     <div
                       class="contextMenuItem ${this.treeClipboard ? "" : "disabled"}"
                       @click=${() => this.pasteTreeItem()}
                     >
                       📥 Incolla
                     </div>
-                    <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}>🗑️ Elimina</div>`
+                    <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}>🗑️ Elimina</div>
+                  `
                 : nothing}
             </div>`
           : nothing}
@@ -2632,6 +3066,91 @@ export class AppRoot extends LitElement {
                   <button class="btn" @click=${() => this.cancelUnsavedModal()}>Annulla</button>
                   <button class="btn" @click=${() => this.confirmUnsavedDiscard()}>Non salvare</button>
                   <button class="btn primary" @click=${() => this.confirmUnsavedSave()}>Salva</button>
+                </div>
+              </div>
+            </div>`
+          : nothing}
+
+        ${this.showUploadModal
+          ? html`<div class="modalBackdrop" @click=${() => this.closeUploadModal()}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:520px;">
+                <h3>Upload file</h3>
+                <div class="formRow" style="margin-top:12px; display:grid; gap:6px;">
+                  <label style="font-size:var(--font-size-sm); color:var(--muted-color);">File</label>
+                  <input type="file" multiple @change=${this.handleUploadFileChange} />
+                </div>
+                ${this.uploadFiles && this.uploadFiles.length
+                  ? html`<div style="max-height:160px; overflow:auto; margin-top:6px; border:1px solid var(--border-color); border-radius:6px; padding:6px; display:grid; gap:4px;">
+                      ${this.uploadFiles.map(
+                        (f) =>
+                          html`<div style="display:flex; justify-content:space-between; gap:8px;">
+                            <span style="overflow:hidden; text-overflow:ellipsis;">${f.name}</span>
+                            <span style="color:var(--muted-color); white-space:nowrap;">${(f.size / 1024).toFixed(
+                              f.size < 10240 ? 2 : 1
+                            )} KB</span>
+                          </div>`
+                      )}
+                    </div>`
+                  : nothing}
+                <div class="formRow" style="margin-top:12px; display:grid; gap:6px;">
+                  <label style="font-size:var(--font-size-sm); color:var(--muted-color);">Cartella destinazione</label>
+                  <select
+                    .value=${this.uploadTargetDir}
+                    @change=${(e: Event) => (this.uploadTargetDir = this.normalizeDir((e.target as HTMLSelectElement).value))}
+                  >
+                    ${this.getDirectoryOptions().map(
+                      (dir) =>
+                        html`<option value=${dir.path} ?disabled=${!dir.writable}>
+                          ${dir.path === "/" ? "/config" : `/config/${dir.path}`} ${dir.writable ? "" : " (readonly)"}
+                        </option>`
+                    )}
+                  </select>
+                </div>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.closeUploadModal()} ?disabled=${this.uploadInProgress}>Annulla</button>
+                  <button
+                    class="btn primary"
+                    @click=${() => this.submitUpload()}
+                    ?disabled=${this.uploadInProgress || !this.uploadFiles || this.uploadFiles.length === 0}
+                  >
+                    ${this.uploadInProgress
+                      ? this.uploadProgress
+                        ? `Caricamento... ${this.uploadProgress.done}/${this.uploadProgress.total}`
+                        : "Caricamento..."
+                      : "Upload"}
+                  </button>
+                </div>
+              </div>
+            </div>`
+          : nothing}
+
+        ${this.moveConfirmOpen && this.pendingMove
+          ? html`<div class="modalBackdrop" @click=${() => this.cancelMoveConfirm()}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:460px;">
+                <h3>Conferma spostamento</h3>
+                <p style="margin-top:8px; color:var(--muted-color);">
+                  Spostare <strong>${this.pendingMove.src.split("/").pop() || this.pendingMove.src}</strong>
+                  in <strong>${this.pendingMove.dstDir || "/"}</strong>?
+                </p>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.cancelMoveConfirm()}>Annulla</button>
+                  <button class="btn primary" @click=${() => this.confirmMove()}>Sposta</button>
+                </div>
+              </div>
+            </div>`
+          : nothing}
+
+        ${this.conflictDialogOpen && this.conflictData
+          ? html`<div class="modalBackdrop" @click=${() => { if (!this.uploadInProgress) this.resolveConflict("skip"); }}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:480px;">
+                <h3>Conflitto nome</h3>
+                <p style="margin-top:8px; color:var(--muted-color);">
+                  Esiste già <strong>${this.conflictData.name}</strong> in <strong>${this.conflictData.target}</strong>.
+                </p>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.resolveConflict("skip")}>Annulla</button>
+                  <button class="btn" @click=${() => this.resolveConflict("autorename")}>Rinomina</button>
+                  <button class="btn primary" @click=${() => this.resolveConflict("overwrite")}>Sovrascrivi</button>
                 </div>
               </div>
             </div>`

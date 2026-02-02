@@ -92,7 +92,8 @@ export function handleTreeContextMenu(this: any, e: MouseEvent, item: TreeItem) 
   this.treeMenuY = e.clientY;
   this.treeMenuPath = item.path;
   this.treeMenuType = item.type;
-   this.treeMenuFromBlank = false;
+  this.treeMenuSize = (item as any).size ?? null;
+  this.treeMenuFromBlank = false;
   this.contextMenuOpen = false;
   this.openMenu = null;
   this.closeSuggestions();
@@ -102,6 +103,84 @@ export function closeTreeMenu(this: any) {
   if (this.treeMenuOpen) {
     this.treeMenuOpen = false;
   }
+}
+
+export function handleTreeDragStart(this: any, e: DragEvent, item: TreeItem) {
+  if (!e.dataTransfer) return;
+  e.dataTransfer.setData("application/json", JSON.stringify({ path: item.path, isDir: item.type === "dir" }));
+  e.dataTransfer.effectAllowed = "move";
+  this.draggingPath = item.path;
+  this.draggingType = item.type;
+}
+
+export function handleTreeDragOver(this: any, e: DragEvent, item: TreeItem) {
+  if (item.type !== "dir" || item.writable === false) {
+    this.dropTargetPath = null;
+    return;
+  }
+  e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+  this.dropTargetPath = item.path || "/";
+}
+
+export function handleTreeDragLeave(this: any, e: DragEvent, item: TreeItem) {
+  if (this.dropTargetPath === (item.path || "/")) {
+    this.dropTargetPath = null;
+  }
+}
+
+export function handleTreeDrop(this: any, e: DragEvent, item: TreeItem) {
+  if (item.type !== "dir") return;
+  e.preventDefault();
+  if (item.writable === false) {
+    this.showToast("Cartella in sola lettura", "error");
+    return;
+  }
+  let payload: { path?: string; isDir?: boolean } | null = null;
+  try {
+    payload = e.dataTransfer?.getData("application/json") ? JSON.parse(e.dataTransfer.getData("application/json")) : null;
+  } catch {
+    payload = null;
+  }
+  const src = payload?.path || this.draggingPath;
+  const srcType = payload?.isDir ? "dir" : this.draggingType;
+  this.dropTargetPath = null;
+  if (!src) return;
+  const dstDir = item.path || "/";
+  if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
+    this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+    return;
+  }
+  this.queueMove(src, dstDir);
+}
+
+export function handleTreeRootDragOver(this: any, e: DragEvent) {
+  // drop on blank/root
+  if (e.target && (e.target as HTMLElement).closest(".treeRow")) return;
+  e.preventDefault();
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+  this.dropTargetPath = "/";
+}
+
+export function handleTreeRootDrop(this: any, e: DragEvent) {
+  if (e.target && (e.target as HTMLElement).closest(".treeRow")) return;
+  e.preventDefault();
+  let payload: { path?: string; isDir?: boolean } | null = null;
+  try {
+    payload = e.dataTransfer?.getData("application/json") ? JSON.parse(e.dataTransfer.getData("application/json")) : null;
+  } catch {
+    payload = null;
+  }
+  const src = payload?.path || this.draggingPath;
+  const srcType = payload?.isDir ? "dir" : this.draggingType;
+  this.dropTargetPath = null;
+  if (!src) return;
+  const dstDir = "/";
+  if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
+    this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+    return;
+  }
+  this.queueMove(src, dstDir);
 }
 
 export function copyTreeItem(this: any) {
@@ -319,17 +398,24 @@ export function renderTree(this: any, path: string, depth = 0) {
     const isExpanded = isDir && this.expanded.has(it.path);
     const active = this.activePath === it.path;
     const targetDir = isDir && this.activeDir === it.path;
+    const readonlyDir = isDir && it.writable === false;
+    const dropActive = this.dropTargetPath === (it.path || "/");
 
     return html`
       <div
-        class="treeRow ${active ? "active" : ""} ${targetDir ? "targetDir" : ""}"
+        class="treeRow ${active ? "active" : ""} ${targetDir ? "targetDir" : ""} ${dropActive ? "dropTarget" : ""} ${readonlyDir ? "readonly-dir" : ""}"
         style="padding-left:${8 + depth * 14}px"
+        draggable="true"
+        @dragstart=${(e: DragEvent) => this.handleTreeDragStart(e, it)}
+        @dragover=${(e: DragEvent) => this.handleTreeDragOver(e, it)}
+        @dragleave=${(e: DragEvent) => this.handleTreeDragLeave(e, it)}
+        @drop=${(e: DragEvent) => this.handleTreeDrop(e, it)}
         @click=${() => {
           if (isDir) {
             this.setActiveSelection(it.path, true);
             this.toggleDir(it.path);
           } else {
-            this.requestOpenFile(it.path);
+            this.requestOpenFile(it.path, (it as any).size);
           }
         }}
         @contextmenu=${(e: MouseEvent) => this.handleTreeContextMenu(e, it)}

@@ -12,6 +12,7 @@ import re
 import socket
 import platform
 import hashlib
+import mimetypes
 from logging.handlers import RotatingFileHandler
 import tempfile
 import zipfile
@@ -22,7 +23,7 @@ from typing import List, Optional
 import json
 import httpx
 import websockets
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -68,6 +69,8 @@ DEFAULT_USER_CONFIG = {
 DEFAULT_SESSION_STATE = {"tabs": [], "active": None, "split": False}
 MAX_BUFFER_BYTES = 256 * 1024  # 256KB
 MAX_BUFFER_FILES = 10
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
+CONFLICT_MODES = {"fail", "overwrite", "autorename"}
 HA_ACTIONS = {
     "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_core_config"},
     "restart_core": {"type": "service", "domain": "homeassistant", "service": "restart"},
@@ -157,6 +160,18 @@ def atomic_write(target: Path, data: str) -> None:
         os.fsync(f.fileno())
 
     os.replace(tmp, target)  # atomic sulla stessa FS
+
+
+def next_available_name(path: Path) -> Path:
+    parent = path.parent
+    stem = path.stem
+    suffix = path.suffix
+    i = 1
+    while True:
+        candidate = parent / f"{stem} ({i}){suffix}"
+        if not candidate.exists():
+            return candidate
+        i += 1
 
 
 def _match_globs(rel_path: Path, globs: Optional[List[str]]) -> bool:
@@ -1224,11 +1239,19 @@ def tree(path: str = ""):
         except Exception:
             continue
 
+        writable = True
+        if p.is_dir():
+            try:
+                writable = os.access(p, os.W_OK)
+            except Exception:
+                writable = False
+
         items.append(
             {
                 "name": name,
                 "path": rel,
                 "type": "dir" if p.is_dir() else "file",
+                "writable": writable if p.is_dir() else None,
             }
         )
 
@@ -1251,6 +1274,133 @@ def read_file(path: str):
         raise HTTPException(500, f"Read failed: {e}")
 
     return {"path": f.resolve().relative_to(BASE_DIR).as_posix(), "content": content}
+
+
+@app.get("/api/file/raw")
+def read_file_raw(path: str):
+    # Support both relative and absolute "/config/..." paths for convenience
+    if path.startswith("/config/"):
+        path = path[len("/config/") :]
+    f = safe_path(path)
+    if not f.exists():
+        raise HTTPException(404, "File not found")
+    if not f.is_file():
+        raise HTTPException(400, "Not a file")
+    allowed_ext = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
+    ext = f.suffix.lower()
+    if ext not in allowed_ext:
+        raise HTTPException(415, f"Unsupported media type: {ext or 'unknown'}")
+    media_type, _ = mimetypes.guess_type(f.name)
+    return FileResponse(
+        str(f),
+        media_type=media_type or "application/octet-stream",
+        headers={"Cache-Control": "private, max-age=60"},
+    )
+
+
+@app.get("/api/fs/download")
+def download_file(path: str):
+    # Support absolute /config/... too
+    if path.startswith("/config/"):
+        path = path[len("/config/") :]
+    f = safe_path(path)
+    if not f.exists():
+        raise HTTPException(404, "File not found")
+    if not f.is_file():
+        raise HTTPException(400, "Not a file")
+    media_type, _ = mimetypes.guess_type(f.name)
+    return FileResponse(
+        str(f),
+        media_type=media_type or "application/octet-stream",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.post("/api/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    target_dir: str = Form(...),
+    mode: str = Form("fail"),
+):
+    if not file or not file.filename:
+        raise HTTPException(415, "Invalid filename")
+    original_name = file.filename
+    if "/" in original_name or "\\" in original_name:
+        raise HTTPException(415, "Invalid filename")
+    mode = (mode or "fail").lower()
+    if mode not in CONFLICT_MODES:
+        mode = "fail"
+
+    # Normalizza target_dir: accetta anche /config/...
+    td = (target_dir or "").strip()
+    if td.startswith("/config/"):
+        td = td[len("/config/") :]
+    elif td == "/config":
+        td = ""
+
+    target_dir_path = safe_path(td)
+
+    if not target_dir_path.exists():
+        raise HTTPException(404, "Target directory does not exist")
+    if not target_dir_path.is_dir():
+        raise HTTPException(400, "Target is not a directory")
+
+    name = Path(original_name).name
+    if not name:
+        raise HTTPException(415, "Invalid filename")
+
+    dest = (target_dir_path / name).resolve()
+    if not _is_within_base(dest):
+        raise HTTPException(403, "Access denied")
+
+    if dest.exists():
+        if dest.is_dir():
+            raise HTTPException(409, "Destination already exists")
+        if mode == "fail":
+            raise HTTPException(409, "File already exists")
+        if mode == "autorename":
+            dest = next_available_name(dest)
+        # overwrite handled later
+
+    tmp_name = f".upload_tmp_{uuid.uuid4().hex}"
+    tmp_path = dest.with_name(tmp_name)
+
+    total = 0
+    try:
+        with open(tmp_path, "wb") as f:
+            while True:
+                chunk = await file.read(1024 * 64)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > MAX_UPLOAD_BYTES:
+                    raise HTTPException(413, "File too large (max 50MB)")
+                f.write(chunk)
+            f.flush()
+            os.fsync(f.fileno())
+        if mode == "overwrite" and dest.exists():
+            if dest.is_file():
+                dest.unlink()
+            else:
+                raise HTTPException(409, "Destination already exists")
+        os.replace(tmp_path, dest)
+    except HTTPException:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        raise
+    except Exception as e:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
+        logger.exception("upload_file: error writing %s: %s", dest, e)
+        raise HTTPException(500, f"Upload failed: {e}")
+    finally:
+        await file.close()
+
+    return {
+        "ok": True,
+        "path": dest.as_posix(),
+        "size_bytes": total,
+    }
 
 
 @app.put("/api/file")
@@ -1285,6 +1435,85 @@ async def write_file(request: Request, path: str, create_only: bool = False):
         raise HTTPException(500, f"Write failed: {e}")
 
     return {"ok": True, "path": f.resolve().relative_to(BASE_DIR).as_posix(), "backup": str(bak.relative_to(BASE_DIR)) if bak else None}
+
+
+@app.post("/api/fs/move")
+async def move_path(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(400, "Invalid JSON")
+    src_raw = (payload.get("src") or "").strip()
+    dst_dir_raw_raw = payload.get("dst_dir")
+    if dst_dir_raw_raw is None:
+        dst_dir_raw = None
+    else:
+        dst_dir_raw = str(dst_dir_raw_raw)
+    dst_dir_raw = dst_dir_raw.strip() if dst_dir_raw is not None else None
+    mode = (payload.get("mode") or "fail").lower() if isinstance(payload, dict) else "fail"
+    if mode not in CONFLICT_MODES:
+        mode = "fail"
+
+    if not src_raw:
+        raise HTTPException(400, "src is required")
+    if dst_dir_raw is None:
+        raise HTTPException(400, "dst_dir is required")
+
+    if src_raw.startswith("/config/"):
+        src_raw = src_raw[len("/config/") :]
+    if src_raw == "/config":
+        src_raw = ""
+    if dst_dir_raw in ("/config", "/config/", "/", ".", ""):
+        dst_dir_raw = ""
+    if dst_dir_raw.startswith("/config/"):
+        dst_dir_raw = dst_dir_raw[len("/config/") :]
+    if dst_dir_raw == "/config":
+        dst_dir_raw = ""
+
+    src = safe_path(src_raw)
+    dst_dir = safe_path(dst_dir_raw)
+
+    if not src.exists():
+        raise HTTPException(404, "Source not found")
+    if not dst_dir.exists():
+        raise HTTPException(404, "Destination directory not found")
+    if not dst_dir.is_dir():
+        raise HTTPException(400, "Destination directory invalid")
+
+    # Prevent moving dir into itself or subdir
+    if src.is_dir():
+        try:
+            dst_rel = dst_dir.resolve().relative_to(src.resolve())
+            # if succeeds, dst is inside src (or same)
+            raise HTTPException(400, "Cannot move a directory into itself")
+        except ValueError:
+            pass
+        if dst_dir.resolve() == src.resolve():
+            raise HTTPException(400, "Cannot move a directory into itself")
+
+    dst = (dst_dir / src.name).resolve()
+    if not _is_within_base(dst):
+        raise HTTPException(403, "Access denied")
+    if dst.exists():
+        if mode == "fail":
+            raise HTTPException(409, "Destination already exists")
+        if mode == "autorename":
+            dst = next_available_name(dst)
+        elif mode == "overwrite":
+            if dst.is_file():
+                dst.unlink()
+            elif dst.is_dir():
+                shutil.rmtree(dst)
+            else:
+                raise HTTPException(400, "Unsupported destination type")
+
+    try:
+        os.replace(src, dst)
+    except Exception as e:
+        logger.exception("move_path: error moving %s to %s: %s", src, dst, e)
+        raise HTTPException(500, f"Move failed: {e}")
+
+    return {"ok": True, "src": src.resolve().relative_to(BASE_DIR).as_posix(), "dst": dst.resolve().relative_to(BASE_DIR).as_posix()}
 
 
 @app.get("/api/snippets")
@@ -1438,24 +1667,29 @@ async def put_session(request: Request):
         raise HTTPException(400, "Body JSON richiesto")
     if not isinstance(payload, dict):
         raise HTTPException(400, "Session deve essere un oggetto")
+
+    def normalize_view(raw: Any):
+        if isinstance(raw, dict):
+            return {
+                "scrollTop": int(raw.get("scrollTop") or 0),
+                "selStart": int(raw.get("selStart") or 0),
+                "selEnd": int(raw.get("selEnd") or 0),
+            }
+        return {"scrollTop": 0, "selStart": 0, "selEnd": 0}
+
     tabs = payload.get("tabs")
     if tabs is not None:
         if not isinstance(tabs, list):
             raise HTTPException(400, "tabs deve essere una lista")
-        for item in tabs:
+        for idx, item in enumerate(tabs):
             if isinstance(item, str):
+                tabs[idx] = {"path": item, "dirty": False, "view": {"scrollTop": 0, "selStart": 0, "selEnd": 0}}
                 continue
             if not isinstance(item, dict) or not isinstance(item.get("path"), str):
                 raise HTTPException(400, "Ogni tab deve essere string o object {path,dirty}")
             if "dirty" in item and not isinstance(item.get("dirty"), bool):
                 raise HTTPException(400, "dirty deve essere boolean")
-            if "view" in item and not isinstance(item.get("view"), dict):
-                raise HTTPException(400, "view deve essere un oggetto")
-            if isinstance(item.get("view"), dict):
-                v = item.get("view")
-                for key in ("scrollTop", "selStart", "selEnd"):
-                    if key in v and not isinstance(v.get(key), int):
-                        raise HTTPException(400, f"view.{key} deve essere int")
+            item["view"] = normalize_view(item.get("view"))
     active = payload.get("active")
     if active is not None and not isinstance(active, str):
         raise HTTPException(400, "active deve essere string o null")
@@ -1556,6 +1790,7 @@ async def diff_endpoint(body: dict):
 # ---- Frontend (Ingress friendly): serve static + SPA fallback
 if FRONTEND_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIR / "assets")), name="assets")
+    app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 
 
 @app.get("/")
@@ -1569,7 +1804,7 @@ def index():
 @app.get("/{full_path:path}")
 def spa_fallback(full_path: str):
     # lascia passare API e assets
-    if full_path.startswith("api/") or full_path.startswith("assets/"):
+    if full_path.startswith("api/") or full_path.startswith("assets/") or full_path.startswith("frontend/"):
         raise HTTPException(404)
     idx = FRONTEND_DIR / "index.html"
     if not idx.exists():

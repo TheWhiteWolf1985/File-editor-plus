@@ -1,16 +1,26 @@
-# Changelog
+# Changelog (major features)
 
-## 0.2.22
+## 🐛 Bug fixes
 
-- 🔄 Fix Undo: l’indent/outdent con Tab/Shift+Tab è registrato nello stack Undo nativo, quindi Ctrl+Z/Undo annullano l’azione in un solo passo.
+- Undo/Ctrl+Z ora annulla correttamente indent/outdent fatti con Tab/Shift+Tab (un solo step).
+- Fix build/packaging e runtime: dipendenza `python-multipart` + fix build frontend + fix path asset Ingress (niente più richieste rotte tipo `/frontend_latest`).
+- Fix Drag&Drop: eventi/handlers corretti, niente spam in console, drop verso root gestito correttamente (no più 400 / “src and dst_dir required”).
+- Fix sessione tab: `/api/session` non fallisce più quando `view` manca o è invalida (default oggetto, stop ai 400).
+- Fix tab Utility: “Genera debug log” e “Reset session” ora chiamano le azioni giuste + refresh tree coerente.
 
-## 0.2.21
+## 🚀 Enhancements
 
-- ⌨️ Undo Tab: l’indent/outdent con Tab/Shift+Tab ora è undoable (Ctrl+Z) grazie a edit undo-friendly sulla textarea.
-- 🗂️ Session restore completo: tab/attivo/split persistiti, flag dirty e buffer non salvati (con limiti) ripristinati con avvisi e reset sicuro della sessione.
-- 📍 Stato editor per tab: caret/selection e scroll vengono salvati e ripristinati all’apertura del tab.
-- ♻️ Reset session: comando in Utility per cancellare session.json e buffer, con fallback automatico se il file sessione è corrotto.
-- Issue [#11](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/11) Testing
-- Issue [#12](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/12) Testing
-- Issue [#13](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/13) Testing
-- Issue [#14](https://github.com/TheWhiteWolf1985/File-editor-plus/issues/14) Testing
+- Upload file in `/config`: endpoint backend + UI con modale, scelta cartella, e refresh automatico del tree.
+- Upload avanzato: multi-file con progress (seriale) e refresh tree unico + gestione conflitti (rinomina/sovrascrivi/annulla) con retry.
+- Drag&Drop nel file explorer: spostamento file/cartelle con endpoint `/api/fs/move` + modale di conferma prima di eseguire il move.
+- Read-only awareness: rilevamento cartelle non scrivibili, upload disabilitato e drop impedito con warning (flag writable nel tree).
+- Anteprima immagini: endpoint download con Content-Type corretto + overlay preview frontend (top-level JS) + UX (ESC/backdrop, limite 20MB, cleanup).
+
+## 🧰 Maintenance
+
+- Hardening generale upload/move: validazioni filename/size, messaggi conflitto più chiari, refresh più coerente, warning su tab coinvolti dallo spostamento.
+- Cleanup UI Explorer: rimosso `TreeTargetLabel` (pulizia/semplificazione DOM e logica).
+
+## 📚 Documentation
+
+- (Nessuna voce doc esplicita nel file sorgente: aggiungere qui solo se vengono aggiornati README/guide.)

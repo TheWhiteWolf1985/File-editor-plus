@@ -185,7 +185,21 @@ export const apiGetSession = (apiBase: string) => {
 
 export const apiPutSession = (
   apiBase: string,
-  session: { tabs: Array<string | { path: string; dirty?: boolean; buffer_id?: string | null; buffer_size?: number | null; last_edit_at?: string | null }>; active: string | null; split: boolean }
+  session: {
+    tabs: Array<
+      | string
+      | {
+          path: string;
+          dirty?: boolean;
+          buffer_id?: string | null;
+          buffer_size?: number | null;
+          last_edit_at?: number | string | null;
+          lastEditAt?: number | null;
+        }
+    >;
+    active: string | null;
+    split: boolean;
+  }
 ) => {
   const url = `${apiBase}api/session`;
   return fetch(url, {
@@ -217,4 +231,25 @@ export const apiResetSession = (apiBase: string) => {
 export const apiGenerateDebugLog = (apiBase: string) => {
   const url = `${apiBase}api/utils/debug-log`;
   return fetch(url, { method: "POST" });
+};
+
+export const apiUpload = (apiBase: string, file: File, targetDir: string, mode: "fail" | "overwrite" | "autorename" = "fail") => {
+  const url = `${apiBase}api/upload`;
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("target_dir", targetDir);
+  fd.append("mode", mode);
+  return fetch(url, {
+    method: "POST",
+    body: fd,
+  });
+};
+
+export const apiMovePath = (apiBase: string, src: string, dstDir: string, mode: "fail" | "overwrite" | "autorename" = "fail") => {
+  const url = `${apiBase}api/fs/move`;
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ src, dst_dir: dstDir, mode }),
+  });
 };
