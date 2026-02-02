@@ -79,10 +79,10 @@ export function openImagePreviewOverlay(opts: ImagePreviewOverlayOptions): void 
   body.appendChild(meta);
   panel.appendChild(body);
 
-  const close = (reason?: string) => {
+  const close = (reason?: string | Event) => {
     window.removeEventListener("keydown", escListener, true);
     overlay.remove();
-    if (reason && onError) {
+    if (onError && typeof reason === "string") {
       onError(reason);
     }
   };
@@ -104,7 +104,7 @@ export function openImagePreviewOverlay(opts: ImagePreviewOverlayOptions): void 
   overlay.addEventListener("click", (e) => {
     if (e.target === overlay) close();
   });
-  closeBtn.addEventListener("click", close);
+  closeBtn.addEventListener("click", () => close());
 
   document.body.appendChild(overlay);
 }

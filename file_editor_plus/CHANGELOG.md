@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.2.50
+## 0.2.51
 
-- 🖼️ Fix: anteprima immagini automatica (cleanup menu + error handling + no-freeze editor).
+- 🖼️ Fix: toast errato in chiusura anteprima immagini (niente più [Object PointerEvent]).
 
 ## 0.2.28
 
