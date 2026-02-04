@@ -70,6 +70,9 @@ export function applyTheme(this: any) {
           "--token-key-color": "#9cdcfe",
           "--indent-guide": "rgba(255, 255, 255, 0.2)",
           "--indent-guide-active": "rgba(255, 255, 255, 0.4)",
+          "--tab-bg": "#111111",
+          "--tab-active-bg": "#2d2d2d",
+          "--tab-active-border": "#2f2f2f",
         }
       : {
           "--bg-color": "#f5f6f8",
@@ -99,6 +102,9 @@ export function applyTheme(this: any) {
           "--token-key-color": "rgb(28 47 193)",
           "--indent-guide": "rgba(0, 0, 0, 0.06)",
           "--indent-guide-active": "rgba(0, 0, 0, 0.16)",
+          "--tab-bg": "#cfd6e0",
+          "--tab-active-bg": "#ffffff",
+          "--tab-active-border": "#c7ccd4",
         };
   Object.entries(palette).forEach(([key, value]) => {
     this.style.setProperty(key, value);

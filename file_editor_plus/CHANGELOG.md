@@ -22,6 +22,7 @@
 - Add: endpoint `/api/search/replace/one` per sostituire una singola occorrenza (backend). UI inline per replace singolo in corso.
 - Fix: pulsante Replace singolo ora chiama correttamente l’API (ok lowercase, toast con dettaglio errore).
 - Fix: Replace singolo aggiorna il file aperto (se non dirty) senza dover riaprire il tab; avviso se ci sono modifiche non salvate.
+- UI: tab attive/inattive ora seguono schema coerente con toolbar (inactive più scure, active più chiare/evidenziate) in entrambi i temi.
 - Fix: collegato handler `replaceOne` nel frontend search (pulsante singolo ora funziona).
 
 ## 🧰 Maintenance

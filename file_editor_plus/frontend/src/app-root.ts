@@ -339,7 +339,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.61";
+  private readonly appVersion = "0.2.62";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
