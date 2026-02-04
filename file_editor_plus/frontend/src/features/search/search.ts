@@ -143,6 +143,13 @@ export async function replaceOne(this: any, res: SearchResult, match: SearchMatc
       return;
     }
     this.showToast("Sostituito 1 match");
+    if (this.activePath === res.path) {
+      if (typeof this.isActiveDirty === "function" && this.isActiveDirty()) {
+        this.showToast("File aperto con modifiche non salvate: non ricaricato", "info");
+      } else if (typeof this.loadFile === "function") {
+        await this.loadFile(res.path);
+      }
+    }
     if (typeof this.notifyFsChanged === "function") {
       await this.notifyFsChanged();
     }
