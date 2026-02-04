@@ -236,7 +236,15 @@ def _find_matches(text: str, query: str, case_sensitive: bool, limit: int):
         if next_nl == -1:
             next_nl = len(text)
         line_text = text[(last_nl + 1 if last_nl != -1 else 0) : next_nl]
-        matches.append({"line": line, "column": col, "preview": line_text[:240], "match_len": len(query)})
+        matches.append(
+            {
+                "line": line,
+                "column": col,
+                "preview": line_text[:240],
+                "match_len": len(query),
+                "start": idx,
+            }
+        )
         if len(matches) >= limit:
             break
         start = idx + len(needle) if len(needle) > 0 else idx + 1
@@ -774,6 +782,66 @@ def _replace_on_files(payload: dict, apply: bool):
     }
 
 
+def _replace_single(payload: dict):
+    query = str(payload.get("query") or "")
+    if not query:
+        raise HTTPException(400, "Query required")
+    replace = str(payload.get("replace") or "")
+    case_sensitive = bool(payload.get("case_sensitive"))
+    path = str(payload.get("path") or "").strip()
+    if not path:
+        raise HTTPException(400, "path required")
+    match_index = payload.get("match_index") or 0
+    try:
+        match_index = int(match_index)
+    except Exception:
+        match_index = 0
+    try:
+        target = safe_path(path)
+    except HTTPException as e:
+        raise e
+    if not target.exists() or not target.is_file():
+        raise HTTPException(404, "File not found")
+    try:
+        st = target.stat()
+    except Exception as e:
+        raise HTTPException(500, f"stat failed: {e}")
+    expected_mtime = payload.get("mtime")
+    if expected_mtime is not None and st.st_mtime != expected_mtime:
+        return {"ok": False, "status": "stale", "mtime": st.st_mtime, "path": path}
+    if st.st_size > MAX_SEARCH_FILE_SIZE or _is_binary_file(target):
+        raise HTTPException(400, "File not eligible for replace")
+    try:
+        text = target.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        text = target.read_text(encoding="utf-8", errors="replace")
+    except Exception as e:
+        raise HTTPException(500, f"read failed: {e}")
+
+    matches = _find_matches(text, query, case_sensitive, limit=SEARCH_MAX_MATCHES_TOTAL)
+    if not matches or match_index < 0 or match_index >= len(matches):
+        return {"ok": False, "status": "nomatch", "path": path, "replacements": 0}
+    m = matches[match_index]
+    start = m.get("start", 0)
+    length = m.get("match_len", len(query))
+    end = start + length
+    new_text = text[:start] + replace + text[end:]
+    try:
+        backup = make_backup(target)
+        atomic_write(target, new_text)
+    except Exception as e:
+        raise HTTPException(500, f"write failed: {e}")
+    return {
+        "ok": True,
+        "status": "modified",
+        "path": path,
+        "replacements": 1,
+        "backup_path": str(backup.relative_to(BASE_DIR)) if backup else None,
+        "mtime": st.st_mtime,
+        "size": len(new_text.encode("utf-8")),
+    }
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
@@ -795,6 +863,12 @@ async def search_replace_preview(request: Request):
 async def search_replace_apply(request: Request):
     payload = await request.json()
     return _replace_on_files(payload, apply=True)
+
+
+@app.post("/api/search/replace/one")
+async def search_replace_one(request: Request):
+    payload = await request.json()
+    return _replace_single(payload)
 
 
 @app.get("/api/ha/states")

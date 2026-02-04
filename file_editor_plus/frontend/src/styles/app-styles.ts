@@ -48,6 +48,9 @@ export const appStyles = css`
       --indent-width: calc(var(--indent-size) * 1ch);
       --indent-guide: rgba(255, 255, 255, 0.06);
       --indent-guide-active: rgba(255, 255, 255, 0.12);
+      --tab-bg: #111111;
+      --tab-active-bg: #2d2d2d;
+      --tab-active-border: #2f2f2f;
     }
 
     /* Layout */
@@ -558,16 +561,18 @@ export const appStyles = css`
       padding: 0 10px;
       margin-top: 4px;
       border-radius: 10px 10px 0 0;
-      background: var(--panel-strong);
+      background: var(--tab-bg);
       color: var(--muted-color);
       cursor: pointer;
       font-size: var(--font-size-sm);
     }
     .tab.active {
-      background: var(--bg-color);
+      background: var(--tab-active-bg);
       color: var(--text-color);
-      outline: 1px solid var(--border-color);
-      outline-offset: -1px;
+      border: 1px solid var(--tab-active-border, var(--border-color));
+      border-bottom: none;
+      padding-top: 2px;
+      margin-top: 2px;
     }
     .tabClose {
       background: transparent;

@@ -1,6 +1,6 @@
 import { html, nothing } from "lit";
 import type { SearchMatch, SearchResult } from "../../types/api";
-import { apiSearch, apiSearchReplaceApply, apiSearchReplacePreview } from "../../services/api";
+import { apiSearch, apiSearchReplaceApply, apiSearchReplacePreview, apiSearchReplaceOne } from "../../services/api";
 
 export async function performSearch(this: any) {
   const query = this.searchQuery.trim();
@@ -106,6 +106,62 @@ export function openSearchMatch(this: any, res: SearchResult, match: SearchMatch
   this.openFile(res.path);
 }
 
+export async function replaceOne(this: any, res: SearchResult, match: SearchMatch, matchIndex: number) {
+  const query = this.searchQuery.trim();
+  if (!query) {
+    this.showToast("Esegui prima una ricerca", "error");
+    return;
+  }
+  this.searchLoading = true;
+  try {
+    const payload = {
+      path: res.path,
+      query,
+      replace: this.searchReplace,
+      case_sensitive: this.searchCaseSensitive,
+      match_index: matchIndex,
+      mtime: res.mtime,
+    };
+    const applyRes = await apiSearchReplaceOne(this.apiBase, payload);
+    let body: any = null;
+    try {
+      body = await applyRes.json();
+    } catch {
+      body = null;
+    }
+    const ok = body?.ok === true;
+    if (!applyRes.ok || !ok) {
+      const status = body?.status;
+      if (status === "stale") {
+        this.showToast("File modificato nel frattempo (stale)", "error");
+      } else if (status === "nomatch") {
+        this.showToast("Occorrenza non trovata", "error");
+      } else {
+        const detail = body?.detail || `replace one ${applyRes.status}`;
+        throw new Error(detail);
+      }
+      return;
+    }
+    this.showToast("Sostituito 1 match");
+    if (this.activePath === res.path) {
+      if (typeof this.isActiveDirty === "function" && this.isActiveDirty()) {
+        this.showToast("File aperto con modifiche non salvate: non ricaricato", "info");
+      } else if (typeof this.loadFile === "function") {
+        await this.loadFile(res.path);
+      }
+    }
+    if (typeof this.notifyFsChanged === "function") {
+      await this.notifyFsChanged();
+    }
+    await this.performSearch();
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Errore replace singolo";
+    this.showToast(msg, "error");
+  } finally {
+    this.searchLoading = false;
+  }
+}
+
 export function renderSearchResults(this: any) {
   if (this.searchLoading && this.searchResults.length === 0) {
     return html`<div class="searchStatus">Ricerca in corso...</div>`;
@@ -122,9 +178,20 @@ export function renderSearchResults(this: any) {
         </div>
         <div class="searchMatches">
           ${r.matches.map(
-            (m: SearchMatch) => html`<div class="searchMatch" @click=${() => this.openSearchMatch(r, m)}>
+            (m: SearchMatch, idx: number) => html`<div class="searchMatch" @click=${() => this.openSearchMatch(r, m)}>
               <span class="lineTag">L${m.line}</span>
               <span class="preview">${m.preview}</span>
+              <button
+                class="btn linkBtn"
+                style="margin-left:auto;"
+                title="Replace this match"
+                @click=${(e: Event) => {
+                  e.stopPropagation();
+                  this.replaceOne(r, m, idx);
+                }}
+              >
+                Replace
+              </button>
             </div>`
           )}
         </div>

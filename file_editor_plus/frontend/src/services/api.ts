@@ -141,6 +141,24 @@ export const apiSearchReplaceApply = (apiBase: string, payload: SearchReplacePay
   });
 };
 
+export type SearchReplaceOnePayload = {
+  path: string;
+  query: string;
+  replace: string;
+  case_sensitive?: boolean;
+  match_index?: number;
+  mtime?: number;
+};
+
+export const apiSearchReplaceOne = (apiBase: string, payload: SearchReplaceOnePayload) => {
+  const url = `${apiBase}api/search/replace/one`;
+  return fetch(url, {
+    method: "POST",
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  });
+};
+
 export const apiPostHaAction = (apiBase: string, action: string) => {
   const url = `${apiBase}api/ha/action`;
   return fetch(url, {

@@ -15,6 +15,7 @@ import {
   performSearch as searchPerformSearch,
   renderSearchResults as searchRenderSearchResults,
   replaceAll as searchReplaceAll,
+  replaceOne as searchReplaceOne,
 } from "./features/search/search";
 import {
   closeSnippetModal as snippetCloseSnippetModal,
@@ -271,7 +272,6 @@ export class AppRoot extends LitElement {
   declare treeMenuY: number;
   declare treeMenuPath: string | null;
   declare treeMenuType: "file" | "dir" | null;
-  declare treeMenuSize: number | null;
   declare treeMenuFromBlank: boolean;
   declare showTreeDeleteModal: boolean;
   declare deleteTargetPath: string | null;
@@ -339,7 +339,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.55";
+  private readonly appVersion = "0.2.62";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -473,6 +473,7 @@ export class AppRoot extends LitElement {
   }
   private performSearch = searchPerformSearch.bind(this);
   private replaceAll = searchReplaceAll.bind(this);
+  private replaceOne = searchReplaceOne.bind(this);
   private openSearchMatch = searchOpenSearchMatch.bind(this);
   private renderSearchResults = searchRenderSearchResults.bind(this);
   private loadSnippets = snippetLoadSnippets.bind(this);
@@ -592,7 +593,6 @@ export class AppRoot extends LitElement {
     this.treeMenuY = 0;
     this.treeMenuPath = null;
     this.treeMenuType = null;
-    this.treeMenuSize = null;
     this.treeMenuFromBlank = false;
     this.showTreeDeleteModal = false;
     this.deleteTargetPath = null;
