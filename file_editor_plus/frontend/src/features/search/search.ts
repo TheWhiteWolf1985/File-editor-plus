@@ -129,7 +129,8 @@ export async function replaceOne(this: any, res: SearchResult, match: SearchMatc
     } catch {
       body = null;
     }
-    if (!applyRes.ok || body?.ok !== True) {
+    const ok = body?.ok === true;
+    if (!applyRes.ok || !ok) {
       const status = body?.status;
       if (status === "stale") {
         this.showToast("File modificato nel frattempo (stale)", "error");
@@ -147,7 +148,8 @@ export async function replaceOne(this: any, res: SearchResult, match: SearchMatc
     }
     await this.performSearch();
   } catch (e) {
-    this.showToast("Errore replace singolo", "error");
+    const msg = e instanceof Error ? e.message : "Errore replace singolo";
+    this.showToast(msg, "error");
   } finally {
     this.searchLoading = false;
   }

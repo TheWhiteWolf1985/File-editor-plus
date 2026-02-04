@@ -15,6 +15,7 @@ import {
   performSearch as searchPerformSearch,
   renderSearchResults as searchRenderSearchResults,
   replaceAll as searchReplaceAll,
+  replaceOne as searchReplaceOne,
 } from "./features/search/search";
 import {
   closeSnippetModal as snippetCloseSnippetModal,
@@ -338,7 +339,7 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.58";
+  private readonly appVersion = "0.2.60";
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -472,6 +473,7 @@ export class AppRoot extends LitElement {
   }
   private performSearch = searchPerformSearch.bind(this);
   private replaceAll = searchReplaceAll.bind(this);
+  private replaceOne = searchReplaceOne.bind(this);
   private openSearchMatch = searchOpenSearchMatch.bind(this);
   private renderSearchResults = searchRenderSearchResults.bind(this);
   private loadSnippets = snippetLoadSnippets.bind(this);
