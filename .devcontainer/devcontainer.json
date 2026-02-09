@@ -1,21 +1,32 @@
 {
   "name": "Example devcontainer for add-on repositories",
   "image": "ghcr.io/home-assistant/devcontainer:2-addons",
-  "appPort": ["7123:8123", "7357:4357"],
+  "appPort": [
+    "7123:8123",
+    "7357:4357"
+  ],
   "postStartCommand": "bash devcontainer_bootstrap",
-  "runArgs": ["-e", "GIT_EDITOR=code --wait", "--privileged"],
+  "runArgs": [
+    "-e",
+    "GIT_EDITOR=code --wait",
+    "--privileged"
+  ],
   "workspaceFolder": "/mnt/supervisor/addons/local/${localWorkspaceFolderBasename}",
   "workspaceMount": "source=${localWorkspaceFolder},target=${containerWorkspaceFolder},type=bind,consistency=cached",
   "containerEnv": {
-    "WORKSPACE_DIRECTORY": "${containerWorkspaceFolder}",
-    "CODEX_HOME": "/mnt/supervisor/codex"
+    "WORKSPACE_DIRECTORY": "${containerWorkspaceFolder}"
   },
   "customizations": {
     "vscode": {
-      "extensions": ["timonwong.shellcheck", "esbenp.prettier-vscode"],
+      "extensions": [
+        "timonwong.shellcheck",
+        "esbenp.prettier-vscode"
+      ],
       "settings": {
         "terminal.integrated.profiles.linux": {
-          "zsh": { "path": "/usr/bin/zsh" }
+          "zsh": {
+            "path": "/usr/bin/zsh"
+          }
         },
         "terminal.integrated.defaultProfile.linux": "zsh",
         "editor.formatOnPaste": false,
@@ -25,9 +36,8 @@
       }
     }
   },
-	"mounts": [
-	  "type=volume,target=/var/lib/docker",
-	  "type=volume,target=/mnt/supervisor"
-	]
-
+  "mounts": [
+    "type=volume,target=/var/lib/docker",
+    "type=volume,target=/mnt/supervisor"
+  ]
 }
