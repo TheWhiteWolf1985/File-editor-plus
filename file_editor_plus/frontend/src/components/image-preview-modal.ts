@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
+import "./app-icon";
 
 type ImageMeta = {
   width?: number;
@@ -27,16 +28,16 @@ export class ImagePreviewModal extends LitElement {
     .backdrop {
       position: fixed;
       inset: 0;
-      background: var(--overlay-backdrop, rgba(0, 0, 0, 0.55));
+      background: var(--overlay-backdrop);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 9998;
     }
     .modal {
-      background: var(--panel-color, var(--bg-color, #1f1f1f));
-      color: var(--text-color, #eee);
-      border: 1px solid var(--border-color, var(--muted-color, #333));
+      background: var(--overlay-surface);
+      color: var(--text-color);
+      border: 1px solid var(--overlay-border);
       border-radius: 10px;
       max-width: 92vw;
       max-height: 80vh;
@@ -44,15 +45,15 @@ export class ImagePreviewModal extends LitElement {
       overflow: hidden;
       display: grid;
       grid-template-rows: auto 1fr auto;
-      box-shadow: var(--modal-shadow, 0 12px 32px rgba(0, 0, 0, 0.45));
+      box-shadow: var(--modal-shadow);
     }
     .header {
       display: flex;
       align-items: center;
       padding: 10px 14px;
       gap: 10px;
-      background: var(--panel-strong, var(--panel-color, #262626));
-      border-bottom: 1px solid var(--border-color, var(--muted-color, #333));
+      background: var(--overlay-surface-strong);
+      border-bottom: 1px solid var(--overlay-border);
     }
     .title {
       font-weight: 600;
@@ -79,9 +80,9 @@ export class ImagePreviewModal extends LitElement {
       max-width: 90vw;
       max-height: 70vh;
       object-fit: contain;
-      border: 1px solid var(--border-color, var(--muted-color, #333));
+      border: 1px solid var(--overlay-border);
       border-radius: 6px;
-      background: var(--code-bg, var(--panel-color, #1e1e1e));
+      background: var(--code-bg);
     }
     .meta {
       width: 100%;
@@ -95,7 +96,7 @@ export class ImagePreviewModal extends LitElement {
     }
     .label {
       width: 90px;
-      color: var(--muted-color, #aaa);
+      color: var(--overlay-muted);
       flex-shrink: 0;
       text-align: right;
     }
@@ -110,11 +111,11 @@ export class ImagePreviewModal extends LitElement {
       display: grid;
       place-items: center;
       text-align: center;
-      color: var(--muted-color, #aaa);
-      border: 1px dashed var(--border-color, var(--muted-color, #333));
+      color: var(--overlay-muted);
+      border: 1px dashed var(--overlay-border);
       border-radius: 6px;
       padding: 16px;
-      background: var(--code-bg, var(--panel-color, #1e1e1e));
+      background: var(--code-bg);
     }
   `;
 
@@ -176,7 +177,9 @@ export class ImagePreviewModal extends LitElement {
       <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
         <div class="header">
           <div class="title">${this.name || this.path || "Image preview"}</div>
-          <button class="closeBtn" aria-label="Chiudi anteprima" @click=${this.emitClose}>✕</button>
+          <button class="closeBtn" aria-label="Chiudi anteprima" @click=${this.emitClose}>
+            <app-icon name="x" size="20" aria-hidden="true"></app-icon>
+          </button>
         </div>
         <div class="body">
           ${showImage

@@ -49,7 +49,6 @@ import {
   isSameSuggestItem as entitiesIsSameSuggestItem,
   openSuggestions as entitiesOpenSuggestions,
   renderEntityPane as entitiesRenderEntityPane,
-  renderMdiGlyph as entitiesRenderMdiGlyph,
   scrollSuggestIntoView as entitiesScrollSuggestIntoView,
   syncCollapsedDomains as entitiesSyncCollapsedDomains,
   toggleDomain as entitiesToggleDomain,
@@ -310,6 +309,7 @@ export class AppRoot extends LitElement {
   private editorRef: HTMLTextAreaElement | null = null;
   private mainRef: HTMLDivElement | null = null;
   private sidebarRef: HTMLDivElement | null = null;
+  private overlayRootRef: HTMLDivElement | null = null;
   private baseCodeRef: HTMLDivElement | null = null;
   private baseGutterRef: HTMLDivElement | null = null;
   private basePreRef: HTMLPreElement | null = null;
@@ -512,7 +512,6 @@ export class AppRoot extends LitElement {
   private isSameSuggestItem = entitiesIsSameSuggestItem.bind(this);
   private getSuggestCoords = entitiesGetSuggestCoords.bind(this);
   private fetchMdiSuggestions = entitiesFetchMdiSuggestions.bind(this);
-  private renderMdiGlyph = entitiesRenderMdiGlyph.bind(this);
   private applySuggestion = entitiesApplySuggestion.bind(this);
   private scrollSuggestIntoView = entitiesScrollSuggestIntoView.bind(this);
   private initEntities = entitiesInitEntities.bind(this);
@@ -670,6 +669,7 @@ export class AppRoot extends LitElement {
         sizeBytes,
         ext,
         onError: (msg?: string) => this.showToast(msg || "Impossibile caricare anteprima immagine", "error"),
+        mountRoot: this.overlayRootRef ?? this.shadowRoot ?? this,
       });
       return;
     }
@@ -1969,14 +1969,14 @@ export class AppRoot extends LitElement {
     return html`
       <div class="menuItem menu-item ${open ? "open" : ""}" @click=${(e: Event) => this.toggleMenu(e, name)}>
         <span>${label}</span>
-        <div class="menuPopup" ?hidden=${!open} @click=${(e: Event) => e.stopPropagation()}>
-          ${items.map(
-            (it) => html`<div class="menuItemRow" @click=${() => this.handleMenuAction(name, it.label)}>
-              <span class="menuIcon">${it.icon}</span>
+          <div class="menuPopup" ?hidden=${!open} @click=${(e: Event) => e.stopPropagation()}>
+            ${items.map(
+              (it) => html`<div class="menuItemRow" @click=${() => this.handleMenuAction(name, it.label)}>
+              <span class="menuIcon"><app-icon name=${it.icon} size="14" aria-hidden="true"></app-icon></span>
               <span>${it.label}</span>
             </div>`
-          )}
-        </div>
+            )}
+          </div>
       </div>
     `;
   }
@@ -2394,7 +2394,7 @@ export class AppRoot extends LitElement {
             @click=${() => this.runBackup("download")}
           >
             <div class="systemCardTitle">
-              <span>💾</span>
+              <app-icon name="save" size="16" aria-hidden="true"></app-icon>
               <span>${downloading ? "Backup locale..." : "Backup locale"}</span>
             </div>
             <div class="systemCardDesc">Crea uno zip della cartella /config e avvia il download.</div>
@@ -2406,14 +2406,14 @@ export class AppRoot extends LitElement {
             @click=${() => this.runBackup("saveas")}
           >
             <div class="systemCardTitle">
-              <span>🗂️</span>
+              <app-icon name="folder-open" size="16" aria-hidden="true"></app-icon>
               <span>${saving ? "Backup in rete..." : "Backup in rete"}</span>
             </div>
             <div class="systemCardDesc">Salva lo zip con la finestra di sistema (se supportata).</div>
           </button>
           <button class="systemCard" type="button" disabled>
             <div class="systemCardTitle">
-              <span>☁️</span>
+              <app-icon name="cloud" size="16" aria-hidden="true"></app-icon>
               <span>Backup su cloud</span>
             </div>
             <div class="systemCardDesc">Disponibile a breve.</div>
@@ -2455,9 +2455,15 @@ export class AppRoot extends LitElement {
               <div class="snippetHeader">
                 <div class="snippetTitle">${s.name}</div>
                 <div class="snippetActions">
-                  <button class="statusToggle" title="Modify" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.openSnippetModal(s); }}>✏️</button>
-                  <button class="statusToggle" title="Cancel" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.deleteSnippet(s); }}>🗙</button>
-                  <button class="statusToggle" title="Insert" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.insertSnippet(s); }}>➕</button>
+                  <button class="statusToggle" title="Modify" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.openSnippetModal(s); }}>
+                    <app-icon name="edit" size="14" aria-hidden="true"></app-icon>
+                  </button>
+                  <button class="statusToggle" title="Cancel" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.deleteSnippet(s); }}>
+                    <app-icon name="x" size="20" aria-hidden="true"></app-icon>
+                  </button>
+                  <button class="statusToggle" title="Insert" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.insertSnippet(s); }}>
+                    <app-icon name="plus" size="14" aria-hidden="true"></app-icon>
+                  </button>
                 </div>
               </div>
               <div class="snippetDesc">${s.description.slice(0, 200)}</div>
@@ -2476,7 +2482,7 @@ export class AppRoot extends LitElement {
             @click=${() => this.generateDebugLog()}
           >
             <div class="systemCardTitle">
-              <span>🛠️</span>
+              <app-icon name="wrench" size="16" aria-hidden="true"></app-icon>
               <span>${this.utilityGenerating ? "Generazione..." : "Genera debug log"}</span>
             </div>
             <div class="systemCardDesc">Crea un file di debug in /config/.fep-config con info di sistema e log Supervisor.</div>
@@ -2487,7 +2493,7 @@ export class AppRoot extends LitElement {
             @click=${() => (this.showResetSessionModal = true)}
           >
             <div class="systemCardTitle">
-              <span>♻️</span>
+              <app-icon name="refresh" size="16" aria-hidden="true"></app-icon>
               <span>Reset session</span>
             </div>
             <div class="systemCardDesc">Cancella tabs salvati e buffer, chiude tutte le schede.</div>
@@ -2501,35 +2507,35 @@ export class AppRoot extends LitElement {
           id: "reload_yaml",
           label: "Reload YAML",
           desc: "Ricarica configuration.yaml e include.",
-          icon: "🧾",
+          icon: "file",
           confirm: false,
         },
         {
           id: "restart_core",
           label: "Restart Core",
           desc: "Riavvia Home Assistant Core.",
-          icon: "🔄",
+          icon: "refresh",
           confirm: true,
         },
         {
           id: "restart_supervisor",
           label: "Restart Supervisor",
           desc: "Riavvia Supervisor (gestione add-on).",
-          icon: "🧩",
+          icon: "puzzle",
           confirm: true,
         },
         {
           id: "reboot_host",
           label: "Reboot Host",
           desc: "Riavvia il dispositivo/OS.",
-          icon: "💻",
+          icon: "monitor",
           confirm: true,
         },
         {
           id: "shutdown_host",
           label: "Shutdown Host",
           desc: "Spegni il dispositivo/OS.",
-          icon: "⏻",
+          icon: "power",
           confirm: true,
         },
       ];
@@ -2544,7 +2550,7 @@ export class AppRoot extends LitElement {
               @click=${() => this.runSystemAction(action.id, action.label, action.confirm)}
             >
               <div class="systemCardTitle">
-                <span>${action.icon}</span>
+                <app-icon name=${action.icon} size="16" aria-hidden="true"></app-icon>
                 <span>${pending ? "In corso..." : action.label}</span>
               </div>
               <div class="systemCardDesc">${action.desc}</div>
@@ -2595,31 +2601,31 @@ export class AppRoot extends LitElement {
           <div class="titlebar editor-header">
           <div class="menus editor-menu">
             ${this.renderMenu("File", "file", [
-              { icon: "📄", label: "New file" },
-              { icon: "📁", label: "New folder" },
-              { icon: "💾", label: "Save" },
-              { icon: "📝", label: "Save as…" },
-              { icon: "⚙️", label: "Settings" },
-              { icon: "⬆️", label: "Import…" },
-              { icon: "⬇️", label: "Export…" },
+              { icon: "file", label: "New file" },
+              { icon: "folder", label: "New folder" },
+              { icon: "save", label: "Save" },
+              { icon: "save-all", label: "Save as…" },
+              { icon: "settings", label: "Settings" },
+              { icon: "upload", label: "Import…" },
+              { icon: "download", label: "Export…" },
             ])}
             ${this.renderMenu("Edit", "edit", [
-              { icon: "↩️", label: "Undo" },
-              { icon: "↪️", label: "Redo" },
-              { icon: "✂️", label: "Cut" },
-              { icon: "📋", label: "Copy" },
-              { icon: "📥", label: "Paste" },
+              { icon: "undo", label: "Undo" },
+              { icon: "redo", label: "Redo" },
+              { icon: "cut", label: "Cut" },
+              { icon: "copy", label: "Copy" },
+              { icon: "paste", label: "Paste" },
             ])}
             ${this.renderMenu("View", "view", [
-              { icon: this.toolbarVisible ? "☑️" : "⬜️", label: "Menù strumenti" },
-              { icon: this.showIndentGuides ? "☑️" : "⬜️", label: "Indent guides" },
-              { icon: "🔄", label: "Reload tree" },
-              { icon: "🪟", label: "Split view" },
-              { icon: "🧭", label: "Compare…" },
+              { icon: this.toolbarVisible ? "check-square" : "square", label: "Menù strumenti" },
+              { icon: this.showIndentGuides ? "check-square" : "square", label: "Indent guides" },
+              { icon: "refresh", label: "Reload tree" },
+              { icon: "columns", label: "Split view" },
+              { icon: "git-branch", label: "Compare…" },
             ])}
             ${this.renderMenu("Help", "help", [
-              { icon: "📖", label: "Docs" },
-              { icon: "❓", label: "About" },
+              { icon: "file", label: "Docs" },
+              { icon: "alert-circle", label: "About" },
             ])}
           </div>
           ${this.toolbarVisible
@@ -2633,16 +2639,16 @@ export class AppRoot extends LitElement {
                   <span>Save all</span>
                 </button>
                 <button class="toolBtn action-btn ghost" title="Undo" aria-label="Undo" @click=${() => this.handleUndoRedo("undo")}>
-                  ↩️ <span>Undo</span>
+                  <app-icon name="undo" size="16" aria-hidden="true"></app-icon><span>Undo</span>
                 </button>
                 <button class="toolBtn action-btn ghost" title="Redo" aria-label="Redo" @click=${() => this.handleUndoRedo("redo")}>
-                  ↪️ <span>Redo</span>
+                  <app-icon name="redo" size="16" aria-hidden="true"></app-icon><span>Redo</span>
                 </button>
                 <button class="toolBtn action-btn ghost" title="Search" aria-label="Search" @click=${() => this.openSearchTab("search")}>
-                  🔎 <span>Search</span>
+                  <app-icon name="search" size="16" aria-hidden="true"></app-icon><span>Search</span>
                 </button>
                 <button class="toolBtn action-btn ghost" title="Replace" aria-label="Replace" @click=${() => this.openSearchTab("replace")}>
-                  🪄 <span>Replace</span>
+                  <app-icon name="palette" size="16" aria-hidden="true"></app-icon><span>Replace</span>
                 </button>
                 <button
                   class="toolBtn action-btn ghost"
@@ -2655,7 +2661,7 @@ export class AppRoot extends LitElement {
                   <span>Indent file</span>
                 </button>
                 <button class="toolBtn action-btn ghost" title="Split view" aria-label="Split view" @click=${() => this.handleMenuAction("view", "Split view")}>
-                  🪟 <span>Split</span>
+                  <app-icon name="columns" size="16" aria-hidden="true"></app-icon><span>Split</span>
                 </button>
                 <button
                   class="toolBtn action-btn ghost"
@@ -2664,7 +2670,7 @@ export class AppRoot extends LitElement {
                   ?disabled=${!this.splitViewEnabled || !this.activePath}
                   @click=${() => this.handleMenuAction("view", "Compare…")}
                 >
-                  🧭 <span>Compare</span>
+                  <app-icon name="git-branch" size="16" aria-hidden="true"></app-icon><span>Compare</span>
                 </button>
               </div>`
             : nothing}
@@ -2718,20 +2724,22 @@ export class AppRoot extends LitElement {
                             ? "Utility"
                             : "System"}
               </div>
-              <button class="sidebarClose" title="Close" @click=${() => (this.sidebarOpen = false)}>✕</button>
+              <button class="sidebarClose" title="Close" @click=${() => (this.sidebarOpen = false)}>
+                <app-icon name="x" size="20" aria-hidden="true"></app-icon>
+              </button>
             </div>
             ${this.renderSidebarContent()}
             <div class="sidebarResizer ${this.sidebarResizing ? "active" : ""}" @mousedown=${this.startSidebarResize}></div>
           </div>
 
           <div class="editor main-content">
-            <div class="tabs">
+            <div class="tabs editor-tabs">
               ${this.tabs.length === 0
-                ? html`<div class="tab active">Welcome</div>`
+                ? html`<div class="tab editor-tab active">Welcome</div>`
                 : this.tabs.map(
                     (t) => html`
-                      <div class="tab ${t.path === this.activePath ? "active" : ""}" @click=${() => this.switchTab(t.path)}>
-                        <span>${t.name}</span>
+                      <div class="tab editor-tab ${t.path === this.activePath ? "active" : ""}" @click=${() => this.switchTab(t.path)}>
+                        <span class="editor-tab-name">${t.name}</span>
                         ${t.dirty ? html`<span class="dot" title="Unsaved"></span>` : nothing}
                         <button
                           class="tabClose"
@@ -2739,7 +2747,7 @@ export class AppRoot extends LitElement {
                           title="Close"
                           @click=${(e: Event) => this.handleCloseTab(e, t.path)}
                         >
-                          ✕
+                          <app-icon name="x" size="20" aria-hidden="true"></app-icon>
                         </button>
                       </div>
                     `
@@ -2859,11 +2867,11 @@ export class AppRoot extends LitElement {
               style="top:${this.contextMenuY}px; left:${this.contextMenuX}px;"
               @click=${(e: Event) => e.stopPropagation()}
             >
-              <div class="contextMenuItem" @click=${() => this.handleCopyCut("cut")}>✂️ Cut</div>
-              <div class="contextMenuItem" @click=${() => this.handleCopyCut("copy")}>📋 Copy</div>
-              <div class="contextMenuItem" @click=${() => this.handlePaste()}>📥 Paste</div>
-              <div class="contextMenuItem" @click=${() => this.reindentAll()}>🔧 Auto-indent</div>
-              <div class="contextMenuItem" @click=${() => this.handleCompareFromContext()}>🧩 Compare…</div>
+              <div class="contextMenuItem" @click=${() => this.handleCopyCut("cut")}><app-icon name="cut" size="16" aria-hidden="true"></app-icon> Cut</div>
+              <div class="contextMenuItem" @click=${() => this.handleCopyCut("copy")}><app-icon name="copy" size="16" aria-hidden="true"></app-icon> Copy</div>
+              <div class="contextMenuItem" @click=${() => this.handlePaste()}><app-icon name="paste" size="16" aria-hidden="true"></app-icon> Paste</div>
+              <div class="contextMenuItem" @click=${() => this.reindentAll()}><app-icon name="indent" size="16" aria-hidden="true"></app-icon> Auto-indent</div>
+              <div class="contextMenuItem" @click=${() => this.handleCompareFromContext()}><app-icon name="git-branch" size="16" aria-hidden="true"></app-icon> Compare…</div>
             </div>`
           : nothing}
 
@@ -2875,22 +2883,22 @@ export class AppRoot extends LitElement {
             >
               ${this.treeMenuType === "dir"
                 ? html`<div class="contextMenuItem" @click=${() => this.createFromContext("file")}>
-                      📄 New File ${this.treeMenuFromBlank ? "" : "here"}
+                      <app-icon name="file-plus" size="16" aria-hidden="true"></app-icon> New File ${this.treeMenuFromBlank ? "" : "here"}
                     </div>
                     <div class="contextMenuItem" @click=${() => this.createFromContext("folder")}>
-                      📁 New Folder ${this.treeMenuFromBlank ? "" : "here"}
+                      <app-icon name="folder-plus" size="16" aria-hidden="true"></app-icon> New Folder ${this.treeMenuFromBlank ? "" : "here"}
                     </div>`
                 : nothing}
               ${!this.treeMenuFromBlank
                 ? html`
-                    <div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
+                    <div class="contextMenuItem" @click=${() => this.copyTreeItem()}><app-icon name="copy" size="16" aria-hidden="true"></app-icon> Copia</div>
                     <div
                       class="contextMenuItem ${this.treeClipboard ? "" : "disabled"}"
                       @click=${() => this.pasteTreeItem()}
                     >
-                      📥 Incolla
+                      <app-icon name="paste" size="16" aria-hidden="true"></app-icon> Incolla
                     </div>
-                    <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}>🗑️ Elimina</div>
+                    <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}><app-icon name="trash" size="16" aria-hidden="true"></app-icon> Elimina</div>
                   `
                 : nothing}
             </div>`
@@ -2911,11 +2919,11 @@ export class AppRoot extends LitElement {
                   }}
                 >
                   <span class="suggestItemLabel">
-                    ${s.type === "entity" ? "🧭" : ""}
+                    ${s.type === "entity" ? html`<app-icon name="git-branch" size="14" aria-hidden="true"></app-icon>` : nothing}
                     <span>${s.type === "mdi" ? `mdi:${s.value}` : s.value}</span>
                   </span>
                   ${s.type === "mdi"
-                    ? html`<span class="suggestItemIcon">${this.renderMdiGlyph(s.codepoint)}</span>`
+                    ? html`<span class="suggestItemIcon"><app-icon name="settings" size="14" aria-hidden="true"></app-icon></span>`
                     : nothing}
                 </div>`
               )}
@@ -3257,6 +3265,7 @@ export class AppRoot extends LitElement {
             <span class="status-item">Lit</span>
           </div>
         </div>
+        <div class="overlay-root" ${ref((el) => (this.overlayRootRef = el instanceof HTMLDivElement ? el : null))}></div>
       </div>
       </div>
     `;

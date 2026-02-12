@@ -166,15 +166,6 @@ export async function fetchMdiSuggestions(this: any, query: string): Promise<Mdi
   }
 }
 
-export function renderMdiGlyph(this: any, codepoint?: string) {
-  if (!codepoint) return "";
-  const normalized = codepoint.trim().replace(/^0x/i, "");
-  if (!normalized) return "";
-  const value = Number.parseInt(normalized, 16);
-  if (Number.isNaN(value)) return "";
-  return String.fromCodePoint(value);
-}
-
 export function applySuggestion(this: any) {
   if (!this.editorRef || !this.suggestOpen || this.suggestItems.length === 0) return;
   const ta = this.editorRef;
@@ -361,7 +352,9 @@ export function renderEntityPane(this: any) {
                 const isOpen = !this.collapsedDomains.has(domain);
                 return html`<div class="entityGroup">
                   <button class="entityGroupHeader" type="button" @click=${() => this.toggleDomain(domain)}>
-                    <span class="chevron">${isOpen ? "▾" : "▸"}</span>
+                    ${isOpen
+                      ? html`<app-icon name="chevron-down" size="14" class="chevron" aria-hidden="true"></app-icon>`
+                      : html`<app-icon name="chevron-right" size="14" class="chevron" aria-hidden="true"></app-icon>`}
                     <span class="entityGroupTitle">${domain}</span>
                     <span style="margin-left:auto; opacity:0.75; font-size:var(--font-size-sm);">${items.length}</span>
                   </button>
@@ -374,7 +367,7 @@ export function renderEntityPane(this: any) {
                             <div class="entityId">${e.entity_id}</div>
                             <div class="entityMeta">${domain} • State: ${e.state}</div>
                             <button class="entityInsert" title="Insert.." @click=${(ev: Event) => { ev.stopPropagation(); this.insertEntityId(e.entity_id); }}>
-                              ➕ <span>Insert</span>
+                              <app-icon name="plus" size="14" aria-hidden="true"></app-icon><span>Insert</span>
                             </button>
                           </div>`;
                         })}

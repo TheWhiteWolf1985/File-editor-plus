@@ -89,8 +89,9 @@ export const figmaEditorStyles = css`
 
 /* Main App Layout */
 .editor-app {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -214,7 +215,7 @@ export const figmaEditorStyles = css`
 
 :host([data-theme="light"]) .sidebar {
   background: var(--light-bg-tertiary);
-  border-right: 1px solid var(--light-border);
+  border-right: 1px solid var(--light-border-strong);
 }
 
 .sidebar::before {
@@ -529,7 +530,7 @@ export const figmaEditorStyles = css`
 :host([data-theme="light"]) .editor-header {
   background: rgba(248, 249, 250, 0.7);
   backdrop-filter: blur(var(--glass-blur));
-  border-bottom: 1px solid var(--light-border);
+  border-bottom: 1px solid var(--light-border-strong);
 }
 
 .editor-header::before {
@@ -699,7 +700,7 @@ export const figmaEditorStyles = css`
 
 :host([data-theme="light"]) .editor-tab {
   background: var(--light-bg-tertiary);
-  border-bottom: 1px solid var(--light-border);
+  border-bottom: 1px solid var(--light-border-strong);
   color: var(--light-text-primary);
 }
 

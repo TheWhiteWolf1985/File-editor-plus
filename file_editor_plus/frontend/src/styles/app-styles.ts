@@ -3,8 +3,8 @@ import { css } from "lit";
 export const appStyles = css`
     :host {
       display: block;
-      height: 100%;
-      min-height: 100%;
+      height: 100dvh;
+      min-height: 100dvh;
       width: 100%;
       overflow: hidden;
       position: relative;
@@ -40,6 +40,10 @@ export const appStyles = css`
       --light-text-secondary: #4b5563;
       --light-text-tertiary: #9ca3af;
       --overlay-backdrop: rgba(0, 0, 0, 0.45);
+      --overlay-surface: var(--panel-color);
+      --overlay-surface-strong: var(--panel-strong);
+      --overlay-border: var(--border-color);
+      --overlay-muted: var(--muted-color);
       --hover-overlay: rgba(255, 255, 255, 0.08);
       --status-toggle-border: rgba(255, 255, 255, 0.4);
       --danger-bg: #b93a3a;
@@ -63,7 +67,7 @@ export const appStyles = css`
       --gutter-bg: var(--dark-bg-secondary);
       --gutter-text-color: var(--dark-text-tertiary);
       --code-bg: var(--dark-bg-primary);
-      --editor-caret: var(--accent-light);
+      --editor-caret: #14b8a6;
       --editor-selection-bg: rgba(20, 184, 166, 0.24);
       --token-key-color: var(--accent-light);
       --token-keyword-color: var(--accent-light);
@@ -223,15 +227,6 @@ export const appStyles = css`
     .activityGroup.bottom {
       margin-top: auto;
       padding-bottom: 6px;
-    }
-    .mdiGlyph {
-      font-family: "Material Design Icons";
-      font-style: normal;
-      font-weight: normal;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
     }
     .act {
       width: 36px;
@@ -1093,16 +1088,13 @@ export const appStyles = css`
       white-space: nowrap;
     }
     .suggestItemIcon {
-      font-family: "Material Design Icons";
-      font-style: normal;
-      font-weight: normal;
-      font-size: 2.2em;
+      font-size: 1.1em;
       opacity: 0.9;
       line-height: 1;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 2.4em;
+      min-width: 1.6em;
     }
     .suggestItem:hover,
     .suggestItem.active {
@@ -1249,6 +1241,15 @@ export const appStyles = css`
       display: grid;
       gap: 8px;
       z-index: 300;
+    }
+    .overlay-root {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      pointer-events: none;
+    }
+    .overlay-root > * {
+      pointer-events: auto;
     }
     .toast {
       min-width: 275px;

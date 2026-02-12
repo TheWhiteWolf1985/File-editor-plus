@@ -27,7 +27,7 @@ const triggerBackupDownload = (apiBase: string) => {
   link.href = url;
   link.download = "";
   link.rel = "noopener";
-  document.body.appendChild(link);
+  document.documentElement.appendChild(link);
   link.click();
   link.remove();
 };
