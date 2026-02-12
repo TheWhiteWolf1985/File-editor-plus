@@ -343,6 +343,44 @@ log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
   - date: "2026-02-12"
     actor: "codex"
+    change: "Bump release add-on a 0.2.64 con aggiornamento changelog e ciclo operativo standard (build frontend + rebuild/restart addon)."
+    reason: "Pubblicare una nuova revisione dell'add-on con il workflow di deploy locale richiesto."
+    touched_files:
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "`npm run build` frontend completato con successo (Vite build OK)."
+      - "`ha addons update local_file_editor_plus`: nessun update disponibile."
+      - "`ha addons rebuild local_file_editor_plus`: comando completato con successo."
+      - "`ha addons restart local_file_editor_plus`: comando completato con successo."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Fix SVG icons in `app-icon`: renderer icone migrato da template `html` a template `svg` (namespace corretto), shape tags mantenuti self-closing e verificata assenza di annidamenti tipo `<path><path...` nel bundle."
+    reason: "Risolvere mancato rendering icone in Home Assistant Ingress dovuto a parsing SVG non affidabile con template HTML."
+    touched_files:
+      - "file_editor_plus/frontend/src/components/app-icon.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend Vite completata senza errori (`dist/assets/index-CJH5lIdX.js`)."
+      - "Check statico su source+bundle: nessun match per pattern annidati `<path...><path...` o shape annidate."
+      - "Nel bundle i frammenti icona risultano con shape self-closing (`<path ... />`, `<circle ... />`, `<rect ... />`)."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Reso `app-icon` bulletproof per Ingress: sizing via `--app-icon-size` applicato su `:host` (width/height/flex fix) con `svg` a 100%, fallback icona di default e a11y condizionale (`role`/`aria-hidden`)."
+    reason: "Evitare icone invisibili per collasso 0x0 in Home Assistant Ingress senza modificare i consumer `<app-icon size=\"...\">`."
+    touched_files:
+      - "file_editor_plus/frontend/src/components/app-icon.ts"
+      - "file_editor_plus/frontend/src/main.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "`app-icon` aggiorna `this.style.setProperty('--app-icon-size', ...)` su mount e cambio `size`; rimossa la variabile size inline su `<svg>`."
+      - "`main.ts` importa side-effect `./components/app-icon` per garantire registrazione del custom element in build."
+      - "Impatto atteso: risoluzione invisibilità icone in Ingress dovuta a box host collassato."
+  - date: "2026-02-12"
+    actor: "codex"
     change: "STEP 11: creato documento `AI/UI_SMOKE_TEST_HA.md` con checklist smoke test UI per locale e Home Assistant Ingress."
     reason: "Definire una procedura pratica e ripetibile di verifica post-audit prima dell'installazione Ingress."
     touched_files:
