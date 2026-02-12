@@ -2,7 +2,7 @@
 schema:
   name: "ai-knowledge"
   version: 2
-  updated_at: "2026-01-29"
+  updated_at: "2026-02-12"
   updated_by: "codex"
   update_policy:
     rulebook: "AI/agents.md"
@@ -158,6 +158,10 @@ architecture:
       why: "Manifest add-on (ingress, mount /config, metadata)."
     - path: "file_editor_plus/frontend/src/app-root.ts"
       why: "UI principale (mock Explorer/Editor da collegare alle API)."
+    - path: "file_editor_plus/frontend/src/styles/figma-editor-styles.ts"
+      why: "Modulo Lit con baseline CSS reference importata da .temp/src/styles/editor.css per refactor UI."
+    - path: "file_editor_plus/frontend/src/components/app-icon.ts"
+      why: "Componente Lit riusabile per icone SVG inline (size/stroke/color controllabili) senza dipendenze esterne."
 
 interfaces:
   http_api:
@@ -337,6 +341,189 @@ decisions: []
 
 log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "STEP 17: creato documento AI/UI_REFACTOR_QA.md con checklist QA dark/light e sezione confronto con reference .temp/index.html."
+    reason: "Formalizzare i controlli manuali per validare match UI rispetto alla reference durante il refactor."
+    touched_files:
+      - "AI/UI_REFACTOR_QA.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Checklist include topbar glass, activity icons/active, explorer header actions, tree icon-color map, top actions hover primary, status teal-alpha, focus ring, zero emoji/MDI."
+      - "Sezione confronto con .temp/index.html presente."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "STEP 16: audit riferimenti MDI completato; rimozione @mdi/font rinviata per uso ancora attivo in autocomplete mdi (entities.ts + render codepoint in suggest list)."
+    reason: "Evitare regressioni funzionali: il font MDI e i codepoint sono ancora necessari nelle aree non migrate a app-icon."
+    touched_files:
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Riferimenti attivi confermati: entities.ts (codepoint), app-root.ts (renderMdiGlyph/suggestItemIcon), main.ts (@mdi/font import), package.json (@mdi/font)."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "STEP 15: aggiornati editor token/style in overlay.ts e app-styles.ts con palette Monaco-like Figma (caret/selection teal, syntax colors via CSS vars, line numbers senza hardcoded)."
+    reason: "Rendere overlay+textarea coerenti in dark/light usando token tema e senza impattare logica di editing."
+    touched_files:
+      - "file_editor_plus/frontend/src/features/editor/overlay.ts"
+      - "file_editor_plus/frontend/src/styles/app-styles.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Caret/selection teal e colori syntax governati da CSS vars."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "STEP 14: ridotti hardcoded principali sostituendoli con CSS vars in index.html, app-styles.ts e componenti preview immagine (overlay/modal)."
+    reason: "Evitare blocchi colore fissi e migliorare coerenza tema dark/light senza cambiare logica."
+    touched_files:
+      - "file_editor_plus/frontend/index.html"
+      - "file_editor_plus/frontend/src/styles/app-styles.ts"
+      - "file_editor_plus/frontend/src/components/image_preview_overlay.ts"
+      - "file_editor_plus/frontend/src/components/image-preview-modal.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Background/border/hover/focus/backdrop principali ora guidati da tokens CSS."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "STEP 13: rifinita status bar reference in app-root.ts/figma-editor-styles.ts con icona wifi decorativa e palette teal-alpha coerente in dark/light."
+    reason: "Allineare la resa visiva della status bar alla reference mantenendo invariata la logica di stato e i relativi handler."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/styles/figma-editor-styles.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Wrapper status-bar/status-bar-left/status-bar-right/status-item confermati; icona wifi con aria-hidden=true."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "STEP 12: allineati i pulsanti Save/Save All/Indent in app-root.ts alla reference (container top-actions, classi action-btn primary|secondary|ghost e icone app-icon 16px)."
+    reason: "Rendere i top actions coerenti visivamente senza modificare handler o comportamento."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Hover con shadow+translate resta su action-btn.primary (CSS già presente in figma-editor-styles.ts)."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "STEP 11: aggiornato render tree in features/tree/tree.ts sostituendo twisty unicode e emoji file/folder con app-icon (chevron/folder/file) e classi file-tree-item/selected."
+    reason: "Allineare rendering al sistema icone unificato mantenendo invariata la logica di espansione, click e selezione."
+    touched_files:
+      - "file_editor_plus/frontend/src/features/tree/tree.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Nessun unicode/emoji residuo nel rendering tree."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "STEP 10: aggiornato header Explorer in app-root.ts con 3 action button Figma (new file, new folder, upload) usando app-icon e classi file-explorer-header/explorer-actions/explorer-btn."
+    reason: "Allineare il markup dell'header File Explorer alla reference UI senza introdurre nuove logiche."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Pulsanti Explorer collegati a handler esistenti (newItemKind/openUploadModal)."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Sostituite icone emoji/MDI della activity bar in app-root.ts con <app-icon size=\"24\"> e aggiunte classi Figma activity-bar/activity-bar-btn."
+    reason: "Uniformare rendering icone della sidebar attività senza alterare comportamento dei pulsanti."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Nessuna emoji residua nella sezione activity bar del template."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Creato componente Lit app-icon con mappa interna SVG inline e set minimo icone richieste (activity, explorer, tree, actions, status, extra)."
+    reason: "Introdurre un sistema icone unico e controllabile (name/size/title) mantenendo dipendenze zero."
+    touched_files:
+      - "file_editor_plus/frontend/src/components/app-icon.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "SVG usa stroke=currentColor, fill=none e vector-effect=non-scaling-stroke."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Rifinito effetto glass/noise in figma-editor-styles.ts: aggiunto overlay noise su main-content (frame-only, pointer-events:none) e aumentata opacità noise della status-bar per coerenza visuale."
+    reason: "Allineare l'effetto glass alla reference Figma mantenendo leggibilità e interazioni UI."
+    touched_files:
+      - "file_editor_plus/frontend/src/styles/figma-editor-styles.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Overlay noise non blocca click (pointer-events:none)."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Aggiornato il markup di app-root.ts con classi/wrapper minimi per aggancio ai selettori Figma (editor-app, editor-header/menu, editor-layout, main-content, status-bar, top-actions/action-btn)."
+    reason: "Allineare la struttura classi Lit ai selettori figmaEditorStyles senza modificare layout o logica."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Classi target presenti nel DOM template renderizzato di app-root."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Integrato figmaEditorStyles in app-root.ts aggiungendo il modulo style a static styles con ordine [appStyles, figmaEditorStyles]."
+    reason: "Applicare gli stili Figma come override UI senza modificare logiche applicative."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Nessun errore runtime atteso da import statico styles Lit."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Allineata la palette runtime dark/light in app-styles.ts e settings.ts alla spec Figma (accent teal) mantenendo invariata la logica di switch tema."
+    reason: "Uniformare colori e token CSS tra runtime Lit e reference UI senza refactor di comportamento."
+    touched_files:
+      - "file_editor_plus/frontend/src/styles/app-styles.ts"
+      - "file_editor_plus/frontend/src/features/settings/settings.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "Aggiunte/mappate CSS vars Figma (accent-active, accent-light, accent-subtle, glass-blur, light-border-strong)."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Aggiunta sincronizzazione attributo host data-theme in app-root.ts usando il tema risolto (dark/light) senza cambiare la logica di selezione."
+    reason: "Rendere disponibili i selettori CSS :host([data-theme=...]) per il modulo stile Lit."
+    touched_files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+      - "applyTheme ora aggiorna sempre this.setAttribute('data-theme', resolvedTheme)."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Adattato figma-editor-styles.ts a Shadow DOM con selettori tema su :host([data-theme=\"dark|light\"]) e rimozione selettori body theme-scoped."
+    reason: "Allineare il CSS Figma al modello Lit senza modificare logica applicativa."
+    touched_files:
+      - "file_editor_plus/frontend/src/styles/figma-editor-styles.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Nessuna occorrenza residua di .dark/.light/html/body nel modulo styles."
+      - "Build frontend TypeScript/Vite completata senza errori."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Creato modulo styles Lit figma-editor-styles.ts con export figmaEditorStyles e CSS baseline reference."
+    reason: "Portare la reference UI in style module TypeScript senza modificare logiche applicative."
+    touched_files:
+      - "file_editor_plus/frontend/src/styles/figma-editor-styles.ts"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend TypeScript/Vite completata senza errori."
+  - date: "2026-02-12"
+    actor: "codex"
+    change: "Creato documento baseline UI per step 0 refactor con reference .temp e checklist screenshot manuale."
+    reason: "Stabilire baseline documentale prima delle modifiche UI, senza toccare logica applicativa."
+    touched_files:
+      - "AI/UI_REFACTOR_BASELINE.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Verificati riferimenti esistenti: .temp/index.html e .temp/src/styles/editor.css"
   - date: "2026-01-31"
     actor: "codex"
     change: "Sanitizzazione step 1: rimosso codice morto (treeMenuSize, duplicato appVersion), build green; bump 0.2.56."

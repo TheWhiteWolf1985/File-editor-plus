@@ -5,12 +5,23 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>File Editor Plus</title>
     <style>
+      :root {
+        --app-bg-color: #0a0a0a;
+        --app-text-color: #e5e7eb;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --app-bg-color: #f8f9fa;
+          --app-text-color: #1f2937;
+        }
+      }
       html, body {
         margin: 0;
         padding: 0;
         height: 100%;
         overflow: hidden;
-        background: #1e1e1e;
+        background: var(--app-bg-color);
+        color: var(--app-text-color);
       }
     </style>
   </head>

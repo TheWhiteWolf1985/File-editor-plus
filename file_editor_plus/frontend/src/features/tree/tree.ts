@@ -402,7 +402,7 @@ export function renderTree(this: any, path: string, depth = 0) {
 
     return html`
       <div
-        class="treeRow ${active ? "active" : ""} ${targetDir ? "targetDir" : ""} ${dropActive ? "dropTarget" : ""} ${readonlyDir ? "readonly-dir" : ""}"
+        class="treeRow file-tree-item ${active ? "active selected" : ""} ${targetDir ? "targetDir" : ""} ${dropActive ? "dropTarget" : ""} ${readonlyDir ? "readonly-dir" : ""}"
         style="padding-left:${8 + depth * 14}px"
         draggable="true"
         @dragstart=${(e: DragEvent) => this.handleTreeDragStart(e, it)}
@@ -419,8 +419,16 @@ export function renderTree(this: any, path: string, depth = 0) {
         }}
         @contextmenu=${(e: MouseEvent) => this.handleTreeContextMenu(e, it)}
       >
-        <span class="twisty">${isDir ? (isExpanded ? "▾" : "▸") : ""}</span>
-        <span>${isDir ? "📁" : "📄"}</span>
+        <span class="twisty">
+          ${isDir
+            ? isExpanded
+              ? html`<app-icon name="chevron-down" size="14" class="chevron"></app-icon>`
+              : html`<app-icon name="chevron-right" size="14" class="chevron"></app-icon>`
+            : nothing}
+        </span>
+        ${isDir
+          ? html`<app-icon name="folder" size="16" class="folder-icon"></app-icon>`
+          : html`<app-icon name="file" size="16" class="file-icon"></app-icon>`}
         <span class=${isDir ? "" : "muted"}>${it.name}</span>
       </div>
 

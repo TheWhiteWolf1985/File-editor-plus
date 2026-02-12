@@ -7,13 +7,13 @@ export type ImagePreviewOverlayOptions = {
 };
 
 const STYLE = `
-.fep-img-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:99999;}
-.fep-img-panel{background:var(--panel-color,#1f1f1f);color:var(--text-color,#f5f5f5);border:1px solid var(--border-color,#333);border-radius:10px;max-width:92vw;max-height:92vh;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,0.45);position:relative;display:grid;grid-template-rows:auto 1fr auto;min-width:320px;}
-.fep-img-header{display:flex;align-items:center;padding:10px 14px;gap:10px;background:var(--panel-strong,#262626);border-bottom:1px solid var(--border-color,#333);}
+.fep-img-overlay{position:fixed;inset:0;background:var(--overlay-backdrop,rgba(0,0,0,0.65));display:flex;align-items:center;justify-content:center;z-index:99999;}
+.fep-img-panel{background:var(--panel-color,var(--bg-color,#1f1f1f));color:var(--text-color,#f5f5f5);border:1px solid var(--border-color,var(--muted-color,#333));border-radius:10px;max-width:92vw;max-height:92vh;overflow:hidden;box-shadow:var(--modal-shadow,0 12px 32px rgba(0,0,0,0.45));position:relative;display:grid;grid-template-rows:auto 1fr auto;min-width:320px;}
+.fep-img-header{display:flex;align-items:center;padding:10px 14px;gap:10px;background:var(--panel-strong,var(--panel-color,#262626));border-bottom:1px solid var(--border-color,var(--muted-color,#333));}
 .fep-img-title{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .fep-img-close{border:none;background:transparent;color:inherit;font-size:18px;cursor:pointer;}
 .fep-img-body{padding:12px 14px;overflow:auto;display:grid;gap:10px;justify-items:center;}
-.fep-img-preview{max-width:88vw;max-height:68vh;object-fit:contain;border:1px solid var(--border-color,#333);border-radius:6px;background:var(--code-bg,#1e1e1e);}
+.fep-img-preview{max-width:88vw;max-height:68vh;object-fit:contain;border:1px solid var(--border-color,var(--muted-color,#333));border-radius:6px;background:var(--code-bg,var(--panel-color,#1e1e1e));}
 .fep-img-meta{width:100%;display:grid;gap:6px;font-size:var(--font-size-sm,0.9rem);} 
 .fep-img-row{display:flex;gap:8px;} 
 .fep-img-label{width:90px;color:var(--muted-color,#aaa);flex-shrink:0;text-align:right;} 

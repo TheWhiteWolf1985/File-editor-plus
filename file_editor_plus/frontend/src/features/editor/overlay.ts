@@ -25,7 +25,7 @@ const highlightLine = (line: string): HighlightSegment[] => {
       }
       const token = m[1];
       if (token === "true" || token === "false" || token === "null") {
-        segments.push({ text: token, cls: "token-boolean" });
+        segments.push({ text: token, cls: "token-boolean token-keyword" });
       } else if (/^\d/.test(token)) {
         segments.push({ text: token, cls: "token-number" });
       } else {
@@ -45,7 +45,7 @@ const highlightLine = (line: string): HighlightSegment[] => {
   const keyMatch = contentPart.match(/^(\s*-?\s*[^:\s#]+:)/);
   if (keyMatch) {
     const key = keyMatch[1];
-    segments.push({ text: key, cls: "token-key" });
+    segments.push({ text: key, cls: "token-key token-keyword" });
     const rest = contentPart.slice(key.length);
     if (rest) pushWithStyles(rest);
   } else {

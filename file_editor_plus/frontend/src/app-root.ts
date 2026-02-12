@@ -1,9 +1,11 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
+import "./components/app-icon";
 import { openImagePreviewOverlay } from "./components/image_preview_overlay";
 import type { HAClient, HassState } from "./ha-client";
 import { appStyles } from "./styles/app-styles";
+import { figmaEditorStyles } from "./styles/figma-editor-styles";
 import {
   computeIndentSegments,
   renderHighlighted,
@@ -89,7 +91,7 @@ import type { DiffHunk, DiffSummary, SuggestItem, Tab, TreeItem } from "./types/
 
 @customElement("app-root")
 export class AppRoot extends LitElement {
-  static styles = appStyles;
+  static styles = [appStyles, figmaEditorStyles];
 
   private apiBase = (() => {
     const base = new URL("./", window.location.href).pathname;
@@ -486,7 +488,18 @@ export class AppRoot extends LitElement {
   private runBackup = systemRunBackup.bind(this);
   private handleThemeChange = settingsHandleThemeChange.bind(this);
   private cycleTheme = settingsCycleTheme.bind(this);
-  private applyTheme = settingsApplyTheme.bind(this);
+  private resolveThemeMode(): "dark" | "light" {
+    if (this.themeMode === "auto") {
+      const prefersDark = this.themeMedia ? this.themeMedia.matches : true;
+      return prefersDark ? "dark" : "light";
+    }
+    return this.themeMode;
+  }
+  private applyTheme() {
+    settingsApplyTheme.call(this);
+    const resolvedTheme = this.resolveThemeMode();
+    this.setAttribute("data-theme", resolvedTheme);
+  }
   private persistUserConfig = settingsPersistUserConfig.bind(this);
   private loadFontSettings = settingsLoadFontSettings.bind(this);
   private openSettingsModal = settingsOpenSettingsModal.bind(this);
@@ -1954,7 +1967,7 @@ export class AppRoot extends LitElement {
   private renderMenu(label: string, name: string, items: { icon: string; label: string }[]) {
     const open = this.openMenu === name;
     return html`
-      <div class="menuItem ${open ? "open" : ""}" @click=${(e: Event) => this.toggleMenu(e, name)}>
+      <div class="menuItem menu-item ${open ? "open" : ""}" @click=${(e: Event) => this.toggleMenu(e, name)}>
         <span>${label}</span>
         <div class="menuPopup" ?hidden=${!open} @click=${(e: Event) => e.stopPropagation()}>
           ${items.map(
@@ -2282,8 +2295,36 @@ export class AppRoot extends LitElement {
   private renderSidebarContent() {
     if (this.activeActivity === "explorer") {
       return html`<div class="tree">
-        <div class="treeHeader">
-          <button class="btn" type="button" @click=${() => this.openUploadModal()}>⬆️ Upload</button>
+        <div class="treeHeader file-explorer-header">
+          <div class="explorer-actions">
+            <button
+              class="explorer-btn new-file-btn"
+              type="button"
+              title="New File"
+              aria-label="New File"
+              @click=${() => (this.newItemKind = "file")}
+            >
+              <app-icon name="file-plus" size="14"></app-icon>
+            </button>
+            <button
+              class="explorer-btn new-folder-btn"
+              type="button"
+              title="New Folder"
+              aria-label="New Folder"
+              @click=${() => (this.newItemKind = "folder")}
+            >
+              <app-icon name="folder-plus" size="14"></app-icon>
+            </button>
+            <button
+              class="explorer-btn upload-btn-header"
+              type="button"
+              title="Upload"
+              aria-label="Upload"
+              @click=${() => this.openUploadModal()}
+            >
+              <app-icon name="upload" size="14"></app-icon>
+            </button>
+          </div>
         </div>
         <div
           class="treeScrollable"
@@ -2549,9 +2590,10 @@ export class AppRoot extends LitElement {
     const diffMaps = this.getDiffMaps();
 
     return html`
+      <div class="editor-app">
       <div class="shell">
-          <div class="titlebar">
-          <div class="menus">
+          <div class="titlebar editor-header">
+          <div class="menus editor-menu">
             ${this.renderMenu("File", "file", [
               { icon: "📄", label: "New file" },
               { icon: "📁", label: "New folder" },
@@ -2581,39 +2623,42 @@ export class AppRoot extends LitElement {
             ])}
           </div>
           ${this.toolbarVisible
-            ? html`<div class="toolbar">
-                <button class="toolBtn" title="Save" aria-label="Save" ?disabled=${!this.activePath} @click=${() => this.save()}>
-                  💾 <span>Save</span>
+            ? html`<div class="toolbar top-actions">
+                <button class="toolBtn action-btn secondary" title="Save" aria-label="Save" ?disabled=${!this.activePath} @click=${() => this.save()}>
+                  <app-icon name="save" size="16"></app-icon>
+                  <span>Save</span>
                 </button>
-                <button class="toolBtn" title="Save all" aria-label="Save all" ?disabled=${!this.activePath} @click=${() => this.save()}>
-                  🧩 <span>Save all</span>
+                <button class="toolBtn action-btn primary" title="Save all" aria-label="Save all" ?disabled=${!this.activePath} @click=${() => this.save()}>
+                  <app-icon name="save-all" size="16"></app-icon>
+                  <span>Save all</span>
                 </button>
-                <button class="toolBtn" title="Undo" aria-label="Undo" @click=${() => this.handleUndoRedo("undo")}>
+                <button class="toolBtn action-btn ghost" title="Undo" aria-label="Undo" @click=${() => this.handleUndoRedo("undo")}>
                   ↩️ <span>Undo</span>
                 </button>
-                <button class="toolBtn" title="Redo" aria-label="Redo" @click=${() => this.handleUndoRedo("redo")}>
+                <button class="toolBtn action-btn ghost" title="Redo" aria-label="Redo" @click=${() => this.handleUndoRedo("redo")}>
                   ↪️ <span>Redo</span>
                 </button>
-                <button class="toolBtn" title="Search" aria-label="Search" @click=${() => this.openSearchTab("search")}>
+                <button class="toolBtn action-btn ghost" title="Search" aria-label="Search" @click=${() => this.openSearchTab("search")}>
                   🔎 <span>Search</span>
                 </button>
-                <button class="toolBtn" title="Replace" aria-label="Replace" @click=${() => this.openSearchTab("replace")}>
+                <button class="toolBtn action-btn ghost" title="Replace" aria-label="Replace" @click=${() => this.openSearchTab("replace")}>
                   🪄 <span>Replace</span>
                 </button>
                 <button
-                  class="toolBtn"
+                  class="toolBtn action-btn ghost"
                   title="Indent file"
                   aria-label="Indent file"
                   ?disabled=${!this.activePath || this.indenting}
                   @click=${() => this.indentFile()}
                 >
-                  🧹 <span>Indent file</span>
+                  <app-icon name="indent" size="16"></app-icon>
+                  <span>Indent file</span>
                 </button>
-                <button class="toolBtn" title="Split view" aria-label="Split view" @click=${() => this.handleMenuAction("view", "Split view")}>
+                <button class="toolBtn action-btn ghost" title="Split view" aria-label="Split view" @click=${() => this.handleMenuAction("view", "Split view")}>
                   🪟 <span>Split</span>
                 </button>
                 <button
-                  class="toolBtn"
+                  class="toolBtn action-btn ghost"
                   title="Compare"
                   aria-label="Compare"
                   ?disabled=${!this.splitViewEnabled || !this.activePath}
@@ -2625,19 +2670,31 @@ export class AppRoot extends LitElement {
             : nothing}
         </div>
 
-        <div class="main" ${ref((el) => (this.mainRef = el instanceof HTMLDivElement ? el : null))}>
-          <div class="activity">
+        <div class="main editor-layout" ${ref((el) => (this.mainRef = el instanceof HTMLDivElement ? el : null))}>
+          <div class="activity activity-bar">
             <div class="activityGroup">
-              <div class="act ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>📁</div>
-              <div class="act ${this.activeActivity === "search" ? "active" : ""}" title="Search" @click=${() => this.setActivity("search")}>🔎</div>
-              <div class="act ${this.activeActivity === "entity" ? "active" : ""}" title="Entity" @click=${() => this.setActivity("entity")}>🗂️</div>
-              <div class="act ${this.activeActivity === "snippet" ? "active" : ""}" title="Snippet" @click=${() => this.setActivity("snippet")}>📜</div>
-              <div class="act ${this.activeActivity === "backup" ? "active" : ""}" title="Backup" @click=${() => this.setActivity("backup")}>💾</div>
-              <div class="act ${this.activeActivity === "utility" ? "active" : ""}" title="Utility" @click=${() => this.setActivity("utility")}>🛠️</div>
+              <div class="act activity-bar-btn ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>
+                <app-icon name="folder-open" size="24"></app-icon>
+              </div>
+              <div class="act activity-bar-btn ${this.activeActivity === "search" ? "active" : ""}" title="Search" @click=${() => this.setActivity("search")}>
+                <app-icon name="search" size="24"></app-icon>
+              </div>
+              <div class="act activity-bar-btn ${this.activeActivity === "entity" ? "active" : ""}" title="Entity" @click=${() => this.setActivity("entity")}>
+                <app-icon name="git-branch" size="24"></app-icon>
+              </div>
+              <div class="act activity-bar-btn ${this.activeActivity === "snippet" ? "active" : ""}" title="Snippet" @click=${() => this.setActivity("snippet")}>
+                <app-icon name="palette" size="24"></app-icon>
+              </div>
+              <div class="act activity-bar-btn ${this.activeActivity === "backup" ? "active" : ""}" title="Backup" @click=${() => this.setActivity("backup")}>
+                <app-icon name="sun" size="24"></app-icon>
+              </div>
+              <div class="act activity-bar-btn ${this.activeActivity === "utility" ? "active" : ""}" title="Utility" @click=${() => this.setActivity("utility")}>
+                <app-icon name="moon" size="24"></app-icon>
+              </div>
             </div>
             <div class="activityGroup bottom">
-              <div class="act ${this.activeActivity === "system" ? "active" : ""}" title="System" @click=${() => this.setActivity("system")}>
-                <span class="mdiGlyph">${this.renderMdiGlyph("F0425")}</span>
+              <div class="act activity-bar-btn ${this.activeActivity === "system" ? "active" : ""}" title="System" @click=${() => this.setActivity("system")}>
+                <app-icon name="settings" size="24"></app-icon>
               </div>
             </div>
           </div>
@@ -2667,7 +2724,7 @@ export class AppRoot extends LitElement {
             <div class="sidebarResizer ${this.sidebarResizing ? "active" : ""}" @mousedown=${this.startSidebarResize}></div>
           </div>
 
-          <div class="editor">
+          <div class="editor main-content">
             <div class="tabs">
               ${this.tabs.length === 0
                 ? html`<div class="tab active">Welcome</div>`
@@ -2694,10 +2751,17 @@ export class AppRoot extends LitElement {
                 <div>${activeTab ? `/config/${activeTab.path}` : "Apri un file dall’Explorer"}</div>
                 ${this.toolbarVisible
                   ? nothing
-                  : html`<div style="display:flex; gap:8px;">
-                      <button class="btn" ?disabled=${!this.activePath} @click=${this.save}>Save</button>
-                      <button class="btn primary" ?disabled=${!this.activePath} @click=${this.save}>Save All</button>
-                      <button class="btn" ?disabled=${!this.activePath || this.indenting} @click=${() => this.indentFile()}>
+                  : html`<div class="top-actions" style="display:flex; gap:8px;">
+                      <button class="btn action-btn secondary" ?disabled=${!this.activePath} @click=${this.save}>
+                        <app-icon name="save" size="16"></app-icon>
+                        <span>Save</span>
+                      </button>
+                      <button class="btn primary action-btn primary" ?disabled=${!this.activePath} @click=${this.save}>
+                        <app-icon name="save-all" size="16"></app-icon>
+                        <span>Save All</span>
+                      </button>
+                      <button class="btn action-btn ghost" ?disabled=${!this.activePath || this.indenting} @click=${() => this.indentFile()}>
+                        <app-icon name="indent" size="16"></app-icon>
                         ${this.indenting ? "Formatting..." : "Indent file…"}
                       </button>
                     </div>`}
@@ -3171,23 +3235,29 @@ export class AppRoot extends LitElement {
             </div>`
           : nothing}
 
-        <div class="statusbar">
-          <div>${this.status}</div>
-          <div class="version">v${this.appVersion}</div>
-          <div class="right">
-            <button class="statusToggle" @click=${() => (this.autoIndentEnabled = !this.autoIndentEnabled)}>
+        <div class="statusbar status-bar">
+          <div class="status-bar-left">
+            <div class="status-item">
+              <app-icon name="wifi" size="14" aria-hidden="true"></app-icon>
+              <span>${this.status}</span>
+            </div>
+            <div class="version status-item">v${this.appVersion}</div>
+          </div>
+          <div class="right status-bar-right">
+            <button class="statusToggle status-item" @click=${() => (this.autoIndentEnabled = !this.autoIndentEnabled)}>
               Auto-indent: ${this.autoIndentEnabled ? "On" : "Off"}
             </button>
-            <button class="statusToggle" @click=${() => this.cycleTheme()}>
+            <button class="statusToggle status-item" @click=${() => this.cycleTheme()}>
               Theme: ${this.themeMode.charAt(0).toUpperCase()}${this.themeMode.slice(1)}
             </button>
-            <span>Ln ${this.cursorLine}</span>
-            <span>Col ${this.cursorCol}</span>
-            <span>UTF-8</span>
-            <span>LF</span>
-            <span>Lit</span>
+            <span class="status-item">Ln ${this.cursorLine}</span>
+            <span class="status-item">Col ${this.cursorCol}</span>
+            <span class="status-item">UTF-8</span>
+            <span class="status-item">LF</span>
+            <span class="status-item">Lit</span>
           </div>
         </div>
+      </div>
       </div>
     `;
   }
