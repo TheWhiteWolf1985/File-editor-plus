@@ -1132,6 +1132,13 @@ export const appStyles = css`
       display: grid;
       gap: 12px;
     }
+    .settingsModal {
+      min-width: 500px;
+      min-height: 350px;
+      width: min(620px, 92vw);
+      max-height: min(80vh, 680px);
+      overflow: auto;
+    }
     .modal h3 {
       margin: 0;
       font-size: var(--font-size-lg);
@@ -1238,6 +1245,51 @@ export const appStyles = css`
     }
     .settingsRange {
       width: 100%;
+    }
+    .localeGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .localeTile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      border: 1px solid var(--border-color);
+      background: var(--panel-color);
+      color: var(--text-color);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+    .localeTile:hover {
+      background: var(--hover-color);
+      border-color: var(--accent-color);
+      transform: translateY(-1px);
+    }
+    .localeTile.selected {
+      border-color: var(--accent-color);
+      background: color-mix(in srgb, var(--accent-color) 14%, var(--panel-color));
+    }
+    .localeBadge {
+      min-width: 30px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--panel-strong);
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      font-size: var(--font-size-sm);
+    }
+    .localeName {
+      font-size: var(--font-size-sm);
+      font-weight: 600;
     }
 
     /* Toast */

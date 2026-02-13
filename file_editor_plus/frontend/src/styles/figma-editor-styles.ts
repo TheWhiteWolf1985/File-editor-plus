@@ -246,6 +246,7 @@ export const figmaEditorStyles = css`
   justify-content: space-between;
   padding: var(--space-md) var(--space-md);
   gap: var(--space-sm);
+  margin-bottom: var(--space-md);
 }
 
 .file-explorer-title {

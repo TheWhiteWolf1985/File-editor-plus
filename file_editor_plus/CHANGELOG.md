@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.68
+
+- Status bar version fix: rimosso hardcode e lettura versione da build-time (`VITE_APP_VERSION`) con fallback visibile (`v?.?.?`).
+- i18n scaffolding: aggiunti file locali `it/en/de/fr/es` in `frontend/src/i18n/` e indice metadati lingue supportate.
+- Settings -> Localizzazione: nuova griglia tile selezionabili (badge lingua + nome + stato selected).
+- Settings modal: dimensione minima impostata (`min-width: 500px; min-height: 350px`) con scroll interno.
+
 ## 0.2.67
 
 - Tree icon colors: risolto override cascade di `currentColor` con classi stabili su `<app-icon>` (`tree-icon--folder/file/chevron`) e regole CSS univoche nel tree.

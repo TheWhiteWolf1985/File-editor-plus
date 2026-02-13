@@ -1,8 +1,16 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { readFileSync } from "node:fs";
+
+const addonConfigYaml = readFileSync(new URL("../config.yaml", import.meta.url), "utf8");
+const addonVersionMatch = addonConfigYaml.match(/^version:\s*"?([^"\n]+)"?\s*$/m);
+const addonVersion = addonVersionMatch?.[1]?.trim() || "unknown";
 
 export default defineConfig({
   base: "./",
+  define: {
+    "import.meta.env.VITE_APP_VERSION": JSON.stringify(addonVersion),
+  },
   plugins: [
     react({
       babel: {

@@ -84,6 +84,7 @@ import {
   apiGetSessionBuffer,
   apiResetSession,
 } from "./services/api";
+import { SUPPORTED_LOCALES, type SupportedLocaleCode } from "./i18n";
 import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS } from "./constants";
 import type { MdiIcon, SearchResult, SearchSummary, Snippet, ThemeMode } from "./types/api";
 import type { DiffHunk, DiffSummary, SuggestItem, Tab, TreeItem } from "./types/editor";
@@ -132,6 +133,7 @@ export class AppRoot extends LitElement {
     showAboutModal: { state: true },
     showSettingsModal: { state: true },
     settingsTab: { state: true },
+    selectedLocale: { state: true },
     settingsFontBaseRem: { state: true },
     snippetName: { state: true },
     snippetDescription: { state: true },
@@ -246,6 +248,7 @@ export class AppRoot extends LitElement {
   declare showAboutModal: boolean;
   declare showSettingsModal: boolean;
   declare settingsTab: "appearance" | "localization";
+  declare selectedLocale: SupportedLocaleCode;
   declare settingsFontBaseRem: number;
   declare snippetName: string;
   declare snippetDescription: string;
@@ -341,7 +344,10 @@ export class AppRoot extends LitElement {
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.62";
+  private readonly appVersion = (() => {
+    const value = (import.meta.env.VITE_APP_VERSION ?? "").trim();
+    return value.length > 0 ? value : "unknown";
+  })();
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -578,6 +584,7 @@ export class AppRoot extends LitElement {
     this.showAboutModal = false;
     this.showSettingsModal = false;
     this.settingsTab = "appearance";
+    this.selectedLocale = "it";
     this.settingsFontBaseRem = this.fontBaseRem;
     this.snippetName = "";
     this.snippetDescription = "";
@@ -3031,7 +3038,7 @@ export class AppRoot extends LitElement {
         ${this.showSettingsModal
           ? html`
               <div class="modalBackdrop" @click=${() => this.cancelSettingsModal()}>
-                <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:520px;">
+                <div class="modal settingsModal" @click=${(e: Event) => e.stopPropagation()}>
                   <h3>Settings</h3>
                   <div class="settingsTabs">
                     <button
@@ -3072,7 +3079,23 @@ export class AppRoot extends LitElement {
                       `
                     : html`
                         <div class="settingsBody">
-                          <div class="settingsHint">Impostazioni di localizzazione in arrivo.</div>
+                          <div class="settingsHint">Seleziona la lingua dell'interfaccia.</div>
+                          <div class="localeGrid" role="radiogroup" aria-label="Seleziona lingua">
+                            ${SUPPORTED_LOCALES.map(
+                              (locale) => html`
+                                <button
+                                  class="localeTile ${this.selectedLocale === locale.code ? "selected" : ""}"
+                                  type="button"
+                                  role="radio"
+                                  aria-checked=${this.selectedLocale === locale.code ? "true" : "false"}
+                                  @click=${() => (this.selectedLocale = locale.code)}
+                                >
+                                  <span class="localeBadge" aria-hidden="true">${locale.badge}</span>
+                                  <span class="localeName">${locale.label}</span>
+                                </button>
+                              `
+                            )}
+                          </div>
                         </div>
                       `}
                   <div class="actions">
@@ -3249,7 +3272,7 @@ export class AppRoot extends LitElement {
               <app-icon name="wifi" size="14" aria-hidden="true"></app-icon>
               <span>${this.status}</span>
             </div>
-            <div class="version status-item">v${this.appVersion}</div>
+            <div class="version status-item">v${this.appVersion === "unknown" ? "?.?.?" : this.appVersion}</div>
           </div>
           <div class="right status-bar-right">
             <button class="statusToggle status-item" @click=${() => (this.autoIndentEnabled = !this.autoIndentEnabled)}>
