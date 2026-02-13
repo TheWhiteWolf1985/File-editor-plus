@@ -3,8 +3,8 @@ import { css } from "lit";
 export const figmaEditorStyles = css`
 /* Monaco Editor Glass UI Theme */
 
-/* CSS Variables for theming */
-:root {
+/* CSS Variables for theming (Shadow DOM scoped) */
+:host {
   /* Teal/Cyan Accent */
   --accent-primary: #14b8a6;
   --accent-hover: #0d9488;
@@ -762,8 +762,11 @@ export const figmaEditorStyles = css`
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-lg);
-  min-height: 24px;
+  min-height: 30px;
   font-size: 14px;
+  line-height: 1.2;
+  flex: 0 0 auto;
+  box-sizing: border-box;
   position: relative;
   z-index: 10;
 }
@@ -804,7 +807,9 @@ export const figmaEditorStyles = css`
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: 2px 6px;
+  padding: 1px 6px;
+  font-size: inherit;
+  line-height: 1.2;
   border-radius: var(--radius-sm);
   transition: all 0.2s;
 }

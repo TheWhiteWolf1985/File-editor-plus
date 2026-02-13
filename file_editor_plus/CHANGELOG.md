@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.71
+
+- Fix CSS vars in Shadow DOM: token Figma (es. `--space-md`, `--space-sm`, radius/shadow/accent vars) spostati da `:root` a `:host` in `figma-editor-styles.ts`.
+- Risolto warning DevTools su variabili non definite nel pannello stili dello shadow root.
+
+## 0.2.70
+
+- Status bar: impostati `min-height: 30px` e `font-size: 14px`.
+- Status bar: ridotto padding verticale interno (`.status-item`) e line-height controllata per evitare clipping nella parte inferiore.
+
+## 0.2.69
+
+- Status bar UI: aumentata altezza del 50% (`min-height: 36px`) e aumentato il font interno a `16px` per migliorare leggibilità.
+
 ## 0.2.68
 
 - Status bar version fix: rimosso hardcode e lettura versione da build-time (`VITE_APP_VERSION`) con fallback visibile (`v?.?.?`).

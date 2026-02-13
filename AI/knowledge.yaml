@@ -2,7 +2,7 @@
 schema:
   name: "ai-knowledge"
   version: 2
-  updated_at: "2026-02-12"
+  updated_at: "2026-02-13"
   updated_by: "codex"
   update_policy:
     rulebook: "AI/agents.md"
@@ -341,6 +341,59 @@ decisions: []
 
 log:
   # Older log entries have been moved to AI/knowledge-archive.yaml
+  - date: "2026-02-13"
+    actor: "codex"
+    change: "Fix scope token CSS Figma in Shadow DOM: variabili custom (es. `--space-md`) spostate da `:root` a `:host` in `figma-editor-styles.ts`; bump versione add-on a 0.2.71."
+    reason: "In Lit/Shadow DOM i token dichiarati su `:root` non risultavano disponibili nel contesto host del componente, causando variabili non risolte in DevTools e spacing incoerente."
+    touched_files:
+      - "file_editor_plus/frontend/src/styles/figma-editor-styles.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend completata con successo (`npm run build`)."
+      - "Update/rebuild/restart addon eseguiti in sequenza."
+  - date: "2026-02-13"
+    actor: "codex"
+    change: "Status bar tuning: ridotta a `min-height: 30px` con `font-size: 14px` e micro-fix anti-clipping (line-height/padding verticale/flex box-sizing); bump versione add-on a 0.2.70."
+    reason: "Correggere il taglio inferiore della status bar in Ingress mantenendo la richiesta di dimensioni più compatte."
+    touched_files:
+      - "file_editor_plus/frontend/src/styles/figma-editor-styles.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Status bar: `min-height: 30px`, `font-size: 14px`, `line-height: 1.2`, `flex: 0 0 auto`."
+      - "Build frontend completata con successo (`npm run build`)."
+      - "Ricostruzione/restart addon eseguiti senza errori bloccanti."
+  - date: "2026-02-13"
+    actor: "codex"
+    change: "UI tweak status bar: altezza aumentata del 50% e font interno aumentato di 2px; bump versione add-on a 0.2.69 con rebuild completo."
+    reason: "Migliorare leggibilità della status bar mantenendo invariata la logica applicativa."
+    touched_files:
+      - "file_editor_plus/frontend/src/styles/figma-editor-styles.ts"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Status bar aggiornata a `min-height: 36px` e `font-size: 16px`."
+      - "Build frontend completata con successo (`npm run build`)."
+      - "`docker exec hassio_cli ha apps update local_file_editor_plus` completato con successo."
+      - "`docker exec hassio_cli ha apps restart local_file_editor_plus` completato con successo."
+  - date: "2026-02-13"
+    actor: "codex"
+    change: "Fix resilienza build add-on: `vite.config.ts` ora risolve la versione in modo robusto (multi-path `config.yaml` + fallback env + default `0.0.0`) senza eccezioni; Docker stage frontend copia esplicitamente `config.yaml` in `/fe` prima di `npm run build`."
+    reason: "Sbloccare `ha apps update/restart` falliti per `ENOENT: /config.yaml` durante build Vite nel container add-on."
+    touched_files:
+      - "file_editor_plus/frontend/vite.config.ts"
+      - "file_editor_plus/Dockerfile"
+      - "AI/knowledge.yaml"
+    verification:
+      - "Build frontend locale OK (`npm run build`, bundle `dist/assets/index-C5YZYWWI.js`)."
+      - "Versione app iniettata nel bundle da Vite (`appVersion` valorizzata a `0.2.68`, fallback non vuoto)."
+      - "`docker exec hassio_cli ha apps update local_file_editor_plus` completato con successo."
+      - "`docker exec hassio_cli ha apps restart local_file_editor_plus` completato con successo."
+      - "`ha apps info local_file_editor_plus`: addon `started`, `version: 0.2.68`, `update_available: false`."
   - date: "2026-02-13"
     actor: "codex"
     change: "UI/i18n step: fix versione status bar (no hardcode), scaffolding locali `it/en/de/fr/es`, nuova griglia tile in tab Localizzazione e min-size della modal Settings."
