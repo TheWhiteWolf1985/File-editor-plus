@@ -1,1 +1,445 @@
-{}
+{
+  "meta": {
+    "language": "fr",
+    "version": 5
+  },
+  "btn": {
+    "cancel": "Annuler",
+    "create": "Créer",
+    "apply": "Appliquer",
+    "delete": "Supprimer",
+    "reset": "Réinitialiser",
+    "close": "Fermer",
+    "save": "Sauvegarder"
+  },
+  "menu": {
+    "file": "Déposer",
+    "edit": "Modifier",
+    "view": "Voir",
+    "help": "Aide"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "tabs": {
+      "localization": "Emplacement",
+      "appearance": "j'attends"
+    },
+    "appearance": {
+      "font_size": "Taille de la police",
+      "font_size_hint": "Ajustez en temps réel, enregistrez avec Appliquer."
+    },
+    "localization": {
+      "hint": "Sélectionnez la langue de l'interface.",
+      "select_aria": "Sélectionnez la langue"
+    },
+    "toast": {
+      "save_theme_error": "Erreur d'enregistrement du thème",
+      "save_error": "Erreur lors de l'enregistrement des paramètres",
+      "applied": "Paramètres appliqués"
+    }
+  },
+  "status": {
+    "unknown": "inconnu",
+    "ready": "Prêt",
+    "loading_file": "Chargement des fichiers...",
+    "error_loading_file": "Erreur de chargement du fichier",
+    "session_reset": "Réinitialisation de la session",
+    "yaml_formatting": "Formatage de YAML...",
+    "formatted_unsaved": "Formaté (non enregistré)",
+    "format_error": "Erreur de formatage",
+    "debug_log_generating": "Génération du journal de débogage...",
+    "debug_log_error": "Erreur du journal de débogage",
+    "auto_indent": "Retrait automatique",
+    "theme": "Thème",
+    "theme_auto": "Voiture",
+    "theme_light": "Clair",
+    "theme_dark": "Sombre",
+    "line_short": "Ln",
+    "column_short": "Avec le",
+    "version": "Version",
+    "encoding_utf8": "UTF-8",
+    "eol_lf": "LF",
+    "runtime_lit": "Lit",
+    "saving": "Sauvetage...",
+    "saved": "Enregistré",
+    "in_progress": "En cours..."
+  },
+  "tree": {
+    "status": {
+      "loading": "Chargement de l'arbre...",
+      "empty": "Aucun fichier",
+      "error_loading": "Erreur de chargement de l'arborescence"
+    },
+    "toast": {
+      "reloaded": "Arbre rechargé",
+      "readonly_folder": "Dossier en lecture seule",
+      "invalid_move_self": "Vous ne pouvez pas déplacer un dossier à l'intérieur de lui-même",
+      "copy_error": "Erreur de copie",
+      "copied": "Copié : {path}",
+      "pasted": "Collé : {path}",
+      "deleted": "Élément supprimé",
+      "delete_error": "Supprimer l'erreur"
+    },
+    "validation": {
+      "file_name_required": "Nom de fichier requis",
+      "file_exists": "Le fichier existe déjà",
+      "folder_name_required": "Nom du dossier requis",
+      "folder_exists": "Le dossier existe déjà"
+    },
+    "error": {
+      "create_file": "Erreur de création de fichier",
+      "create_folder_exists": "Le dossier existe déjà ou erreur",
+      "create_folder": "Erreur de création de dossier",
+      "copy_http": "Erreur de copie (HTTP {status})",
+      "delete_http": "Erreur de suppression (HTTP {status})"
+    },
+    "action": {
+      "reload": "Recharger l'arborescence"
+    }
+  },
+  "modal": {
+    "preview": {
+      "close_aria": "Fermer l'aperçu",
+      "title": "Image d'aperçu",
+      "error_load": "Impossible de charger l'aperçu de l'image",
+      "not_available": "Aperçu non disponible",
+      "image_not_available": "Image non disponible",
+      "meta": {
+        "name": "Nom",
+        "path": "Chemin",
+        "dimensions": "Dimensions",
+        "size": "Poids"
+      }
+    },
+    "delete_confirm": {
+      "title": "Confirmer la suppression",
+      "message_prefix": "Vous souhaitez supprimer"
+    },
+    "upload": {
+      "title": "Télécharger des fichiers",
+      "destination_folder": "Dossier de destination",
+      "error_select_files": "Sélectionnez au moins un fichier à télécharger",
+      "error_readonly_destination": "Dossier en lecture seule : choisissez une autre destination",
+      "error_upload_file": "Erreur de téléchargement {name}",
+      "error_file_too_large": "Fichier trop volumineux : {name}",
+      "error_destination_not_found": "Dossier de destination introuvable",
+      "error_invalid_name": "Nom invalide : {name}",
+      "error_file_detail": "{name} : {detail}",
+      "file_uploaded": "Chargé : {name}",
+      "completed": "Téléchargement terminé : {success}/{total}",
+      "uploading": "Chargement...",
+      "progress": "Chargement... {done}/{total}"
+    },
+    "about": {
+      "title": "Information",
+      "developer": "Promoteur",
+      "github": "GitHub",
+      "repository": "Dépôts",
+      "license": "Licence"
+    },
+    "settings": {
+      "title": "Paramètres"
+    },
+    "snippet": {
+      "new_title": "Nouvel extrait"
+    },
+    "unsaved": {
+      "title": "Modifications non enregistrées",
+      "discard": "Ne sauvegardez pas",
+      "message": "Vous avez des modifications non enregistrées le {path}.",
+      "current_file": "fichier actuel"
+    },
+    "move_confirm": {
+      "title": "Confirmer le déménagement",
+      "message": "Déplacer {source} vers {target} ?"
+    },
+    "conflict": {
+      "title": "Conflit de nom",
+      "message": "{name} existe déjà dans {target}."
+    }
+  },
+  "errors": {
+    "entities": {
+      "loading": "Erreur de chargement de l'entité",
+      "open_file_first": "Ouvrir un fichier avant de l'insérer"
+    },
+    "snippets": {
+      "missing_id": "ID d'extrait manquant"
+    }
+  },
+  "labels": {
+    "zip": "Fermeture éclair",
+    "state": "État",
+    "here": "ici",
+    "on": "Hon",
+    "off": "Désactivé",
+    "folder": "dossier",
+    "file": "déposer"
+  },
+  "tabs": {
+    "unsaved": "Non enregistré",
+    "welcome": "Accueillir"
+  },
+  "actions": {
+    "new_file": "Nouveau fichier",
+    "new_folder": "Nouveau dossier",
+    "save": "Sauvegarder",
+    "save_as": "Enregistrer sous…",
+    "import": "C’est important…",
+    "export": "Exporter…",
+    "undo": "Annuler",
+    "redo": "Répéter",
+    "cut": "Couper",
+    "copy": "Copie",
+    "paste": "Coller",
+    "save_all": "Enregistrez tout",
+    "search": "Près",
+    "replace": "Remplacer",
+    "indent_file": "Fichiers d'indentation",
+    "auto_indent": "Retrait automatique",
+    "close": "Fermer",
+    "move": "Se déplacer",
+    "rename": "Rebaptiser",
+    "overwrite": "Écraser"
+  },
+  "search": {
+    "toast": {
+      "query_required": "Entrez un terme de recherche",
+      "error": "Erreur de recherche",
+      "run_search_first": "Faites d'abord une recherche",
+      "no_result_replace": "Aucun résultat à remplacer",
+      "no_occurrence": "Aucune occurrence à remplacer",
+      "error_replace": "Erreur de remplacement",
+      "stale": "Fichier modifié entre-temps (périmé)",
+      "match_not_found": "Occurrence introuvable",
+      "replaced_one": "Remplacé 1 match",
+      "replace_completed": "Remplacement terminé : {modified} fichiers mis à jour{stale}",
+      "replace_completed_stale_suffix": ", {stale} périmé",
+      "file_dirty_not_reloaded": "Fichier ouvert avec des modifications non enregistrées : non rechargé",
+      "error_replace_one": "Erreur de substitution unique"
+    },
+    "status": {
+      "loading": "Recherche...",
+      "searching": "Recherche...",
+      "empty": "Aucun résultat",
+      "truncated": "Des résultats tronqués par des limites fixées"
+    },
+    "labels": {
+      "hits": "{count} a touché",
+      "case_sensitive": "Sensible aux majuscules et minuscules"
+    },
+    "summary": {
+      "hits_in_files": "{hits} appel dans le fichier {files_with_matches}/{files_scanned}",
+      "truncated_suffix": "(tronqué)"
+    },
+    "action": {
+      "find": "Trouve",
+      "replace_match_title": "Remplacer ce match",
+      "replace": "Remplacer",
+      "working": "Traitement...",
+      "replace_all": "Remplacez tout"
+    },
+    "confirm": {
+      "replace_all": "Remplacer les occurrences {replacements} dans le fichier {files} ?"
+    }
+  },
+  "entities": {
+    "title": "Entité",
+    "empty": "Aucune entité",
+    "search": {
+      "placeholder": "Rechercher un identifiant ou un nom d'entité"
+    },
+    "action": {
+      "insert_title": "Entrer",
+      "insert": "Entrer"
+    }
+  },
+  "snippets": {
+    "action": {
+      "add": "Ajouter un extrait…",
+      "modify": "Modifier"
+    },
+    "field": {
+      "title": "Titre",
+      "description": "Description"
+    },
+    "search": {
+      "placeholder": "Extrait de recherche..."
+    },
+    "form": {
+      "title_max_100": "Titre (max 100)",
+      "description_max_250": "Description (maximum 250)",
+      "content": "Contenu"
+    },
+    "validation": {
+      "fill_all": "Remplissez tous les champs",
+      "title_too_long": "Titre trop long (max 100)",
+      "description_too_long": "Description trop longue (max 250)"
+    },
+    "toast": {
+      "offline_mock": "Extrait hors ligne (simulé)",
+      "updated": "Extrait mis à jour",
+      "saved": "Extrait enregistré",
+      "save_error": "Erreur lors de l'enregistrement de l'extrait",
+      "inserted": "Extrait inséré : {name}",
+      "deleted": "Extrait supprimé",
+      "delete_error": "Erreur lors de la suppression de l'extrait"
+    },
+    "error": {
+      "missing_id": "ID d'extrait manquant"
+    }
+  },
+  "system": {
+    "actions": {
+      "reload_yaml": {
+        "label": "Recharger YAML",
+        "desc": "Rechargez la configuration.yaml et incluez."
+      },
+      "restart_core": {
+        "label": "Redémarrer le noyau",
+        "desc": "Redémarrez Home Assistant Core."
+      },
+      "restart_supervisor": {
+        "label": "Redémarrer le superviseur",
+        "desc": "Redémarrez Supervisor (gestion des modules complémentaires)."
+      },
+      "reboot_host": {
+        "label": "Redémarrer l'hôte",
+        "desc": "Redémarrez votre appareil/système d'exploitation."
+      },
+      "shutdown_host": {
+        "label": "Arrêter l'hôte",
+        "desc": "Éteignez votre appareil/système d'exploitation."
+      }
+    },
+    "confirm": {
+      "action": "Confirmez-vous : {label} ?"
+    },
+    "toast": {
+      "action_started": "{label} a commencé",
+      "call_error": "Erreur d'appel système",
+      "cloud_coming_soon": "Sauvegarde cloud bientôt disponible",
+      "download_started": "Le téléchargement de la sauvegarde a commencé",
+      "save_not_supported": "Enregistrement non pris en charge, démarrage du téléchargement",
+      "saved": "Sauvegarde enregistrée",
+      "save_cancelled": "Sauvegarde annulée",
+      "backup_error": "Erreur de sauvegarde"
+    }
+  },
+  "view": {
+    "toolbar_toggle": "Menu Outils",
+    "indent_guides": "Guides de retour",
+    "split": "Vue fractionnée",
+    "split_short": "Diviser",
+    "compare": "Comparer…"
+  },
+  "help": {
+    "docs": "Documentation"
+  },
+  "about": {
+    "title": "Information"
+  },
+  "activity": {
+    "explorer": "Explorateur",
+    "entity": "Entité",
+    "snippet": "Extraits",
+    "backup": "Sauvegardes",
+    "utility": "Utilitaire",
+    "system": "Système"
+  },
+  "backup": {
+    "local": "Sauvegarde locale",
+    "local_loading": "Sauvegarde locale...",
+    "local_desc": "Créez un zip du dossier /config et lancez le téléchargement.",
+    "network": "Sauvegarde réseau",
+    "network_loading": "Sauvegarde réseau...",
+    "network_desc": "Enregistrez le zip avec la fenêtre système (si pris en charge).",
+    "cloud": "Sauvegarde dans le cloud",
+    "cloud_coming_soon_desc": "Bientôt disponible."
+  },
+  "utility": {
+    "generating": "Génération...",
+    "generate_debug_log": "Générer un journal de débogage",
+    "generate_debug_log_desc": "Créez un fichier de débogage dans /config/.fep-config avec les informations système et les journaux du superviseur."
+  },
+  "editor": {
+    "empty_open_from_explorer": "Ouvrir un fichier depuis l'Explorateur",
+    "placeholder": {
+      "select_file": "Sélectionnez un fichier à gauche…"
+    }
+  },
+  "explorer": {
+    "action": {
+      "new_file": "Nouveau fichier",
+      "new_folder": "Nouveau dossier",
+      "upload": "Charger"
+    },
+    "context": {
+      "new_file": "Nouveau fichier",
+      "new_folder": "Nouveau dossier"
+    }
+  },
+  "session": {
+    "reset": {
+      "title": "Réinitialiser la session",
+      "desc": "Efface les onglets et les tampons enregistrés, ferme tous les onglets.",
+      "confirm_message": "Cela fermera tous les onglets et supprimera la session enregistrée (session.json et buffer)."
+    }
+  },
+  "toast": {
+    "debug_log_created": "Journal de débogage créé : {filename}",
+    "debug_log_error": "Erreur lors de la génération du journal de débogage",
+    "file": {
+      "save_error": "Enregistrer l'erreur",
+      "save_as_not_implemented": "Enregistrer comme non implémenté"
+    },
+    "diff": {
+      "error": "Erreur différentielle"
+    },
+    "clipboard": {
+      "nothing_to_copy": "Rien à copier",
+      "copied": "Copié",
+      "cut": "Couper",
+      "nothing_to_paste": "Rien à coller",
+      "pasted": "Collé",
+      "unavailable": "Presse-papiers non disponible"
+    },
+    "editor": {
+      "open_file_first": "Ouvrir un fichier avant de le modifier",
+      "undo_unavailable": "Annuler non disponible",
+      "redo_unavailable": "Rétablir non disponible",
+      "auto_indent_completed": "Retrait automatique terminé"
+    },
+    "yaml": {
+      "invalid": "YAML invalide",
+      "formatted": "YAML formaté",
+      "format_error": "Erreur de formatage",
+      "format_http_error": "Impossible de formater YAML (HTTP {status})."
+    },
+    "view": {
+      "enable_split_first": "Activez d'abord la vue fractionnée",
+      "open_file_to_compare": "Ouvrir un fichier pour comparer"
+    },
+    "help": {
+      "docs_unavailable": "Documents non disponibles"
+    },
+    "move": {
+      "missing_source": "Déplacement invalide (origine manquante)",
+      "destination_conflict": "Un élément du même nom existe déjà dans la destination",
+      "invalid": "Déplacement invalide",
+      "not_found": "Source ou destination introuvable",
+      "error_http": "Erreur de déplacement (HTTP {status})",
+      "moved": "Déplacé : {name}",
+      "file_reopen_needed": "Fichier déplacé : rouvrez-le à partir du nouvel emplacement",
+      "error": "Erreur de décalage"
+    },
+    "session": {
+      "restored_defaults_corrupted": "Session restaurée aux valeurs par défaut (fichier de session corrompu)",
+      "unsaved_reopened_from_disk": "Session précédente avec des modifications non enregistrées. Les fichiers ont été rouverts à partir de la version disque.",
+      "restored_unsaved_files": "{count} fichiers non enregistrés restaurés de la session précédente",
+      "restored_defaults_error": "Session réinitialisée aux valeurs par défaut (erreur)",
+      "reset_done": "Réinitialisation de la session",
+      "reset_error": "Erreur de réinitialisation de session"
+    }
+  }
+}
