@@ -1,5 +1,6 @@
 import type { Snippet } from "../../types/api";
 import { apiCreateSnippet, apiDeleteSnippet, apiGetSnippets, apiUpdateSnippet } from "../../services/api";
+import { t } from "../../i18n";
 
 export async function loadSnippets(this: any) {
   try {
@@ -10,7 +11,7 @@ export async function loadSnippets(this: any) {
     this.snippets = items.length > 0 ? items : this.snippetMocks;
   } catch (e) {
     this.snippets = this.snippetMocks;
-    this.showToast("Snippet offline (mock)", "error");
+    this.showToast(t("snippets.toast.offline_mock"), "error");
   }
 }
 
@@ -41,15 +42,15 @@ export async function saveSnippet(this: any) {
   const description = this.snippetDescription.trim();
   const content = this.snippetContent;
   if (!name || !description || !content) {
-    this.showToast("Compila tutti i campi", "error");
+    this.showToast(t("snippets.validation.fill_all"), "error");
     return;
   }
   if (name.length > 100) {
-    this.showToast("Titolo troppo lungo (max 100)", "error");
+    this.showToast(t("snippets.validation.title_too_long"), "error");
     return;
   }
   if (description.length > 250) {
-    this.showToast("Descrizione troppo lunga (max 250)", "error");
+    this.showToast(t("snippets.validation.description_too_long"), "error");
     return;
   }
   this.snippetSaving = true;
@@ -63,7 +64,7 @@ export async function saveSnippet(this: any) {
       if (item && item.id) {
         this.snippets = this.snippets.map((s: Snippet) => (s.id === item.id ? item : s));
       }
-      this.showToast("Snippet aggiornato");
+      this.showToast(t("snippets.toast.updated"));
     } else {
       const res = await apiCreateSnippet(this.apiBase, payload);
       if (!res.ok) throw new Error(`save snippet ${res.status}`);
@@ -74,12 +75,12 @@ export async function saveSnippet(this: any) {
       } else {
         this.snippets = [...this.snippets, { id: `tmp-${Date.now()}`, name, description, content }];
       }
-      this.showToast("Snippet salvato");
+      this.showToast(t("snippets.toast.saved"));
     }
     this.showSnippetModal = false;
     this.snippetEditingId = null;
   } catch (e) {
-    this.showToast("Errore salvataggio snippet", "error");
+    this.showToast(t("snippets.toast.save_error"), "error");
   } finally {
     this.snippetSaving = false;
   }
@@ -87,7 +88,7 @@ export async function saveSnippet(this: any) {
 
 export function insertSnippet(this: any, snippet: Snippet) {
   if (!this.editorRef || !this.activePath) {
-    this.showToast("Apri un file prima di inserire", "error");
+    this.showToast(t("errors.entities.open_file_first"), "error");
     return;
   }
   const ta = this.editorRef;
@@ -104,21 +105,21 @@ export function insertSnippet(this: any, snippet: Snippet) {
     this.editorRef.focus();
     this.updateCursorFromPos(pos, this.content);
   });
-  this.showToast(`Snippet inserito: ${snippet.name}`);
+  this.showToast(t("snippets.toast.inserted", { name: snippet.name }));
 }
 
 export async function deleteSnippet(this: any, snippet: Snippet) {
   const id = snippet.id;
   if (!id) {
-    this.showToast("ID snippet mancante", "error");
+    this.showToast(t("snippets.error.missing_id"), "error");
     return;
   }
   try {
     const res = await apiDeleteSnippet(this.apiBase, id);
     if (!res.ok) throw new Error(`delete snippet ${res.status}`);
     this.snippets = this.snippets.filter((s: Snippet) => s.id !== id);
-    this.showToast("Snippet eliminato");
+    this.showToast(t("snippets.toast.deleted"));
   } catch (e) {
-    this.showToast("Errore eliminazione snippet", "error");
+    this.showToast(t("snippets.toast.delete_error"), "error");
   }
 }

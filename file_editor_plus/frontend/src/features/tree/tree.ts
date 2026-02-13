@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import type { TreeItem } from "../../types/editor";
 import { apiCreateFile, apiCreateFolder, apiGetTree, apiTreeCopy, apiTreeDelete } from "../../services/api";
+import { t } from "../../i18n";
 
 const getCopyName = (path: string, type: "file" | "dir") => {
   const name = path.split("/").pop() || path;
@@ -34,7 +35,7 @@ export async function loadTree(this: any, path: string, force = false) {
   this.loadingPaths.add(path);
 
   try {
-    this.status = "Loading tree...";
+    this.status = t("tree.status.loading");
     const res = await apiGetTree(this.apiBase, path);
     if (!res.ok) {
       throw new Error(`tree ${res.status}`);
@@ -46,9 +47,9 @@ export async function loadTree(this: any, path: string, force = false) {
       this.rootItems = items;
     }
     this.treeData = { ...this.treeData, [key]: items };
-    this.status = items.length === 0 ? "Nessun file" : "Ready";
+    this.status = items.length === 0 ? t("tree.status.empty") : t("status.ready");
   } catch (e) {
-    this.status = "Errore caricamento tree";
+    this.status = t("tree.status.error_loading");
   } finally {
     this.loadingPaths.delete(path);
     this.loadedPaths.add(path);
@@ -69,7 +70,7 @@ export async function reloadTree(this: any, quiet = false) {
     this.treeDirty = false;
   }
   if (!quiet) {
-    this.showToast("Tree ricaricato");
+    this.showToast(t("tree.toast.reloaded"));
   }
 }
 
@@ -132,7 +133,7 @@ export function handleTreeDrop(this: any, e: DragEvent, item: TreeItem) {
   if (item.type !== "dir") return;
   e.preventDefault();
   if (item.writable === false) {
-    this.showToast("Cartella in sola lettura", "error");
+    this.showToast(t("tree.toast.readonly_folder"), "error");
     return;
   }
   let payload: { path?: string; isDir?: boolean } | null = null;
@@ -147,7 +148,7 @@ export function handleTreeDrop(this: any, e: DragEvent, item: TreeItem) {
   if (!src) return;
   const dstDir = item.path || "/";
   if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
-    this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+    this.showToast(t("tree.toast.invalid_move_self"), "error");
     return;
   }
   this.queueMove(src, dstDir);
@@ -176,7 +177,7 @@ export function handleTreeRootDrop(this: any, e: DragEvent) {
   if (!src) return;
   const dstDir = "/";
   if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
-    this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+    this.showToast(t("tree.toast.invalid_move_self"), "error");
     return;
   }
   this.queueMove(src, dstDir);
@@ -185,7 +186,7 @@ export function handleTreeRootDrop(this: any, e: DragEvent) {
 export function copyTreeItem(this: any) {
   if (!this.treeMenuPath || !this.treeMenuType) return;
   this.treeClipboard = { path: this.treeMenuPath, type: this.treeMenuType };
-  this.showToast(`Copiato: ${this.treeMenuPath}`);
+  this.showToast(t("tree.toast.copied", { path: this.treeMenuPath }));
   this.closeTreeMenu();
 }
 
@@ -211,19 +212,19 @@ export async function pasteTreeItem(this: any) {
       payload = null;
     }
     if (!res.ok || payload?.ok !== true) {
-      const msg = payload?.detail || payload?.error?.message || `Errore copia (HTTP ${res.status})`;
+      const msg = payload?.detail || payload?.error?.message || t("tree.error.copy_http", { status: res.status });
       this.showToast(msg, "error");
       return;
     }
     const destPath = payload?.dest ? String(payload.dest) : destName;
-    this.showToast(`Incollato: ${destPath}`);
+    this.showToast(t("tree.toast.pasted", { path: destPath }));
     if (typeof this.notifyFsChanged === "function") {
       await this.notifyFsChanged();
     } else {
       await this.reloadTreePath(destDir);
     }
   } catch {
-    this.showToast("Errore copia", "error");
+    this.showToast(t("tree.toast.copy_error"), "error");
   } finally {
     this.closeTreeMenu();
   }
@@ -256,19 +257,19 @@ export async function executeTreeDelete(this: any) {
       payload = null;
     }
     if (!res.ok || payload?.ok !== true) {
-      const msg = payload?.detail || payload?.error?.message || `Errore eliminazione (HTTP ${res.status})`;
+      const msg = payload?.detail || payload?.error?.message || t("tree.error.delete_http", { status: res.status });
       this.showToast(msg, "error");
       return;
     }
     closeTabsForDeletedPath(this, target, this.deleteTargetType);
-    this.showToast("Elemento eliminato");
+    this.showToast(t("tree.toast.deleted"));
     if (typeof this.notifyFsChanged === "function") {
       await this.notifyFsChanged();
     } else {
       await this.reloadTreePath(parent);
     }
   } catch {
-    this.showToast("Errore eliminazione", "error");
+    this.showToast(t("tree.toast.delete_error"), "error");
   } finally {
     this.cancelTreeDelete();
   }
@@ -288,8 +289,8 @@ export async function createNewItem(this: any) {
     const base = this.newItemName.trim();
     const ext = this.newItemExt.trim();
     if (!base) {
-      this.status = "Nome file richiesto";
-      this.showToast("Nome file richiesto", "error");
+      this.status = t("tree.validation.file_name_required");
+      this.showToast(t("tree.validation.file_name_required"), "error");
       return;
     }
     const filename = ext ? `${base}.${ext.replace(/^\\./, "")}` : base;
@@ -302,8 +303,8 @@ export async function createNewItem(this: any) {
             ? this.rootItems
             : this.treeData[""] ?? [];
       if (parentItems.some((it: TreeItem) => it.name === filename && it.type === "file")) {
-        this.showToast("File already exist", "error");
-        this.status = "File already exist";
+        this.showToast(t("tree.validation.file_exists"), "error");
+        this.status = t("tree.validation.file_exists");
         return;
       }
       const res = await apiCreateFile(this.apiBase, target);
@@ -313,7 +314,7 @@ export async function createNewItem(this: any) {
         const msg =
           (detailJson && (detailJson.detail || detailJson.message)) ||
           detailText ||
-          (res.status === 400 ? "File already exist" : "Errore creazione file");
+          (res.status === 400 ? t("tree.validation.file_exists") : t("tree.error.create_file"));
         this.showToast(msg, "error");
         this.status = msg;
         return;
@@ -329,14 +330,14 @@ export async function createNewItem(this: any) {
       }
       this.openFile(target);
     } catch (e) {
-      this.status = "Errore creazione file";
-      this.showToast("Errore creazione file", "error");
+      this.status = t("tree.error.create_file");
+      this.showToast(t("tree.error.create_file"), "error");
     }
   } else if (this.newItemKind === "folder") {
     const base = this.newItemName.trim();
     if (!base) {
-      this.status = "Nome cartella richiesto";
-      this.showToast("Nome cartella richiesta", "error");
+      this.status = t("tree.validation.folder_name_required");
+      this.showToast(t("tree.validation.folder_name_required"), "error");
       return;
     }
     const parentItems =
@@ -346,7 +347,7 @@ export async function createNewItem(this: any) {
           ? this.rootItems
           : this.treeData[""] ?? [];
     if (parentItems.some((it: TreeItem) => it.name === base && it.type === "dir")) {
-      const msg = "Folder already exist";
+      const msg = t("tree.validation.folder_exists");
       this.showToast(msg, "error");
       this.status = msg;
       return;
@@ -360,7 +361,7 @@ export async function createNewItem(this: any) {
         const msg =
           (detailJson && (detailJson.detail || detailJson.message)) ||
           detailText ||
-          (res.status === 400 ? "Folder already exist" : "Cartella esiste già o errore");
+          (res.status === 400 ? t("tree.validation.folder_exists") : t("tree.error.create_folder_exists"));
         this.showToast(msg, "error");
         this.status = msg;
         return;
@@ -373,8 +374,8 @@ export async function createNewItem(this: any) {
         await this.notifyFsChanged();
       }
     } catch (e) {
-      this.status = "Errore creazione cartella";
-      this.showToast("Errore creazione cartella", "error");
+      this.status = t("tree.error.create_folder");
+      this.showToast(t("tree.error.create_folder"), "error");
     }
   }
 }

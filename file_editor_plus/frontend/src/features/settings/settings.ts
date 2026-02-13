@@ -1,6 +1,7 @@
 import { apiGetUserConfig, apiPutUserConfig } from "../../services/api";
 import { THEME_MODES } from "../../constants";
 import type { ThemeMode, UserConfig } from "../../types/api";
+import { t } from "../../i18n";
 
 const getEffectiveTheme = (mode: ThemeMode, media: MediaQueryList | null): "dark" | "light" => {
   if (mode === "auto") {
@@ -34,7 +35,7 @@ export async function cycleTheme(this: any) {
   this.applyTheme();
   const ok = await this.persistUserConfig({ theme_mode: this.themeMode });
   if (!ok) {
-    this.showToast("Errore salvataggio tema", "error");
+    this.showToast(t("settings.toast.save_theme_error"), "error");
   }
 }
 
@@ -234,13 +235,13 @@ export async function applySettingsModal(this: any) {
   } catch {
     applyFontScale(this, this.fontBaseRem);
     this.settingsFontBaseRem = this.fontBaseRem;
-    this.showToast("Errore salvataggio impostazioni", "error");
+    this.showToast(t("settings.toast.save_error"), "error");
     return;
   }
   this.fontBaseRem = next;
   applyFontScale(this, this.fontBaseRem);
   this.showSettingsModal = false;
-  this.showToast("Impostazioni applicate");
+  this.showToast(t("settings.toast.applied"));
 }
 
 export function handleFontSizeInput(this: any, e: Event) {
