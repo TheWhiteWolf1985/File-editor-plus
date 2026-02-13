@@ -10,9 +10,9 @@ export const appStyles = css`
       position: relative;
       color: var(--text-color);
       font-family: Roboto, "Noto Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-      --font-size-xs: 0.6875rem;
-      --font-size-sm: 0.75rem;
-      --font-size-md: 0.8125rem;
+      --font-size-xs: 0.875rem;
+      --font-size-sm: 0.875rem;
+      --font-size-md: 0.875rem;
       --font-size-base: 0.875rem;
       --font-size-lg: 1rem;
       --sidebar-width: 280px;
@@ -115,6 +115,8 @@ export const appStyles = css`
     }
     .menus {
       display: flex;
+      justify-content: flex-start;
+      margin-right: auto;
       gap: 12px;
       position: relative;
     }
@@ -144,8 +146,11 @@ export const appStyles = css`
       border-radius: 8px;
       min-width: 180px;
       padding: 6px 0;
-      z-index: 20;
+      z-index: 1200;
       overflow: visible;
+      opacity: 1;
+      backdrop-filter: none;
+      isolation: isolate;
     }
     .menuItemRow {
       display: flex;
@@ -154,6 +159,7 @@ export const appStyles = css`
       padding: 8px 12px;
       cursor: pointer;
       font-size: var(--font-size-sm);
+      opacity: 1;
     }
     .menuItemRow:hover {
       background: var(--hover-color);
@@ -222,7 +228,7 @@ export const appStyles = css`
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 15px;
     }
     .activityGroup.bottom {
       margin-top: auto;
@@ -575,11 +581,12 @@ export const appStyles = css`
     .tabs {
       display: flex;
       align-items: end;
-      gap: 1px;
+      gap: 8px;
       padding: 0 8px;
       background: var(--panel-color);
       border-bottom: 1px solid var(--border-color);
-      overflow: auto;
+      overflow-x: auto;
+      overflow-y: hidden;
       white-space: nowrap;
     }
     .tab {

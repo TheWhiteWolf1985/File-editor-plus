@@ -422,14 +422,14 @@ export function renderTree(this: any, path: string, depth = 0) {
         <span class="twisty">
           ${isDir
             ? isExpanded
-              ? html`<app-icon name="chevron-down" size="14" class="chevron"></app-icon>`
-              : html`<app-icon name="chevron-right" size="14" class="chevron"></app-icon>`
+              ? html`<app-icon name="chevron-down" size="14" class="tree-icon tree-icon--chevron chevron"></app-icon>`
+              : html`<app-icon name="chevron-right" size="14" class="tree-icon tree-icon--chevron chevron"></app-icon>`
             : nothing}
         </span>
         ${isDir
-          ? html`<app-icon name="folder" size="16" class="folder-icon"></app-icon>`
-          : html`<app-icon name="file" size="16" class="file-icon"></app-icon>`}
-        <span class=${isDir ? "" : "muted"}>${it.name}</span>
+          ? html`<app-icon name="folder" size="16" class="tree-icon tree-icon--folder folder-icon"></app-icon>`
+          : html`<app-icon name="file" size="16" class="tree-icon tree-icon--file file-icon"></app-icon>`}
+        <span class=${isDir ? "tree-label" : "tree-label muted"}>${it.name}</span>
       </div>
 
       ${isDir && isExpanded

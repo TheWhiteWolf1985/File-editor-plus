@@ -160,14 +160,13 @@ export class AppIcon extends LitElement {
       justify-content: center;
       line-height: 0;
       flex: 0 0 auto;
-      color: inherit;
       vertical-align: middle;
     }
 
     svg {
       display: block;
-      width: 100%;
-      height: 100%;
+      width: 130%;
+      height: 130%;
       overflow: visible;
     }
 

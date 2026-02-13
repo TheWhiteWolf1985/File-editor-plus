@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.67
+
+- Tree icon colors: risolto override cascade di `currentColor` con classi stabili su `<app-icon>` (`tree-icon--folder/file/chevron`) e regole CSS univoche nel tree.
+- Selected state tree: colore applicato al solo label testo (`.tree-label`) evitando tint globale sul container icona+testo.
+
+## 0.2.66
+
+- Tree icons: fix definitivo colori via `currentColor` + CSS specifico sulle classi reali (`.file-tree-item .file-icon`, `.folder-icon`, `.chevron`) con palette Figma (file blue `#3b82f6`, folder orange `#f97316`, chevron teal).
+- Rimosso selector non allineato (`.file-doc-icon`) che non colpiva le icone tree renderizzate.
+
+## 0.2.65
+
+- Chore release: bump versione add-on e ricostruzione completa in ambiente Home Assistant dev Docker.
+
 ## 0.2.64
 
 - Chore release: bump versione add-on e rebuild/restart.

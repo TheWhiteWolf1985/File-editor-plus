@@ -11,7 +11,9 @@ export const figmaEditorStyles = css`
   --accent-active: #0f766e;
   --accent-light: #5eead4;
   --accent-subtle: rgba(20, 184, 166, 0.1);
-  
+  --file-blue: #3b82f6;
+  --folder-orange: #f97316;
+
   /* Dark Theme Colors */
   --dark-bg-primary: #0a0a0a;
   --dark-bg-secondary: #141414;
@@ -20,7 +22,7 @@ export const figmaEditorStyles = css`
   --dark-text-primary: #e5e7eb;
   --dark-text-secondary: #9ca3af;
   --dark-text-tertiary: #6b7280;
-  
+
   /* Light Theme Colors */
   --light-bg-primary: #f8f9fa;
   --light-bg-secondary: #f3f4f6;
@@ -30,23 +32,23 @@ export const figmaEditorStyles = css`
   --light-text-primary: #1f2937;
   --light-text-secondary: #4b5563;
   --light-text-tertiary: #9ca3af;
-  
+
   /* Glass Effects */
   --glass-blur: 24px;
   --glass-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
-  
+
   /* Spacing */
   --space-xs: 4px;
   --space-sm: 8px;
   --space-md: 12px;
   --space-lg: 16px;
   --space-xl: 24px;
-  
+
   /* Border Radius */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -72,7 +74,7 @@ export const figmaEditorStyles = css`
   margin: 0;
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   overflow: hidden;
 }
@@ -105,7 +107,7 @@ export const figmaEditorStyles = css`
 
 /* Activity Bar */
 .activity-bar {
-  width: 48px;
+  width: 68px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -247,7 +249,7 @@ export const figmaEditorStyles = css`
 }
 
 .file-explorer-title {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.5px;
 }
@@ -262,7 +264,7 @@ export const figmaEditorStyles = css`
 
 .explorer-actions {
   display: flex;
-  gap: var(--space-xs);
+  gap: var(--space-sm);
 }
 
 .explorer-btn {
@@ -345,7 +347,7 @@ export const figmaEditorStyles = css`
   padding: 4px 8px;
   border: none;
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
   color: var(--accent-primary);
@@ -410,12 +412,12 @@ export const figmaEditorStyles = css`
 .file-tree-item {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
+  gap: 10px;
   padding: 4px var(--space-sm);
   cursor: pointer;
   user-select: none;
   transition: all 0.15s;
-  font-size: 13px;
+  font-size: 14px;
   min-height: 28px;
 }
 
@@ -429,7 +431,6 @@ export const figmaEditorStyles = css`
 
 .file-tree-item.selected {
   background: var(--accent-subtle);
-  color: var(--accent-primary);
 }
 
 :host([data-theme="dark"]) .file-tree-item.selected {
@@ -445,29 +446,15 @@ export const figmaEditorStyles = css`
   transition: transform 0.2s;
 }
 
-.file-tree-item .file-icon {
-  flex-shrink: 0;
+.file-tree-item app-icon.tree-icon--folder { color: #f97316; }
+.file-tree-item app-icon.tree-icon--file { color: #3b82f6; }
+.file-tree-item app-icon.tree-icon--chevron { color: #14b8a6; }
+
+.file-tree-item .tree-label {
+  color: inherit;
 }
 
-/* Folder icon - Orange */
-.folder-icon {
-  color: #f97316 !important;
-}
-
-/* File icon - Blue */
-.file-doc-icon {
-  color: #3b82f6 !important;
-}
-
-:host([data-theme="dark"]) .file-tree-item .file-icon {
-  color: var(--dark-text-tertiary);
-}
-
-:host([data-theme="light"]) .file-tree-item .file-icon {
-  color: var(--light-text-tertiary);
-}
-
-.file-tree-item.selected .file-icon {
+.file-tree-item.selected .tree-label {
   color: var(--accent-primary);
 }
 
@@ -544,13 +531,15 @@ export const figmaEditorStyles = css`
 
 .editor-menu {
   display: flex;
+  justify-content: flex-start;
+  margin-right: auto;
   gap: var(--space-lg);
   position: relative;
   z-index: 1;
 }
 
 .menu-item {
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
@@ -591,7 +580,7 @@ export const figmaEditorStyles = css`
   padding: 6px 12px;
   border: none;
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -692,6 +681,12 @@ export const figmaEditorStyles = css`
   min-height: 36px;
 }
 
+.editor-tabs,
+.tabs {
+  gap: 8px;
+  overflow-x: auto;
+}
+
 :host([data-theme="dark"]) .editor-tab {
   background: var(--dark-bg-tertiary);
   border-bottom: 1px solid var(--dark-border);
@@ -705,7 +700,7 @@ export const figmaEditorStyles = css`
 }
 
 .editor-tab-name {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 /* Editor Empty State */
@@ -767,7 +762,7 @@ export const figmaEditorStyles = css`
   justify-content: space-between;
   padding: 0 var(--space-lg);
   min-height: 24px;
-  font-size: 12px;
+  font-size: 14px;
   position: relative;
   z-index: 10;
 }
@@ -860,7 +855,7 @@ export const figmaEditorStyles = css`
   :host([data-theme="dark"]) .editor-header {
     border-color: rgba(255, 255, 255, 0.2);
   }
-  
+
   :host([data-theme="light"]) .activity-bar,
   :host([data-theme="light"]) .sidebar,
   :host([data-theme="light"]) .editor-header {
