@@ -2767,8 +2767,8 @@ export class AppRoot extends LitElement {
                 ? html`<div class="tab editor-tab active">${t("tabs.welcome")}</div>`
                 : this.tabs.map(
                     (tab) => html`
-                      <div class="tab editor-tab ${tab.path === this.activePath ? "active" : ""}" @click=${() => this.switchTab(tab.path)}>
-                        <span class="editor-tab-name">${tab.name}</span>
+                      <div class="tab editor-tab ${tab.path === this.activePath ? "active" : ""}" title=${tab.name} @click=${() => this.switchTab(tab.path)}>
+                        <span class="editor-tab-name" title=${tab.name}>${tab.name}</span>
                         ${tab.dirty ? html`<span class="dot" title=${t("tabs.unsaved")}></span>` : nothing}
                         <button
                           class="tabClose"

@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.2.76
+
+- Chore release: bump versione add-on e ciclo di ricostruzione (build frontend + update/restart addon).
+
+## 0.2.75
+
+- Editor layout isolation (Step 3.2): `textarea` e `basePre` portati in layer assoluto (`position:absolute; inset:0`) dentro `codeWrap`.
+- Overlay syntax `.code` consolidato con `inset:0` e layering esplicito (`z-index`), così i layer editor non contribuiscono al flow verticale.
+- Obiettivo: evitare compressione/collasso della tab-bar con contenuti lunghi mantenendo focus/selection/copy-paste invariati.
+
+## 0.2.74
+
+- Layout fix minimo anti-collasso tabs (Strategia A): aggiunto `min-height: 0` ai container di shrink (`.main`, `.editor-layout`, `.editorWrap`, `.codeWrap`, `textarea`) per prevenire crescita verticale della colonna editor con contenuti lunghi.
+
+## 0.2.73
+
+- Tabs robustness (IDE-like):
+  - tab-bar con altezza/flex fissi e scroll orizzontale stabile (`flex-wrap: nowrap`, `overflow-x: auto`, `height/flex: 36px`)
+  - tab singolo a quota fissa (`height: 32px`, `flex: 0 0 auto`) senza shift verticale active/non-active
+  - titolo tab single-line con ellipsis e `max-width: 220px`
+  - aggiunto tooltip (`title`) con nome completo file sul tab/title
+  - fix layout con `min-height: 0` su contenitori chiave per evitare salti in colonna
+
+## 0.2.72
+
+- Tabs/editor rows allineati per eliminare oscillazioni verticali:
+  - `grid-template-rows` editor impostato a `36px 1fr`
+  - tabs con `align-items: center`
+  - rimossi offset verticali divergenti tra `.tab` e `.tab.active` (`margin-top`/`padding-top`)
+  - altezza tab resa coerente (`min-height: 32px`)
+
 ## 0.2.71
 
 - Fix CSS vars in Shadow DOM: token Figma (es. `--space-md`, `--space-sm`, radius/shadow/accent vars) spostati da `:root` a `:host` in `figma-editor-styles.ts`.

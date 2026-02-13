@@ -210,6 +210,7 @@ export const appStyles = css`
       display: grid;
       grid-template-columns: 48px var(--sidebar-width) 1fr; /* activity, sidebar, editor */
       height: 100%;
+      min-height: 0;
       overflow: hidden;
       position: relative;
     }
@@ -573,46 +574,65 @@ export const appStyles = css`
     /* Editor */
     .editor {
       display: grid;
-      grid-template-rows: 34px 1fr; /* tabs, content */
+      grid-template-rows: 36px 1fr; /* tabs, content */
       overflow: hidden;
+      min-height: 0;
       background: var(--bg-color);
     }
 
     .tabs {
       display: flex;
-      align-items: end;
+      align-items: center;
+      flex-wrap: nowrap;
+      height: 36px;
+      flex: 0 0 36px;
       gap: 8px;
       padding: 0 8px;
       background: var(--panel-color);
       border-bottom: 1px solid var(--border-color);
       overflow-x: auto;
       overflow-y: hidden;
+      scrollbar-gutter: stable;
       white-space: nowrap;
     }
     .tab {
       display: inline-flex;
       align-items: center;
+      flex: 0 0 auto;
       gap: 8px;
-      height: 30px;
+      height: 32px;
       padding: 0 10px;
-      margin-top: 4px;
+      margin-top: 0;
+      border: 1px solid transparent;
+      border-bottom: none;
+      box-sizing: border-box;
       border-radius: 10px 10px 0 0;
       background: var(--tab-bg);
       color: var(--muted-color);
       cursor: pointer;
       font-size: var(--font-size-sm);
+      line-height: 1;
     }
     .tab.active {
       background: var(--tab-active-bg);
       color: var(--text-color);
       border: 1px solid var(--tab-active-border, var(--border-color));
       border-bottom: none;
-      padding-top: 2px;
-      margin-top: 2px;
+      margin-top: 0;
+    }
+    .editor-tab-name {
+      display: block;
+      min-width: 0;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.2;
     }
     .tabClose {
       background: transparent;
       border: none;
+      flex: 0 0 auto;
       color: inherit;
       cursor: pointer;
       padding: 0;
@@ -637,6 +657,7 @@ export const appStyles = css`
       gap: 8px;
       padding: 12px;
       overflow: hidden;
+      min-height: 0;
     }
 
     .crumbs {
@@ -682,6 +703,7 @@ export const appStyles = css`
       align-items: stretch;
       gap: 0;
       height: 100%;
+      min-height: 0;
       overflow: hidden;
       position: relative;
     }
@@ -720,6 +742,7 @@ export const appStyles = css`
       --editor-pad: 12px;
       --editor-pad-right: 28px;
       height: 100%;
+      min-height: 0;
       overflow: hidden;
       border: 1px solid var(--border-color);
       border-left: none;
@@ -728,8 +751,7 @@ export const appStyles = css`
     }
     .code {
       position: absolute;
-      top: 0;
-      left: 0;
+      inset: 0;
       padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: var(--font-size-md);
@@ -745,6 +767,7 @@ export const appStyles = css`
       width: max-content;
       min-height: 100%;
       box-sizing: border-box;
+      z-index: 1;
     }
     .codeLine {
       position: relative;
@@ -827,8 +850,11 @@ export const appStyles = css`
       color: var(--token-function-color);
     }
     textarea {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
+      min-height: 0;
       resize: none;
       border-radius: 0 12px 12px 0;
       border: none;
@@ -846,6 +872,7 @@ export const appStyles = css`
       white-space: pre;
       word-wrap: normal;
       scrollbar-gutter: stable;
+      z-index: 2;
     }
     textarea::selection {
       background: var(--editor-selection-bg);
@@ -857,6 +884,8 @@ export const appStyles = css`
       border-color: var(--border-color);
     }
     .basePre {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       margin: 0;
@@ -874,6 +903,7 @@ export const appStyles = css`
       white-space: pre;
       word-wrap: normal;
       scrollbar-gutter: stable;
+      z-index: 2;
     }
 
     /* Status bar */

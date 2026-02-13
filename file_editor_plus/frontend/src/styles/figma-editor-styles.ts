@@ -102,6 +102,7 @@ export const figmaEditorStyles = css`
 .editor-layout {
   flex: 1;
   display: flex;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -472,6 +473,7 @@ export const figmaEditorStyles = css`
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
   position: relative;
 }
 
@@ -677,15 +679,27 @@ export const figmaEditorStyles = css`
 .editor-tab {
   display: flex;
   align-items: center;
-  padding: var(--space-sm) var(--space-lg);
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 var(--space-md);
   gap: var(--space-sm);
-  min-height: 36px;
+  min-height: 32px;
+  line-height: 1;
+  box-sizing: border-box;
 }
 
 .editor-tabs,
 .tabs {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  height: 36px;
+  flex: 0 0 36px;
   gap: 8px;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+  white-space: nowrap;
 }
 
 :host([data-theme="dark"]) .editor-tab {
@@ -701,7 +715,14 @@ export const figmaEditorStyles = css`
 }
 
 .editor-tab-name {
+  display: block;
   font-size: 14px;
+  min-width: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
 /* Editor Empty State */
