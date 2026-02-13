@@ -3,46 +3,84 @@ import { css } from "lit";
 export const appStyles = css`
     :host {
       display: block;
-      height: 100%;
-      min-height: 100%;
+      height: 100dvh;
+      min-height: 100dvh;
       width: 100%;
       overflow: hidden;
       position: relative;
       color: var(--text-color);
       font-family: Roboto, "Noto Sans", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-      --font-size-xs: 0.6875rem;
-      --font-size-sm: 0.75rem;
-      --font-size-md: 0.8125rem;
+      --font-size-xs: 0.875rem;
+      --font-size-sm: 0.875rem;
+      --font-size-md: 0.875rem;
       --font-size-base: 0.875rem;
       --font-size-lg: 1rem;
       --sidebar-width: 280px;
       font-size: var(--font-size-base);
       background: var(--bg-color);
       box-sizing: border-box;
-      --bg-color: #1e1e1e;
-      --panel-color: #252526;
-      --panel-strong: #2d2d2d;
-      --border-color: #2a2a2a;
-      --hover-color: #3a3a3a;
-      --text-color: #d4d4d4;
-      --muted-color: #c8c8c8;
-      --activity-color: #333333;
-      --accent-color: #0e639c;
-      --accent-hover: #1177bb;
-      --card-color: #1f1f1f;
-      --input-bg: #1e1e1e;
-      --toast-bg: #2d2d2d;
-      --toast-border: #3a3a3a;
+      --accent-color: #14b8a6;
+      --accent-hover: #0d9488;
+      --accent-active: #0f766e;
+      --accent-light: #5eead4;
+      --accent-subtle: rgba(20, 184, 166, 0.1);
+      --dark-bg-primary: #0a0a0a;
+      --dark-bg-secondary: #141414;
+      --dark-bg-tertiary: #1a1a1a;
+      --dark-border: rgba(255, 255, 255, 0.08);
+      --dark-text-primary: #e5e7eb;
+      --dark-text-secondary: #9ca3af;
+      --dark-text-tertiary: #6b7280;
+      --light-bg-primary: #f8f9fa;
+      --light-bg-secondary: #f3f4f6;
+      --light-bg-tertiary: #fafafa;
+      --light-border: rgba(0, 0, 0, 0.08);
+      --light-border-strong: rgba(0, 0, 0, 0.18);
+      --light-text-primary: #1f2937;
+      --light-text-secondary: #4b5563;
+      --light-text-tertiary: #9ca3af;
+      --overlay-backdrop: rgba(0, 0, 0, 0.45);
+      --overlay-surface: var(--panel-color);
+      --overlay-surface-strong: var(--panel-strong);
+      --overlay-border: var(--border-color);
+      --overlay-muted: var(--muted-color);
+      --hover-overlay: rgba(255, 255, 255, 0.08);
+      --status-toggle-border: rgba(255, 255, 255, 0.4);
+      --danger-bg: #b93a3a;
+      --danger-hover: #a13232;
+      --glass-blur: 24px;
+      --bg-color: var(--dark-bg-primary);
+      --panel-color: var(--dark-bg-secondary);
+      --panel-strong: var(--dark-bg-tertiary);
+      --border-color: var(--dark-border);
+      --hover-color: rgba(255, 255, 255, 0.06);
+      --text-color: var(--dark-text-primary);
+      --muted-color: var(--dark-text-secondary);
+      --activity-color: var(--dark-bg-secondary);
+      --card-color: var(--dark-bg-tertiary);
+      --input-bg: var(--dark-bg-primary);
+      --toast-bg: var(--dark-bg-tertiary);
+      --toast-border: var(--dark-border);
       --error-bg: #3a1f1f;
       --error-border: #c74c4c;
-      --status-bg: #007acc;
-      --gutter-bg: #1a1a1a;
-      --code-bg: #1e1e1e;
+      --status-bg: var(--accent-active);
+      --gutter-bg: var(--dark-bg-secondary);
+      --gutter-text-color: var(--dark-text-tertiary);
+      --code-bg: var(--dark-bg-primary);
+      --editor-caret: #14b8a6;
+      --editor-selection-bg: rgba(20, 184, 166, 0.24);
+      --token-key-color: var(--accent-light);
+      --token-keyword-color: var(--accent-light);
+      --token-string-color: #d2b48c;
+      --token-number-color: #9fc7a7;
+      --token-comment-color: var(--muted-color);
+      --token-type-color: #8ab4f8;
+      --token-function-color: #7fc8a9;
       --menu-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
       --toast-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
       --modal-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-      --tree-hover: #2a2d2e;
-      --tree-active: #37373d;
+      --tree-hover: rgba(255, 255, 255, 0.05);
+      --tree-active: rgba(20, 184, 166, 0.15);
       --entity-error-text: #f6dada;
       --indent-size: 2;
       --indent-width: calc(var(--indent-size) * 1ch);
@@ -77,6 +115,8 @@ export const appStyles = css`
     }
     .menus {
       display: flex;
+      justify-content: flex-start;
+      margin-right: auto;
       gap: 12px;
       position: relative;
     }
@@ -106,8 +146,11 @@ export const appStyles = css`
       border-radius: 8px;
       min-width: 180px;
       padding: 6px 0;
-      z-index: 20;
+      z-index: 1200;
       overflow: visible;
+      opacity: 1;
+      backdrop-filter: none;
+      isolation: isolate;
     }
     .menuItemRow {
       display: flex;
@@ -116,6 +159,7 @@ export const appStyles = css`
       padding: 8px 12px;
       cursor: pointer;
       font-size: var(--font-size-sm);
+      opacity: 1;
     }
     .menuItemRow:hover {
       background: var(--hover-color);
@@ -154,7 +198,7 @@ export const appStyles = css`
     .menuDivider {
       height: 1px;
       margin: 6px 0;
-      background: #3a3a3a;
+      background: var(--border-color);
     }
     .title {
       margin-left: auto;
@@ -166,6 +210,7 @@ export const appStyles = css`
       display: grid;
       grid-template-columns: 48px var(--sidebar-width) 1fr; /* activity, sidebar, editor */
       height: 100%;
+      min-height: 0;
       overflow: hidden;
       position: relative;
     }
@@ -184,20 +229,11 @@ export const appStyles = css`
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 15px;
     }
     .activityGroup.bottom {
       margin-top: auto;
       padding-bottom: 6px;
-    }
-    .mdiGlyph {
-      font-family: "Material Design Icons";
-      font-style: normal;
-      font-weight: normal;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
     }
     .act {
       width: 36px;
@@ -384,10 +420,10 @@ export const appStyles = css`
       box-sizing: border-box;
     }
     .entityGroup {
-      border: 1px solid #2a2a2a;
+      border: 1px solid var(--border-color);
       border-radius: 8px;
       overflow: hidden;
-      background: #222;
+      background: var(--panel-color);
     }
     .entityGroup + .entityGroup {
       margin-top: 6px;
@@ -395,8 +431,8 @@ export const appStyles = css`
     .entityGroupHeader {
       width: 100%;
       border: none;
-      background: #252526;
-      color: #d4d4d4;
+      background: var(--panel-strong);
+      color: var(--text-color);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -407,7 +443,7 @@ export const appStyles = css`
       font-size: var(--font-size-md);
     }
     .entityGroupHeader:hover {
-      background: #2d2d2d;
+      background: var(--hover-color);
     }
     .entityGroupTitle {
       font-weight: 600;
@@ -476,7 +512,7 @@ export const appStyles = css`
     }
     .sidebarResizer:hover,
     .sidebarResizer.active {
-      background: rgba(255, 255, 255, 0.08);
+      background: var(--hover-overlay);
     }
 
     .tree {
@@ -538,45 +574,65 @@ export const appStyles = css`
     /* Editor */
     .editor {
       display: grid;
-      grid-template-rows: 34px 1fr; /* tabs, content */
+      grid-template-rows: 36px 1fr; /* tabs, content */
       overflow: hidden;
+      min-height: 0;
       background: var(--bg-color);
     }
 
     .tabs {
       display: flex;
-      align-items: end;
-      gap: 1px;
+      align-items: center;
+      flex-wrap: nowrap;
+      height: 36px;
+      flex: 0 0 36px;
+      gap: 8px;
       padding: 0 8px;
       background: var(--panel-color);
       border-bottom: 1px solid var(--border-color);
-      overflow: auto;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-gutter: stable;
       white-space: nowrap;
     }
     .tab {
       display: inline-flex;
       align-items: center;
+      flex: 0 0 auto;
       gap: 8px;
-      height: 30px;
+      height: 32px;
       padding: 0 10px;
-      margin-top: 4px;
+      margin-top: 0;
+      border: 1px solid transparent;
+      border-bottom: none;
+      box-sizing: border-box;
       border-radius: 10px 10px 0 0;
       background: var(--tab-bg);
       color: var(--muted-color);
       cursor: pointer;
       font-size: var(--font-size-sm);
+      line-height: 1;
     }
     .tab.active {
       background: var(--tab-active-bg);
       color: var(--text-color);
       border: 1px solid var(--tab-active-border, var(--border-color));
       border-bottom: none;
-      padding-top: 2px;
-      margin-top: 2px;
+      margin-top: 0;
+    }
+    .editor-tab-name {
+      display: block;
+      min-width: 0;
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      line-height: 1.2;
     }
     .tabClose {
       background: transparent;
       border: none;
+      flex: 0 0 auto;
       color: inherit;
       cursor: pointer;
       padding: 0;
@@ -591,7 +647,7 @@ export const appStyles = css`
       width: 8px;
       height: 8px;
       border-radius: 99px;
-      background: #d4d4d4;
+      background: var(--muted-color);
       opacity: 0.65;
     }
 
@@ -601,6 +657,7 @@ export const appStyles = css`
       gap: 8px;
       padding: 12px;
       overflow: hidden;
+      min-height: 0;
     }
 
     .crumbs {
@@ -632,12 +689,12 @@ export const appStyles = css`
       background: var(--accent-hover);
     }
     .btn.danger {
-      background: #b93a3a;
-      border-color: #b93a3a;
+      background: var(--danger-bg);
+      border-color: var(--danger-bg);
       color: white;
     }
     .btn.danger:hover {
-      background: #a13232;
+      background: var(--danger-hover);
     }
 
     .editorWrap {
@@ -646,6 +703,7 @@ export const appStyles = css`
       align-items: stretch;
       gap: 0;
       height: 100%;
+      min-height: 0;
       overflow: hidden;
       position: relative;
     }
@@ -666,7 +724,7 @@ export const appStyles = css`
       width: 52px;
       padding: 12px 8px;
       background: var(--gutter-bg);
-      color: #7c7c7c;
+      color: var(--gutter-text-color);
       border: 1px solid var(--border-color);
       border-right: none;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -684,6 +742,7 @@ export const appStyles = css`
       --editor-pad: 12px;
       --editor-pad-right: 28px;
       height: 100%;
+      min-height: 0;
       overflow: hidden;
       border: 1px solid var(--border-color);
       border-left: none;
@@ -692,8 +751,7 @@ export const appStyles = css`
     }
     .code {
       position: absolute;
-      top: 0;
-      left: 0;
+      inset: 0;
       padding: var(--editor-pad) var(--editor-pad-right) var(--editor-pad) var(--editor-pad);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: var(--font-size-md);
@@ -709,6 +767,7 @@ export const appStyles = css`
       width: max-content;
       min-height: 100%;
       box-sizing: border-box;
+      z-index: 1;
     }
     .codeLine {
       position: relative;
@@ -767,23 +826,35 @@ export const appStyles = css`
       background: rgba(255, 211, 61, 0.2);
     }
     .token-key {
-      color: var(--token-key-color, #9cdcfe);
+      color: var(--token-key-color);
+    }
+    .token-keyword {
+      color: var(--token-keyword-color);
     }
     .token-string {
-      color: #ce9178;
+      color: var(--token-string-color);
     }
     .token-number {
-      color: #b5cea8;
+      color: var(--token-number-color);
     }
     .token-boolean {
-      color: #4ec9b0;
+      color: var(--token-keyword-color);
     }
     .token-comment {
-      color: #6a9955;
+      color: var(--token-comment-color);
+    }
+    .token-type {
+      color: var(--token-type-color);
+    }
+    .token-function {
+      color: var(--token-function-color);
     }
     textarea {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
+      min-height: 0;
       resize: none;
       border-radius: 0 12px 12px 0;
       border: none;
@@ -801,6 +872,7 @@ export const appStyles = css`
       white-space: pre;
       word-wrap: normal;
       scrollbar-gutter: stable;
+      z-index: 2;
     }
     textarea::selection {
       background: var(--editor-selection-bg);
@@ -809,9 +881,11 @@ export const appStyles = css`
       background: var(--editor-selection-bg);
     }
     textarea:focus {
-      border-color: #3a3a3a;
+      border-color: var(--border-color);
     }
     .basePre {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       margin: 0;
@@ -829,6 +903,7 @@ export const appStyles = css`
       white-space: pre;
       word-wrap: normal;
       scrollbar-gutter: stable;
+      z-index: 2;
     }
 
     /* Status bar */
@@ -850,7 +925,7 @@ export const appStyles = css`
       align-items: center;
     }
     .statusToggle {
-      border: 1px solid rgba(255, 255, 255, 0.4);
+      border: 1px solid var(--status-toggle-border);
       background: transparent;
       color: inherit;
       border-radius: 8px;
@@ -859,7 +934,7 @@ export const appStyles = css`
       font-size: var(--font-size-xs);
     }
     .statusToggle:hover {
-      background: rgba(255, 255, 255, 0.12);
+      background: var(--hover-color);
     }
     .snippetGrid {
       display: grid;
@@ -1050,16 +1125,13 @@ export const appStyles = css`
       white-space: nowrap;
     }
     .suggestItemIcon {
-      font-family: "Material Design Icons";
-      font-style: normal;
-      font-weight: normal;
-      font-size: 2.2em;
+      font-size: 1.1em;
       opacity: 0.9;
       line-height: 1;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 2.4em;
+      min-width: 1.6em;
     }
     .suggestItem:hover,
     .suggestItem.active {
@@ -1075,7 +1147,7 @@ export const appStyles = css`
     .modalBackdrop {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.45);
+      background: var(--overlay-backdrop);
       display: grid;
       place-items: center;
       z-index: 200;
@@ -1090,13 +1162,20 @@ export const appStyles = css`
       display: grid;
       gap: 12px;
     }
+    .settingsModal {
+      min-width: 500px;
+      min-height: 350px;
+      width: min(620px, 92vw);
+      max-height: min(80vh, 680px);
+      overflow: auto;
+    }
     .modal h3 {
       margin: 0;
       font-size: var(--font-size-lg);
     }
     .modal label {
       font-size: var(--font-size-sm);
-      color: #c8c8c8;
+      color: var(--muted-color);
       display: grid;
       gap: 6px;
     }
@@ -1197,6 +1276,51 @@ export const appStyles = css`
     .settingsRange {
       width: 100%;
     }
+    .localeGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .localeTile {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      border: 1px solid var(--border-color);
+      background: var(--panel-color);
+      color: var(--text-color);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.2s, border-color 0.2s, transform 0.2s;
+    }
+    .localeTile:hover {
+      background: var(--hover-color);
+      border-color: var(--accent-color);
+      transform: translateY(-1px);
+    }
+    .localeTile.selected {
+      border-color: var(--accent-color);
+      background: color-mix(in srgb, var(--accent-color) 14%, var(--panel-color));
+    }
+    .localeBadge {
+      min-width: 30px;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: var(--panel-strong);
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      font-size: var(--font-size-sm);
+    }
+    .localeName {
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+    }
 
     /* Toast */
     .toastContainer {
@@ -1206,6 +1330,15 @@ export const appStyles = css`
       display: grid;
       gap: 8px;
       z-index: 300;
+    }
+    .overlay-root {
+      position: fixed;
+      inset: 0;
+      z-index: 500;
+      pointer-events: none;
+    }
+    .overlay-root > * {
+      pointer-events: auto;
     }
     .toast {
       min-width: 275px;

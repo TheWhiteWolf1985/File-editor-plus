@@ -1,11 +1,12 @@
 import { html, nothing } from "lit";
 import type { SearchMatch, SearchResult } from "../../types/api";
 import { apiSearch, apiSearchReplaceApply, apiSearchReplacePreview, apiSearchReplaceOne } from "../../services/api";
+import { t } from "../../i18n";
 
 export async function performSearch(this: any) {
   const query = this.searchQuery.trim();
   if (!query) {
-    this.showToast("Inserisci un termine di ricerca", "error");
+    this.showToast(t("search.toast.query_required"), "error");
     return;
   }
   this.searchTruncated = false;
@@ -27,7 +28,7 @@ export async function performSearch(this: any) {
     this.searchSummary = data.summary ?? null;
     this.searchTruncated = !!data.truncated;
   } catch (e) {
-    this.showToast("Errore ricerca", "error");
+    this.showToast(t("search.toast.error"), "error");
   } finally {
     this.searchLoading = false;
   }
@@ -36,11 +37,11 @@ export async function performSearch(this: any) {
 export async function replaceAll(this: any) {
   const query = this.searchQuery.trim();
   if (!query) {
-    this.showToast("Esegui prima una ricerca", "error");
+    this.showToast(t("search.toast.run_search_first"), "error");
     return;
   }
   if (this.searchResults.length === 0) {
-    this.showToast("Nessun risultato da sostituire", "error");
+    this.showToast(t("search.toast.no_result_replace"), "error");
     return;
   }
   this.searchLoading = true;
@@ -68,10 +69,10 @@ export async function replaceAll(this: any) {
     const replacements = previewSummary.replacements_total ?? 0;
     const toModify = previewSummary.files_to_modify ?? files.length;
     if (!replacements) {
-      this.showToast("Nessuna occorrenza da sostituire");
+      this.showToast(t("search.toast.no_occurrence"));
       return;
     }
-    const confirmed = window.confirm(`Sostituire ${replacements} occorrenze in ${toModify} file?`);
+    const confirmed = window.confirm(t("search.confirm.replace_all", { replacements, files: toModify }));
     if (!confirmed) return;
 
     const applyRes = await apiSearchReplaceApply(this.apiBase, payload);
@@ -88,14 +89,15 @@ export async function replaceAll(this: any) {
     const summary = apply?.summary || {};
     const modified = summary.files_modified ?? summary.files_to_modify ?? 0;
     const stale = summary.stale_files ?? 0;
-    const msg = `Replace completato: ${modified} file aggiornati${stale ? `, ${stale} stale` : ""}`;
+    const staleSuffix = stale ? t("search.toast.replace_completed_stale_suffix", { stale }) : "";
+    const msg = t("search.toast.replace_completed", { modified, stale: staleSuffix });
     this.showToast(msg);
     if (typeof this.notifyFsChanged === "function") {
       await this.notifyFsChanged();
     }
     await this.performSearch();
   } catch (e) {
-    this.showToast("Errore replace", "error");
+    this.showToast(t("search.toast.error_replace"), "error");
   } finally {
     this.searchLoading = false;
   }
@@ -109,7 +111,7 @@ export function openSearchMatch(this: any, res: SearchResult, match: SearchMatch
 export async function replaceOne(this: any, res: SearchResult, match: SearchMatch, matchIndex: number) {
   const query = this.searchQuery.trim();
   if (!query) {
-    this.showToast("Esegui prima una ricerca", "error");
+    this.showToast(t("search.toast.run_search_first"), "error");
     return;
   }
   this.searchLoading = true;
@@ -133,19 +135,19 @@ export async function replaceOne(this: any, res: SearchResult, match: SearchMatc
     if (!applyRes.ok || !ok) {
       const status = body?.status;
       if (status === "stale") {
-        this.showToast("File modificato nel frattempo (stale)", "error");
+        this.showToast(t("search.toast.stale"), "error");
       } else if (status === "nomatch") {
-        this.showToast("Occorrenza non trovata", "error");
+        this.showToast(t("search.toast.match_not_found"), "error");
       } else {
         const detail = body?.detail || `replace one ${applyRes.status}`;
         throw new Error(detail);
       }
       return;
     }
-    this.showToast("Sostituito 1 match");
+    this.showToast(t("search.toast.replaced_one"));
     if (this.activePath === res.path) {
       if (typeof this.isActiveDirty === "function" && this.isActiveDirty()) {
-        this.showToast("File aperto con modifiche non salvate: non ricaricato", "info");
+        this.showToast(t("search.toast.file_dirty_not_reloaded"), "info");
       } else if (typeof this.loadFile === "function") {
         await this.loadFile(res.path);
       }
@@ -155,7 +157,7 @@ export async function replaceOne(this: any, res: SearchResult, match: SearchMatc
     }
     await this.performSearch();
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Errore replace singolo";
+    const msg = e instanceof Error ? e.message : t("search.toast.error_replace_one");
     this.showToast(msg, "error");
   } finally {
     this.searchLoading = false;
@@ -164,17 +166,17 @@ export async function replaceOne(this: any, res: SearchResult, match: SearchMatc
 
 export function renderSearchResults(this: any) {
   if (this.searchLoading && this.searchResults.length === 0) {
-    return html`<div class="searchStatus">Ricerca in corso...</div>`;
+    return html`<div class="searchStatus">${t("search.status.loading")}</div>`;
   }
   if (this.searchResults.length === 0) {
-    return html`<div class="searchStatus muted">Nessun risultato</div>`;
+    return html`<div class="searchStatus muted">${t("search.status.empty")}</div>`;
   }
   return html`<div class="searchResults">
     ${this.searchResults.map(
       (r: SearchResult) => html`<div class="searchFile">
         <div class="searchFileHeader">
           <div class="path">${r.path}</div>
-          <div class="hits">${r.matches_count} hit</div>
+          <div class="hits">${t("search.labels.hits", { count: r.matches_count })}</div>
         </div>
         <div class="searchMatches">
           ${r.matches.map(
@@ -184,19 +186,19 @@ export function renderSearchResults(this: any) {
               <button
                 class="btn linkBtn"
                 style="margin-left:auto;"
-                title="Replace this match"
+                title=${t("search.action.replace_match_title")}
                 @click=${(e: Event) => {
                   e.stopPropagation();
                   this.replaceOne(r, m, idx);
                 }}
               >
-                Replace
+                ${t("search.action.replace")}
               </button>
             </div>`
           )}
         </div>
       </div>`
     )}
-    ${this.searchTruncated ? html`<div class="searchStatus muted">Risultati troncati dai limiti impostati</div>` : nothing}
+    ${this.searchTruncated ? html`<div class="searchStatus muted">${t("search.status.truncated")}</div>` : nothing}
   </div>`;
 }

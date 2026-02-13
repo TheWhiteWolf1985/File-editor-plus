@@ -1,9 +1,11 @@
 import { LitElement, html, nothing } from "lit";
 import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
+import "./components/app-icon";
 import { openImagePreviewOverlay } from "./components/image_preview_overlay";
 import type { HAClient, HassState } from "./ha-client";
 import { appStyles } from "./styles/app-styles";
+import { figmaEditorStyles } from "./styles/figma-editor-styles";
 import {
   computeIndentSegments,
   renderHighlighted,
@@ -47,7 +49,6 @@ import {
   isSameSuggestItem as entitiesIsSameSuggestItem,
   openSuggestions as entitiesOpenSuggestions,
   renderEntityPane as entitiesRenderEntityPane,
-  renderMdiGlyph as entitiesRenderMdiGlyph,
   scrollSuggestIntoView as entitiesScrollSuggestIntoView,
   syncCollapsedDomains as entitiesSyncCollapsedDomains,
   toggleDomain as entitiesToggleDomain,
@@ -83,13 +84,14 @@ import {
   apiGetSessionBuffer,
   apiResetSession,
 } from "./services/api";
+import { SUPPORTED_LOCALES, getPersistedLocale, loadLocale, setLocale, t, type SupportedLocaleCode } from "./i18n";
 import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS } from "./constants";
 import type { MdiIcon, SearchResult, SearchSummary, Snippet, ThemeMode } from "./types/api";
 import type { DiffHunk, DiffSummary, SuggestItem, Tab, TreeItem } from "./types/editor";
 
 @customElement("app-root")
 export class AppRoot extends LitElement {
-  static styles = appStyles;
+  static styles = [appStyles, figmaEditorStyles];
 
   private apiBase = (() => {
     const base = new URL("./", window.location.href).pathname;
@@ -131,6 +133,7 @@ export class AppRoot extends LitElement {
     showAboutModal: { state: true },
     showSettingsModal: { state: true },
     settingsTab: { state: true },
+    selectedLocale: { state: true },
     settingsFontBaseRem: { state: true },
     snippetName: { state: true },
     snippetDescription: { state: true },
@@ -245,6 +248,7 @@ export class AppRoot extends LitElement {
   declare showAboutModal: boolean;
   declare showSettingsModal: boolean;
   declare settingsTab: "appearance" | "localization";
+  declare selectedLocale: SupportedLocaleCode;
   declare settingsFontBaseRem: number;
   declare snippetName: string;
   declare snippetDescription: string;
@@ -308,6 +312,7 @@ export class AppRoot extends LitElement {
   private editorRef: HTMLTextAreaElement | null = null;
   private mainRef: HTMLDivElement | null = null;
   private sidebarRef: HTMLDivElement | null = null;
+  private overlayRootRef: HTMLDivElement | null = null;
   private baseCodeRef: HTMLDivElement | null = null;
   private baseGutterRef: HTMLDivElement | null = null;
   private basePreRef: HTMLPreElement | null = null;
@@ -334,12 +339,16 @@ export class AppRoot extends LitElement {
   private lastCursorCol = 1;
   private toastTimer: number | null = null;
   private haClient: HAClient | null = null;
+  private readonly handleI18nChanged = () => this.requestUpdate();
   private readonly fontDefaults = FONT_DEFAULTS;
   private readonly fontBaseMin = FONT_BASE_MIN;
   private readonly fontBaseMax = FONT_BASE_MAX;
   private readonly fontBaseStep = FONT_BASE_STEP;
   private fontBaseRem = this.fontDefaults.base;
-  private readonly appVersion = "0.2.62";
+  private readonly appVersion = (() => {
+    const value = (import.meta.env.VITE_APP_VERSION ?? "").trim();
+    return value.length > 0 ? value : "unknown";
+  })();
   private readonly iconUrl = new URL("./assets/icon.png", import.meta.url).href;
   private lastDomains = new Set<string>();
   private themeMedia: MediaQueryList | null = null;
@@ -422,7 +431,7 @@ export class AppRoot extends LitElement {
     if (item.type !== "dir") return;
     e.preventDefault();
     if (item.writable === false) {
-      this.showToast("Cartella in sola lettura", "error");
+      this.showToast(t("tree.toast.readonly_folder"), "error");
       return;
     }
     let payload: { path?: string; isDir?: boolean } | null = null;
@@ -437,7 +446,7 @@ export class AppRoot extends LitElement {
     if (!src) return;
     const dstDir = item.path || "/";
     if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
-      this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+      this.showToast(t("tree.toast.invalid_move_self"), "error");
       return;
     }
     this.queueMove(src, dstDir);
@@ -461,12 +470,12 @@ export class AppRoot extends LitElement {
     const srcType = payload?.isDir ? "dir" : this.draggingType;
     this.dropTargetPath = null;
     if (!src) {
-      this.showToast("Spostamento non valido (origine mancante)", "error");
+      this.showToast(t("toast.move.missing_source"), "error");
       return;
     }
     const dstDir = "";
     if (srcType === "dir" && (dstDir === src || dstDir.startsWith(src + "/"))) {
-      this.showToast("Non puoi spostare una cartella dentro se stessa", "error");
+      this.showToast(t("tree.toast.invalid_move_self"), "error");
       return;
     }
     this.queueMove(src, dstDir);
@@ -486,7 +495,18 @@ export class AppRoot extends LitElement {
   private runBackup = systemRunBackup.bind(this);
   private handleThemeChange = settingsHandleThemeChange.bind(this);
   private cycleTheme = settingsCycleTheme.bind(this);
-  private applyTheme = settingsApplyTheme.bind(this);
+  private resolveThemeMode(): "dark" | "light" {
+    if (this.themeMode === "auto") {
+      const prefersDark = this.themeMedia ? this.themeMedia.matches : true;
+      return prefersDark ? "dark" : "light";
+    }
+    return this.themeMode;
+  }
+  private applyTheme() {
+    settingsApplyTheme.call(this);
+    const resolvedTheme = this.resolveThemeMode();
+    this.setAttribute("data-theme", resolvedTheme);
+  }
   private persistUserConfig = settingsPersistUserConfig.bind(this);
   private loadFontSettings = settingsLoadFontSettings.bind(this);
   private openSettingsModal = settingsOpenSettingsModal.bind(this);
@@ -499,7 +519,6 @@ export class AppRoot extends LitElement {
   private isSameSuggestItem = entitiesIsSameSuggestItem.bind(this);
   private getSuggestCoords = entitiesGetSuggestCoords.bind(this);
   private fetchMdiSuggestions = entitiesFetchMdiSuggestions.bind(this);
-  private renderMdiGlyph = entitiesRenderMdiGlyph.bind(this);
   private applySuggestion = entitiesApplySuggestion.bind(this);
   private scrollSuggestIntoView = entitiesScrollSuggestIntoView.bind(this);
   private initEntities = entitiesInitEntities.bind(this);
@@ -566,6 +585,7 @@ export class AppRoot extends LitElement {
     this.showAboutModal = false;
     this.showSettingsModal = false;
     this.settingsTab = "appearance";
+    this.selectedLocale = getPersistedLocale();
     this.settingsFontBaseRem = this.fontBaseRem;
     this.snippetName = "";
     this.snippetDescription = "";
@@ -614,6 +634,13 @@ export class AppRoot extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    const locale = getPersistedLocale();
+    this.selectedLocale = locale;
+    void loadLocale(locale).then(() => {
+      setLocale(locale);
+      this.requestUpdate();
+    });
+    window.addEventListener("i18n-changed", this.handleI18nChanged);
     if (!this.loadedPaths.has("")) {
       this.loadTree("");
     }
@@ -630,6 +657,7 @@ export class AppRoot extends LitElement {
   }
 
   disconnectedCallback(): void {
+    window.removeEventListener("i18n-changed", this.handleI18nChanged);
     document.removeEventListener("selectionchange", this.selectionListener);
     document.removeEventListener("click", this.handleGlobalClick, true);
     window.removeEventListener("beforeunload", this.beforeUnloadHandler);
@@ -646,6 +674,13 @@ export class AppRoot extends LitElement {
     super.disconnectedCallback();
   }
 
+  private async selectLocale(locale: SupportedLocaleCode) {
+    this.selectedLocale = locale;
+    setLocale(locale);
+    await loadLocale(locale);
+    this.requestUpdate();
+  }
+
   private requestOpenFile(path: string, sizeBytes?: number) {
     if (this.isImagePath(path)) {
       const url = `${this.apiBase}api/fs/download?path=${encodeURIComponent(path)}`;
@@ -656,7 +691,8 @@ export class AppRoot extends LitElement {
         filename,
         sizeBytes,
         ext,
-        onError: (msg?: string) => this.showToast(msg || "Impossibile caricare anteprima immagine", "error"),
+        onError: (msg?: string) => this.showToast(msg || t("modal.preview.error_load"), "error"),
+        mountRoot: this.overlayRootRef ?? this.shadowRoot ?? this,
       });
       return;
     }
@@ -677,7 +713,7 @@ export class AppRoot extends LitElement {
   private async generateDebugLog() {
     if (this.utilityGenerating) return;
     this.utilityGenerating = true;
-    this.status = "Generazione debug log...";
+    this.status = t("status.debug_log_generating");
     try {
       const res = await apiGenerateDebugLog(this.apiBase);
       let payload: any = null;
@@ -692,15 +728,15 @@ export class AppRoot extends LitElement {
       }
       const fname = payload?.filename || "debug log";
       await this.notifyFsChanged();
-      this.showToast(`Creato debug log: ${fname}`);
-      this.status = "Ready";
+      this.showToast(t("toast.debug_log_created", { filename: fname }));
+      this.status = t("status.ready");
     } catch (e) {
-      this.showToast("Errore generazione debug log", "error");
-      this.status = "Errore debug log";
+      this.showToast(t("toast.debug_log_error"), "error");
+      this.status = t("status.debug_log_error");
     } finally {
       this.utilityGenerating = false;
-      if (this.status === "Errore debug log") {
-        setTimeout(() => (this.status = "Ready"), 1200);
+      if (this.status === t("status.debug_log_error")) {
+        setTimeout(() => (this.status = t("status.ready")), 1200);
       }
     }
   }
@@ -753,11 +789,11 @@ export class AppRoot extends LitElement {
   private async submitUpload() {
     if (this.uploadInProgress) return;
     if (!this.uploadFiles || this.uploadFiles.length === 0) {
-      this.showToast("Seleziona almeno un file da caricare", "error");
+      this.showToast(t("modal.upload.error_select_files"), "error");
       return;
     }
     if (!this.isDirWritable(this.uploadTargetDir)) {
-      this.showToast("Cartella in sola lettura: scegli un'altra destinazione", "error");
+      this.showToast(t("modal.upload.error_readonly_destination"), "error");
       return;
     }
     const dir = this.uploadTargetDir || "/";
@@ -777,7 +813,7 @@ export class AppRoot extends LitElement {
             payload = null;
           }
         } catch (e) {
-          this.showToast(`Errore upload ${file.name}`, "error");
+          this.showToast(t("modal.upload.error_upload_file", { name: file.name }), "error");
           this.uploadProgress = { done: (this.uploadProgress?.done ?? 0) + 1, total: this.uploadFiles.length };
           continue;
         }
@@ -795,32 +831,32 @@ export class AppRoot extends LitElement {
               }
               if (retry.ok && retryPayload?.ok === true) {
                 const fname = retryPayload?.path || file.name;
-                this.showToast(`Caricato: ${fname}`);
+                this.showToast(t("modal.upload.file_uploaded", { name: fname }));
                 success += 1;
               } else {
-                this.showToast(`Errore upload ${file.name}`, "error");
+                this.showToast(t("modal.upload.error_upload_file", { name: file.name }), "error");
               }
             }
           } else if (res.status === 413) {
-            this.showToast(`File troppo grande: ${file.name}`, "error");
+            this.showToast(t("modal.upload.error_file_too_large", { name: file.name }), "error");
           } else if (res.status === 404) {
-            this.showToast("Cartella di destinazione non trovata", "error");
+            this.showToast(t("modal.upload.error_destination_not_found"), "error");
           } else if (res.status === 400 || res.status === 415) {
-            this.showToast(`Nome non valido: ${file.name}`, "error");
+            this.showToast(t("modal.upload.error_invalid_name", { name: file.name }), "error");
           } else {
             const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
-            this.showToast(`${file.name}: ${msg}`, "error");
+            this.showToast(t("modal.upload.error_file_detail", { name: file.name, detail: msg }), "error");
           }
         } else {
           const fname = payload?.path || file.name;
-          this.showToast(`Caricato: ${fname}`);
+          this.showToast(t("modal.upload.file_uploaded", { name: fname }));
           success += 1;
         }
 
         this.uploadProgress = { done: (this.uploadProgress?.done ?? 0) + 1, total: this.uploadFiles.length };
       }
 
-      this.showToast(`Upload completato: ${success}/${this.uploadFiles.length}`);
+      this.showToast(t("modal.upload.completed", { success, total: this.uploadFiles.length }));
       if (success > 0) {
         await this.notifyFsChanged();
       }
@@ -844,23 +880,23 @@ export class AppRoot extends LitElement {
       if (!res.ok || body?.ok !== true) {
         if (res.status === 409) {
           if (mode !== "fail") {
-            this.showToast("Esiste già un elemento con lo stesso nome nella destinazione", "error");
+            this.showToast(t("toast.move.destination_conflict"), "error");
             return;
           }
           const choice = await this.promptConflict("move", src.split("/").pop() || src, dstDir || "/");
           if (choice === "skip") return;
           return await this.performMove(src, dstDir, choice);
         } else if (res.status === 400) {
-          this.showToast(body?.detail || "Spostamento non valido", "error");
+          this.showToast(body?.detail || t("toast.move.invalid"), "error");
         } else if (res.status === 404) {
-          this.showToast("Origine o destinazione non trovata", "error");
+          this.showToast(t("toast.move.not_found"), "error");
         } else {
-          this.showToast(`Errore move (HTTP ${res.status})`, "error");
+          this.showToast(t("toast.move.error_http", { status: res.status }), "error");
         }
         return;
       }
       const dstPath = (body?.dst as string) || null;
-      this.showToast(`Spostato: ${src.split("/").pop() || src}`);
+      this.showToast(t("toast.move.moved", { name: src.split("/").pop() || src }));
 
       if (dstPath) {
         // Aggiorna tab aperti che puntavano al vecchio path
@@ -889,12 +925,12 @@ export class AppRoot extends LitElement {
           this.status = "File spostato: riaperto dal nuovo percorso";
         }
       } else if (this.activePath === src) {
-        this.showToast("File spostato: riaprilo dalla nuova posizione", "error");
+        this.showToast(t("toast.move.file_reopen_needed"), "error");
       }
 
       await this.notifyFsChanged();
     } catch (e) {
-      this.showToast("Errore spostamento", "error");
+      this.showToast(t("toast.move.error"), "error");
     } finally {
       this.pendingMove = null;
       this.moveConfirmOpen = false;
@@ -922,7 +958,7 @@ export class AppRoot extends LitElement {
     const action = this.pendingUnsavedAction;
     await this.save();
     if (this.isActiveDirty()) {
-      this.showToast("Errore salvataggio", "error");
+      this.showToast(t("toast.file.save_error"), "error");
       return;
     }
     this.showUnsavedModal = false;
@@ -1187,7 +1223,7 @@ export class AppRoot extends LitElement {
       this.diffSummary = (data?.summary as DiffSummary) || null;
     } catch (e) {
       if (requestId !== this.diffRequestId) return;
-      this.showToast("Errore diff", "error");
+      this.showToast(t("toast.diff.error"), "error");
       this.diffHunks = [];
       this.diffSummary = null;
       this.compareEnabled = false;
@@ -1524,7 +1560,7 @@ export class AppRoot extends LitElement {
     const end = ta.selectionEnd ?? start;
     const selection = this.content.slice(start, end);
     if (selection.length === 0 && action === "copy") {
-      this.showToast("Niente da copiare", "error");
+      this.showToast(t("toast.clipboard.nothing_to_copy"), "error");
       return;
     }
     try {
@@ -1545,9 +1581,9 @@ export class AppRoot extends LitElement {
           this.updateCursorFromPos(pos, this.content);
         });
       }
-      this.showToast(action === "copy" ? "Copiato" : "Tagliato");
+      this.showToast(action === "copy" ? t("toast.clipboard.copied") : t("toast.clipboard.cut"));
     } catch (err) {
-      this.showToast("Clipboard non disponibile", "error");
+      this.showToast(t("toast.clipboard.unavailable"), "error");
     } finally {
       this.closeContextMenu();
     }
@@ -1561,7 +1597,7 @@ export class AppRoot extends LitElement {
     try {
       const text = navigator.clipboard ? await navigator.clipboard.readText() : "";
       if (!text) {
-        this.showToast("Niente da incollare", "error");
+        this.showToast(t("toast.clipboard.nothing_to_paste"), "error");
         this.closeContextMenu();
         return;
       }
@@ -1575,9 +1611,9 @@ export class AppRoot extends LitElement {
         this.editorRef.focus();
         this.updateCursorFromPos(pos, this.content);
       });
-      this.showToast("Incollato");
+      this.showToast(t("toast.clipboard.pasted"));
     } catch (err) {
-      this.showToast("Clipboard non disponibile", "error");
+      this.showToast(t("toast.clipboard.unavailable"), "error");
     } finally {
       this.closeContextMenu();
     }
@@ -1585,7 +1621,7 @@ export class AppRoot extends LitElement {
 
   private handleUndoRedo(action: "undo" | "redo") {
     if (!this.editorRef || !this.activePath) {
-      this.showToast("Apri un file prima di modificare", "error");
+      this.showToast(t("toast.editor.open_file_first"), "error");
       return;
     }
     const ta = this.editorRef;
@@ -1596,7 +1632,7 @@ export class AppRoot extends LitElement {
       this.markDirty(next);
     }
     if (!ok) {
-      this.showToast(action === "undo" ? "Undo non disponibile" : "Redo non disponibile", "error");
+      this.showToast(action === "undo" ? t("toast.editor.undo_unavailable") : t("toast.editor.redo_unavailable"), "error");
     }
   }
 
@@ -1635,7 +1671,7 @@ export class AppRoot extends LitElement {
     this.markDirty(next);
     requestAnimationFrame(() => this.updateCursorFromTextarea());
     this.closeContextMenu();
-    this.showToast("Auto-indent completato");
+    this.showToast(t("toast.editor.auto_indent_completed"));
   }
 
   private startSidebarResize(e: MouseEvent) {
@@ -1674,7 +1710,7 @@ export class AppRoot extends LitElement {
       return;
     }
     this.indenting = true;
-    this.status = "Formatting YAML...";
+    this.status = t("status.yaml_formatting");
     try {
       const res = await apiFormatYaml(this.apiBase, this.content);
       let payload: any = null;
@@ -1689,7 +1725,7 @@ export class AppRoot extends LitElement {
         const col = err?.column;
         const raw = String(err?.message ?? "");
         const short = (raw.split("\n")[0] || raw).trim();
-        let msg = "YAML non valido";
+        let msg = t("toast.yaml.invalid");
         if (line != null && col != null) msg += ` (riga ${line}, colonna ${col})`;
         else if (line != null) msg += ` (riga ${line})`;
         if (short) msg += `: ${short}`;
@@ -1699,19 +1735,19 @@ export class AppRoot extends LitElement {
         if (hint1) msg += " (controlla che dopo '-' ci sia uno spazio: '- key: value')";
         if (hint2) msg += " (in una mappa {...} manca una virgola o una '}')";
         if (!err) {
-          msg = `Impossibile formattare YAML (HTTP ${res.status}).`;
+          msg = t("toast.yaml.format_http_error", { status: res.status });
         }
         this.showToast(msg, "error");
-        this.status = "Errore formattazione";
+        this.status = t("status.format_error");
         return;
       }
       const formatted = payload.formatted ?? "";
       this.markDirty(formatted);
-      this.status = "Formatted (non salvato)";
-      this.showToast("YAML formattato");
+      this.status = t("status.formatted_unsaved");
+      this.showToast(t("toast.yaml.formatted"));
     } catch (e) {
-      this.showToast("Errore formattazione", "error");
-      this.status = "Errore formattazione";
+      this.showToast(t("toast.yaml.format_error"), "error");
+      this.status = t("status.format_error");
     } finally {
       this.indenting = false;
     }
@@ -1765,7 +1801,7 @@ export class AppRoot extends LitElement {
     this.setActivity("search");
     requestAnimationFrame(() => {
       if (!this.shadowRoot) return;
-      const selector = focus === "search" ? 'input.searchInput[placeholder="Search..."]' : 'input.searchInput[placeholder="Replace..."]';
+      const selector = focus === "search" ? 'input.searchInput[data-search-field="search"]' : 'input.searchInput[data-search-field="replace"]';
       const el = this.shadowRoot.querySelector(selector) as HTMLInputElement | null;
       el?.focus();
     });
@@ -1847,7 +1883,7 @@ export class AppRoot extends LitElement {
         this.save();
       } else if (action === "Save as…") {
         this.status = "Save as non implementato";
-        this.showToast("Save as non implementato", "info");
+        this.showToast(t("toast.file.save_as_not_implemented"), "info");
       } else if (action === "Settings") {
         this.openSettingsModal();
       }
@@ -1879,11 +1915,11 @@ export class AppRoot extends LitElement {
         }
       } else if (action === "Compare…") {
         if (!this.splitViewEnabled) {
-          this.showToast("Attiva prima Split view", "info");
+          this.showToast(t("toast.view.enable_split_first"), "info");
           return;
         }
         if (!this.activePath) {
-          this.showToast("Apri un file per confrontare", "info");
+          this.showToast(t("toast.view.open_file_to_compare"), "info");
           return;
         }
         this.compareEnabled = !this.compareEnabled;
@@ -1906,7 +1942,7 @@ export class AppRoot extends LitElement {
       if (action === "About") {
         this.openAboutModal();
       } else if (action === "Docs") {
-        this.showToast("Docs non disponibili", "info");
+        this.showToast(t("toast.help.docs_unavailable"), "info");
       }
     }
   }
@@ -1951,19 +1987,19 @@ export class AppRoot extends LitElement {
     this.scheduleSaveSession();
   }
 
-  private renderMenu(label: string, name: string, items: { icon: string; label: string }[]) {
+  private renderMenu(labelKey: string, name: string, items: { icon: string; action: string; labelKey: string }[]) {
     const open = this.openMenu === name;
     return html`
-      <div class="menuItem ${open ? "open" : ""}" @click=${(e: Event) => this.toggleMenu(e, name)}>
-        <span>${label}</span>
-        <div class="menuPopup" ?hidden=${!open} @click=${(e: Event) => e.stopPropagation()}>
-          ${items.map(
-            (it) => html`<div class="menuItemRow" @click=${() => this.handleMenuAction(name, it.label)}>
-              <span class="menuIcon">${it.icon}</span>
-              <span>${it.label}</span>
+      <div class="menuItem menu-item ${open ? "open" : ""}" @click=${(e: Event) => this.toggleMenu(e, name)}>
+        <span>${t(labelKey)}</span>
+          <div class="menuPopup" ?hidden=${!open} @click=${(e: Event) => e.stopPropagation()}>
+            ${items.map(
+              (it) => html`<div class="menuItemRow" @click=${() => this.handleMenuAction(name, it.action)}>
+              <span class="menuIcon"><app-icon name=${it.icon} size="14" aria-hidden="true"></app-icon></span>
+              <span>${t(it.labelKey)}</span>
             </div>`
-          )}
-        </div>
+            )}
+          </div>
       </div>
     `;
   }
@@ -2223,18 +2259,18 @@ export class AppRoot extends LitElement {
         this.activateRestoredTab(targetActive);
       }
       if (data?.corrupted) {
-        this.showToast("Sessione ripristinata ai valori predefiniti (session file corrotto)", "error");
+        this.showToast(t("toast.session.restored_defaults_corrupted"), "error");
       }
       if (hadDirty && !this.dirtySessionToastShown) {
-        this.showToast("Sessione precedente con modifiche non salvate. I file sono stati riaperti dalla versione su disco.");
+        this.showToast(t("toast.session.unsaved_reopened_from_disk"));
         this.dirtySessionToastShown = true;
       }
       if (this.restoredBufferCount > 0) {
-        this.showToast(`Ripristinati ${this.restoredBufferCount} file non salvati dalla sessione precedente`);
+        this.showToast(t("toast.session.restored_unsaved_files", { count: this.restoredBufferCount }));
       }
     } catch (err) {
       console.warn("restoreSession failed", err);
-      this.showToast("Sessione ripristinata ai valori predefiniti (errore)", "error");
+      this.showToast(t("toast.session.restored_defaults_error"), "error");
     } finally {
       this.restoringSession = false;
       if (restoreSucceeded) {
@@ -2270,20 +2306,48 @@ export class AppRoot extends LitElement {
         throw new Error(`reset ${res.status}`);
       }
       this.resetSessionStateInMemory();
-      this.status = "Session reset";
-      this.showToast("Sessione resettata");
+      this.status = t("status.session_reset");
+      this.showToast(t("toast.session.reset_done"));
       await this.notifyFsChanged();
       this.reloadTree(true);
     } catch (err) {
-      this.showToast("Errore reset sessione", "error");
+      this.showToast(t("toast.session.reset_error"), "error");
     }
   }
 
   private renderSidebarContent() {
     if (this.activeActivity === "explorer") {
       return html`<div class="tree">
-        <div class="treeHeader">
-          <button class="btn" type="button" @click=${() => this.openUploadModal()}>⬆️ Upload</button>
+        <div class="treeHeader file-explorer-header">
+          <div class="explorer-actions">
+            <button
+              class="explorer-btn new-file-btn"
+              type="button"
+              title=${t("explorer.action.new_file")}
+              aria-label=${t("explorer.action.new_file")}
+              @click=${() => (this.newItemKind = "file")}
+            >
+              <app-icon name="file-plus" size="14"></app-icon>
+            </button>
+            <button
+              class="explorer-btn new-folder-btn"
+              type="button"
+              title=${t("explorer.action.new_folder")}
+              aria-label=${t("explorer.action.new_folder")}
+              @click=${() => (this.newItemKind = "folder")}
+            >
+              <app-icon name="folder-plus" size="14"></app-icon>
+            </button>
+            <button
+              class="explorer-btn upload-btn-header"
+              type="button"
+              title=${t("explorer.action.upload")}
+              aria-label=${t("explorer.action.upload")}
+              @click=${() => this.openUploadModal()}
+            >
+              <app-icon name="upload" size="14"></app-icon>
+            </button>
+          </div>
         </div>
         <div
           class="treeScrollable"
@@ -2305,7 +2369,8 @@ export class AppRoot extends LitElement {
           <input
             type="text"
             class="searchInput"
-            placeholder="Search..."
+            data-search-field="search"
+            placeholder=${t("actions.search")}
             .value=${this.searchQuery}
             @input=${(e: Event) => (this.searchQuery = (e.target as HTMLInputElement).value)}
             @keydown=${(e: KeyboardEvent) => {
@@ -2317,7 +2382,8 @@ export class AppRoot extends LitElement {
           <input
             type="text"
             class="searchInput"
-            placeholder="Replace..."
+            data-search-field="replace"
+            placeholder=${t("actions.replace")}
             .value=${this.searchReplace}
             @input=${(e: Event) => (this.searchReplace = (e.target as HTMLInputElement).value)}
           />
@@ -2325,17 +2391,21 @@ export class AppRoot extends LitElement {
         <div class="searchControls">
           <label style="display:flex; align-items:center; gap:6px; font-size:var(--font-size-sm);">
             <input type="checkbox" .checked=${this.searchCaseSensitive} @change=${(e: Event) => (this.searchCaseSensitive = (e.target as HTMLInputElement).checked)} />
-            Case sensitive
+            ${t("search.labels.case_sensitive")}
           </label>
           <div style="flex:1;"></div>
-          <button class="btn" ?disabled=${this.searchLoading} @click=${() => this.performSearch()}>${this.searchLoading ? "Searching..." : "Find"}</button>
+          <button class="btn" ?disabled=${this.searchLoading} @click=${() => this.performSearch()}>${this.searchLoading ? t("search.status.searching") : t("search.action.find")}</button>
           <button class="btn primary" ?disabled=${this.searchLoading || this.searchResults.length === 0} @click=${() => this.replaceAll()}>
-            ${this.searchLoading ? "Working..." : "Replace All"}
+            ${this.searchLoading ? t("search.action.working") : t("search.action.replace_all")}
           </button>
         </div>
         ${summary
           ? html`<div class="searchSummary">
-              ${summary.matches_total ?? 0} hit in ${summary.files_with_matches ?? 0}/${summary.files_scanned ?? 0} file${this.searchTruncated ? " (troncato)" : ""}
+              ${t("search.summary.hits_in_files", {
+                hits: summary.matches_total ?? 0,
+                files_with_matches: summary.files_with_matches ?? 0,
+                files_scanned: summary.files_scanned ?? 0,
+              })}${this.searchTruncated ? ` ${t("search.summary.truncated_suffix")}` : ""}
             </div>`
           : html``}
         ${this.renderSearchResults()}
@@ -2353,10 +2423,10 @@ export class AppRoot extends LitElement {
             @click=${() => this.runBackup("download")}
           >
             <div class="systemCardTitle">
-              <span>💾</span>
-              <span>${downloading ? "Backup locale..." : "Backup locale"}</span>
+              <app-icon name="save" size="16" aria-hidden="true"></app-icon>
+              <span>${downloading ? t("backup.local_loading") : t("backup.local")}</span>
             </div>
-            <div class="systemCardDesc">Crea uno zip della cartella /config e avvia il download.</div>
+            <div class="systemCardDesc">${t("backup.local_desc")}</div>
           </button>
           <button
             class="systemCard"
@@ -2365,17 +2435,17 @@ export class AppRoot extends LitElement {
             @click=${() => this.runBackup("saveas")}
           >
             <div class="systemCardTitle">
-              <span>🗂️</span>
-              <span>${saving ? "Backup in rete..." : "Backup in rete"}</span>
+              <app-icon name="folder-open" size="16" aria-hidden="true"></app-icon>
+              <span>${saving ? t("backup.network_loading") : t("backup.network")}</span>
             </div>
-            <div class="systemCardDesc">Salva lo zip con la finestra di sistema (se supportata).</div>
+            <div class="systemCardDesc">${t("backup.network_desc")}</div>
           </button>
           <button class="systemCard" type="button" disabled>
             <div class="systemCardTitle">
-              <span>☁️</span>
-              <span>Backup su cloud</span>
+              <app-icon name="cloud" size="16" aria-hidden="true"></app-icon>
+              <span>${t("backup.cloud")}</span>
             </div>
-            <div class="systemCardDesc">Disponibile a breve.</div>
+            <div class="systemCardDesc">${t("backup.cloud_coming_soon_desc")}</div>
           </button>
         </div>
       </div>`;
@@ -2389,12 +2459,12 @@ export class AppRoot extends LitElement {
       });
       return html`<div class="sidebarContent" style="display:grid; gap:8px;">
         <button class="btn primary" style="justify-self:flex-start; padding:6px 10px;" @click=${() => this.openSnippetModal()}>
-          Add snippet…
+          ${t("snippets.action.add")}
         </button>
         <div style="display:flex; gap:8px; align-items:center;">
           <input
             type="text"
-            placeholder="Search snippets..."
+            placeholder=${t("snippets.search.placeholder")}
             .value=${this.snippetSearchText}
             @input=${(e: Event) => (this.snippetSearchText = (e.target as HTMLInputElement).value)}
             style="flex:1; padding:8px; border-radius:8px; border:1px solid var(--border-color); background: var(--input-bg); color: var(--text-color);"
@@ -2404,8 +2474,8 @@ export class AppRoot extends LitElement {
             @change=${(e: Event) => (this.snippetSearchField = (e.target as HTMLSelectElement).value as "title" | "description")}
             style="padding:8px; border-radius:8px; border:1px solid var(--border-color); background: var(--input-bg); color: var(--text-color);"
           >
-            <option value="title">Title</option>
-            <option value="description">Description</option>
+            <option value="title">${t("snippets.field.title")}</option>
+            <option value="description">${t("snippets.field.description")}</option>
           </select>
         </div>
         <div class="snippetGrid">
@@ -2414,9 +2484,15 @@ export class AppRoot extends LitElement {
               <div class="snippetHeader">
                 <div class="snippetTitle">${s.name}</div>
                 <div class="snippetActions">
-                  <button class="statusToggle" title="Modify" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.openSnippetModal(s); }}>✏️</button>
-                  <button class="statusToggle" title="Cancel" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.deleteSnippet(s); }}>🗙</button>
-                  <button class="statusToggle" title="Insert" style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.insertSnippet(s); }}>➕</button>
+                  <button class="statusToggle" title=${t("snippets.action.modify")} style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.openSnippetModal(s); }}>
+                    <app-icon name="edit" size="14" aria-hidden="true"></app-icon>
+                  </button>
+                  <button class="statusToggle" title=${t("btn.cancel")} style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.deleteSnippet(s); }}>
+                    <app-icon name="x" size="20" aria-hidden="true"></app-icon>
+                  </button>
+                  <button class="statusToggle" title=${t("entities.action.insert")} style="padding:2px 6px; border-color:var(--border-color);" @click=${(e: Event) => { e.stopPropagation(); this.insertSnippet(s); }}>
+                    <app-icon name="plus" size="14" aria-hidden="true"></app-icon>
+                  </button>
                 </div>
               </div>
               <div class="snippetDesc">${s.description.slice(0, 200)}</div>
@@ -2435,10 +2511,10 @@ export class AppRoot extends LitElement {
             @click=${() => this.generateDebugLog()}
           >
             <div class="systemCardTitle">
-              <span>🛠️</span>
-              <span>${this.utilityGenerating ? "Generazione..." : "Genera debug log"}</span>
+              <app-icon name="wrench" size="16" aria-hidden="true"></app-icon>
+              <span>${this.utilityGenerating ? t("utility.generating") : t("utility.generate_debug_log")}</span>
             </div>
-            <div class="systemCardDesc">Crea un file di debug in /config/.fep-config con info di sistema e log Supervisor.</div>
+            <div class="systemCardDesc">${t("utility.generate_debug_log_desc")}</div>
           </button>
           <button
             class="systemCard"
@@ -2446,10 +2522,10 @@ export class AppRoot extends LitElement {
             @click=${() => (this.showResetSessionModal = true)}
           >
             <div class="systemCardTitle">
-              <span>♻️</span>
-              <span>Reset session</span>
+              <app-icon name="refresh" size="16" aria-hidden="true"></app-icon>
+              <span>${t("session.reset.title")}</span>
             </div>
-            <div class="systemCardDesc">Cancella tabs salvati e buffer, chiude tutte le schede.</div>
+            <div class="systemCardDesc">${t("session.reset.desc")}</div>
           </button>
         </div>
       </div>`;
@@ -2458,37 +2534,37 @@ export class AppRoot extends LitElement {
       const actions = [
         {
           id: "reload_yaml",
-          label: "Reload YAML",
-          desc: "Ricarica configuration.yaml e include.",
-          icon: "🧾",
+          label: t("system.actions.reload_yaml.label"),
+          desc: t("system.actions.reload_yaml.desc"),
+          icon: "file",
           confirm: false,
         },
         {
           id: "restart_core",
-          label: "Restart Core",
-          desc: "Riavvia Home Assistant Core.",
-          icon: "🔄",
+          label: t("system.actions.restart_core.label"),
+          desc: t("system.actions.restart_core.desc"),
+          icon: "refresh",
           confirm: true,
         },
         {
           id: "restart_supervisor",
-          label: "Restart Supervisor",
-          desc: "Riavvia Supervisor (gestione add-on).",
-          icon: "🧩",
+          label: t("system.actions.restart_supervisor.label"),
+          desc: t("system.actions.restart_supervisor.desc"),
+          icon: "puzzle",
           confirm: true,
         },
         {
           id: "reboot_host",
-          label: "Reboot Host",
-          desc: "Riavvia il dispositivo/OS.",
-          icon: "💻",
+          label: t("system.actions.reboot_host.label"),
+          desc: t("system.actions.reboot_host.desc"),
+          icon: "monitor",
           confirm: true,
         },
         {
           id: "shutdown_host",
-          label: "Shutdown Host",
-          desc: "Spegni il dispositivo/OS.",
-          icon: "⏻",
+          label: t("system.actions.shutdown_host.label"),
+          desc: t("system.actions.shutdown_host.desc"),
+          icon: "power",
           confirm: true,
         },
       ];
@@ -2503,8 +2579,8 @@ export class AppRoot extends LitElement {
               @click=${() => this.runSystemAction(action.id, action.label, action.confirm)}
             >
               <div class="systemCardTitle">
-                <span>${action.icon}</span>
-                <span>${pending ? "In corso..." : action.label}</span>
+                <app-icon name=${action.icon} size="16" aria-hidden="true"></app-icon>
+                <span>${pending ? t("status.in_progress") : action.label}</span>
               </div>
               <div class="systemCardDesc">${action.desc}</div>
             </button>`;
@@ -2517,7 +2593,7 @@ export class AppRoot extends LitElement {
 
   private async save() {
     if (!this.activePath) return;
-    this.status = "Saving...";
+    this.status = t("status.saving");
     try {
       const res = await apiSaveFile(this.apiBase, this.activePath, this.content);
       if (!res.ok) {
@@ -2537,10 +2613,10 @@ export class AppRoot extends LitElement {
     requestAnimationFrame(() => this.syncBaseOverlay());
     await this.notifyFsChanged();
     this.scheduleSaveSession();
-      this.status = "Saved";
-      setTimeout(() => (this.status = "Ready"), 800);
+      this.status = t("status.saved");
+      setTimeout(() => (this.status = t("status.ready")), 800);
     } catch (e) {
-      this.status = "Errore salvataggio";
+      this.status = t("toast.file.save_error");
     }
   }
 
@@ -2549,95 +2625,111 @@ export class AppRoot extends LitElement {
     const diffMaps = this.getDiffMaps();
 
     return html`
+      <div class="editor-app">
       <div class="shell">
-          <div class="titlebar">
-          <div class="menus">
-            ${this.renderMenu("File", "file", [
-              { icon: "📄", label: "New file" },
-              { icon: "📁", label: "New folder" },
-              { icon: "💾", label: "Save" },
-              { icon: "📝", label: "Save as…" },
-              { icon: "⚙️", label: "Settings" },
-              { icon: "⬆️", label: "Import…" },
-              { icon: "⬇️", label: "Export…" },
+          <div class="titlebar editor-header">
+          <div class="menus editor-menu">
+            ${this.renderMenu("menu.file", "file", [
+              { icon: "file", action: "New file", labelKey: "actions.new_file" },
+              { icon: "folder", action: "New folder", labelKey: "actions.new_folder" },
+              { icon: "save", action: "Save", labelKey: "actions.save" },
+              { icon: "save-all", action: "Save as…", labelKey: "actions.save_as" },
+              { icon: "settings", action: "Settings", labelKey: "settings.title" },
+              { icon: "upload", action: "Import…", labelKey: "actions.import" },
+              { icon: "download", action: "Export…", labelKey: "actions.export" },
             ])}
-            ${this.renderMenu("Edit", "edit", [
-              { icon: "↩️", label: "Undo" },
-              { icon: "↪️", label: "Redo" },
-              { icon: "✂️", label: "Cut" },
-              { icon: "📋", label: "Copy" },
-              { icon: "📥", label: "Paste" },
+            ${this.renderMenu("menu.edit", "edit", [
+              { icon: "undo", action: "Undo", labelKey: "actions.undo" },
+              { icon: "redo", action: "Redo", labelKey: "actions.redo" },
+              { icon: "cut", action: "Cut", labelKey: "actions.cut" },
+              { icon: "copy", action: "Copy", labelKey: "actions.copy" },
+              { icon: "paste", action: "Paste", labelKey: "actions.paste" },
             ])}
-            ${this.renderMenu("View", "view", [
-              { icon: this.toolbarVisible ? "☑️" : "⬜️", label: "Menù strumenti" },
-              { icon: this.showIndentGuides ? "☑️" : "⬜️", label: "Indent guides" },
-              { icon: "🔄", label: "Reload tree" },
-              { icon: "🪟", label: "Split view" },
-              { icon: "🧭", label: "Compare…" },
+            ${this.renderMenu("menu.view", "view", [
+              { icon: this.toolbarVisible ? "check-square" : "square", action: "Menù strumenti", labelKey: "view.toolbar_toggle" },
+              { icon: this.showIndentGuides ? "check-square" : "square", action: "Indent guides", labelKey: "view.indent_guides" },
+              { icon: "refresh", action: "Reload tree", labelKey: "tree.action.reload" },
+              { icon: "columns", action: "Split view", labelKey: "view.split" },
+              { icon: "git-branch", action: "Compare…", labelKey: "view.compare" },
             ])}
-            ${this.renderMenu("Help", "help", [
-              { icon: "📖", label: "Docs" },
-              { icon: "❓", label: "About" },
+            ${this.renderMenu("menu.help", "help", [
+              { icon: "file", action: "Docs", labelKey: "help.docs" },
+              { icon: "alert-circle", action: "About", labelKey: "about.title" },
             ])}
           </div>
           ${this.toolbarVisible
-            ? html`<div class="toolbar">
-                <button class="toolBtn" title="Save" aria-label="Save" ?disabled=${!this.activePath} @click=${() => this.save()}>
-                  💾 <span>Save</span>
+            ? html`<div class="toolbar top-actions">
+                <button class="toolBtn action-btn secondary" title=${t("actions.save")} aria-label=${t("actions.save")} ?disabled=${!this.activePath} @click=${() => this.save()}>
+                  <app-icon name="save" size="16"></app-icon>
+                  <span>${t("actions.save")}</span>
                 </button>
-                <button class="toolBtn" title="Save all" aria-label="Save all" ?disabled=${!this.activePath} @click=${() => this.save()}>
-                  🧩 <span>Save all</span>
+                <button class="toolBtn action-btn primary" title=${t("actions.save_all")} aria-label=${t("actions.save_all")} ?disabled=${!this.activePath} @click=${() => this.save()}>
+                  <app-icon name="save-all" size="16"></app-icon>
+                  <span>${t("actions.save_all")}</span>
                 </button>
-                <button class="toolBtn" title="Undo" aria-label="Undo" @click=${() => this.handleUndoRedo("undo")}>
-                  ↩️ <span>Undo</span>
+                <button class="toolBtn action-btn ghost" title=${t("actions.undo")} aria-label=${t("actions.undo")} @click=${() => this.handleUndoRedo("undo")}>
+                  <app-icon name="undo" size="16" aria-hidden="true"></app-icon><span>${t("actions.undo")}</span>
                 </button>
-                <button class="toolBtn" title="Redo" aria-label="Redo" @click=${() => this.handleUndoRedo("redo")}>
-                  ↪️ <span>Redo</span>
+                <button class="toolBtn action-btn ghost" title=${t("actions.redo")} aria-label=${t("actions.redo")} @click=${() => this.handleUndoRedo("redo")}>
+                  <app-icon name="redo" size="16" aria-hidden="true"></app-icon><span>${t("actions.redo")}</span>
                 </button>
-                <button class="toolBtn" title="Search" aria-label="Search" @click=${() => this.openSearchTab("search")}>
-                  🔎 <span>Search</span>
+                <button class="toolBtn action-btn ghost" title=${t("actions.search")} aria-label=${t("actions.search")} @click=${() => this.openSearchTab("search")}>
+                  <app-icon name="search" size="16" aria-hidden="true"></app-icon><span>${t("actions.search")}</span>
                 </button>
-                <button class="toolBtn" title="Replace" aria-label="Replace" @click=${() => this.openSearchTab("replace")}>
-                  🪄 <span>Replace</span>
+                <button class="toolBtn action-btn ghost" title=${t("actions.replace")} aria-label=${t("actions.replace")} @click=${() => this.openSearchTab("replace")}>
+                  <app-icon name="palette" size="16" aria-hidden="true"></app-icon><span>${t("actions.replace")}</span>
                 </button>
                 <button
-                  class="toolBtn"
-                  title="Indent file"
-                  aria-label="Indent file"
+                  class="toolBtn action-btn ghost"
+                  title=${t("actions.indent_file")}
+                  aria-label=${t("actions.indent_file")}
                   ?disabled=${!this.activePath || this.indenting}
                   @click=${() => this.indentFile()}
                 >
-                  🧹 <span>Indent file</span>
+                  <app-icon name="indent" size="16"></app-icon>
+                  <span>${t("actions.indent_file")}</span>
                 </button>
-                <button class="toolBtn" title="Split view" aria-label="Split view" @click=${() => this.handleMenuAction("view", "Split view")}>
-                  🪟 <span>Split</span>
+                <button class="toolBtn action-btn ghost" title=${t("view.split")} aria-label=${t("view.split")} @click=${() => this.handleMenuAction("view", "Split view")}>
+                  <app-icon name="columns" size="16" aria-hidden="true"></app-icon><span>${t("view.split_short")}</span>
                 </button>
                 <button
-                  class="toolBtn"
-                  title="Compare"
-                  aria-label="Compare"
+                  class="toolBtn action-btn ghost"
+                  title=${t("view.compare")}
+                  aria-label=${t("view.compare")}
                   ?disabled=${!this.splitViewEnabled || !this.activePath}
                   @click=${() => this.handleMenuAction("view", "Compare…")}
                 >
-                  🧭 <span>Compare</span>
+                  <app-icon name="git-branch" size="16" aria-hidden="true"></app-icon><span>${t("view.compare")}</span>
                 </button>
               </div>`
             : nothing}
         </div>
 
-        <div class="main" ${ref((el) => (this.mainRef = el instanceof HTMLDivElement ? el : null))}>
-          <div class="activity">
+        <div class="main editor-layout" ${ref((el) => (this.mainRef = el instanceof HTMLDivElement ? el : null))}>
+          <div class="activity activity-bar">
             <div class="activityGroup">
-              <div class="act ${this.activeActivity === "explorer" ? "active" : ""}" title="Explorer" @click=${() => this.setActivity("explorer")}>📁</div>
-              <div class="act ${this.activeActivity === "search" ? "active" : ""}" title="Search" @click=${() => this.setActivity("search")}>🔎</div>
-              <div class="act ${this.activeActivity === "entity" ? "active" : ""}" title="Entity" @click=${() => this.setActivity("entity")}>🗂️</div>
-              <div class="act ${this.activeActivity === "snippet" ? "active" : ""}" title="Snippet" @click=${() => this.setActivity("snippet")}>📜</div>
-              <div class="act ${this.activeActivity === "backup" ? "active" : ""}" title="Backup" @click=${() => this.setActivity("backup")}>💾</div>
-              <div class="act ${this.activeActivity === "utility" ? "active" : ""}" title="Utility" @click=${() => this.setActivity("utility")}>🛠️</div>
+              <div class="act activity-bar-btn ${this.activeActivity === "explorer" ? "active" : ""}" title=${t("activity.explorer")} @click=${() => this.setActivity("explorer")}>
+                <app-icon name="folder-open" size="24"></app-icon>
+              </div>
+              <div class="act activity-bar-btn ${this.activeActivity === "search" ? "active" : ""}" title=${t("actions.search")} @click=${() => this.setActivity("search")}>
+                <app-icon name="search" size="24"></app-icon>
+              </div>
+              <div class="act activity-bar-btn ${this.activeActivity === "entity" ? "active" : ""}" title=${t("activity.entity")} @click=${() => this.setActivity("entity")}>
+                <app-icon name="git-branch" size="24"></app-icon>
+              </div>
+              <div class="act activity-bar-btn ${this.activeActivity === "snippet" ? "active" : ""}" title=${t("activity.snippet")} @click=${() => this.setActivity("snippet")}>
+                <app-icon name="palette" size="24"></app-icon>
+              </div>
+              <div class="act activity-bar-btn ${this.activeActivity === "backup" ? "active" : ""}" title=${t("activity.backup")} @click=${() => this.setActivity("backup")}>
+                <app-icon name="sun" size="24"></app-icon>
+              </div>
+              <div class="act activity-bar-btn ${this.activeActivity === "utility" ? "active" : ""}" title=${t("activity.utility")} @click=${() => this.setActivity("utility")}>
+                <app-icon name="moon" size="24"></app-icon>
+              </div>
             </div>
             <div class="activityGroup bottom">
-              <div class="act ${this.activeActivity === "system" ? "active" : ""}" title="System" @click=${() => this.setActivity("system")}>
-                <span class="mdiGlyph">${this.renderMdiGlyph("F0425")}</span>
+              <div class="act activity-bar-btn ${this.activeActivity === "system" ? "active" : ""}" title=${t("activity.system")} @click=${() => this.setActivity("system")}>
+                <app-icon name="settings" size="24"></app-icon>
               </div>
             </div>
           </div>
@@ -2648,41 +2740,43 @@ export class AppRoot extends LitElement {
             <div class="sidebarHeader">
               <div class="explorerTitle">
                 ${this.activeActivity === "explorer"
-                  ? "Explorer"
+                  ? t("activity.explorer")
                   : this.activeActivity === "search"
-                    ? "Search"
+                    ? t("actions.search")
                     : this.activeActivity === "entity"
-                      ? "Entity"
+                      ? t("activity.entity")
                       : this.activeActivity === "snippet"
-                        ? "Snippet"
+                        ? t("activity.snippet")
                         : this.activeActivity === "backup"
-                          ? "Backup"
+                          ? t("activity.backup")
                           : this.activeActivity === "utility"
-                            ? "Utility"
-                            : "System"}
+                            ? t("activity.utility")
+                            : t("activity.system")}
               </div>
-              <button class="sidebarClose" title="Close" @click=${() => (this.sidebarOpen = false)}>✕</button>
+              <button class="sidebarClose" title=${t("actions.close")} @click=${() => (this.sidebarOpen = false)}>
+                <app-icon name="x" size="20" aria-hidden="true"></app-icon>
+              </button>
             </div>
             ${this.renderSidebarContent()}
             <div class="sidebarResizer ${this.sidebarResizing ? "active" : ""}" @mousedown=${this.startSidebarResize}></div>
           </div>
 
-          <div class="editor">
-            <div class="tabs">
+          <div class="editor main-content">
+            <div class="tabs editor-tabs">
               ${this.tabs.length === 0
-                ? html`<div class="tab active">Welcome</div>`
+                ? html`<div class="tab editor-tab active">${t("tabs.welcome")}</div>`
                 : this.tabs.map(
-                    (t) => html`
-                      <div class="tab ${t.path === this.activePath ? "active" : ""}" @click=${() => this.switchTab(t.path)}>
-                        <span>${t.name}</span>
-                        ${t.dirty ? html`<span class="dot" title="Unsaved"></span>` : nothing}
+                    (tab) => html`
+                      <div class="tab editor-tab ${tab.path === this.activePath ? "active" : ""}" title=${tab.name} @click=${() => this.switchTab(tab.path)}>
+                        <span class="editor-tab-name" title=${tab.name}>${tab.name}</span>
+                        ${tab.dirty ? html`<span class="dot" title=${t("tabs.unsaved")}></span>` : nothing}
                         <button
                           class="tabClose"
                           type="button"
-                          title="Close"
-                          @click=${(e: Event) => this.handleCloseTab(e, t.path)}
+                          title=${t("actions.close")}
+                          @click=${(e: Event) => this.handleCloseTab(e, tab.path)}
                         >
-                          ✕
+                          <app-icon name="x" size="20" aria-hidden="true"></app-icon>
                         </button>
                       </div>
                     `
@@ -2691,14 +2785,21 @@ export class AppRoot extends LitElement {
 
             <div class="content">
               <div class="crumbs">
-                <div>${activeTab ? `/config/${activeTab.path}` : "Apri un file dall’Explorer"}</div>
+                <div>${activeTab ? `/config/${activeTab.path}` : t("editor.empty_open_from_explorer")}</div>
                 ${this.toolbarVisible
                   ? nothing
-                  : html`<div style="display:flex; gap:8px;">
-                      <button class="btn" ?disabled=${!this.activePath} @click=${this.save}>Save</button>
-                      <button class="btn primary" ?disabled=${!this.activePath} @click=${this.save}>Save All</button>
-                      <button class="btn" ?disabled=${!this.activePath || this.indenting} @click=${() => this.indentFile()}>
-                        ${this.indenting ? "Formatting..." : "Indent file…"}
+                  : html`<div class="top-actions" style="display:flex; gap:8px;">
+                      <button class="btn action-btn secondary" ?disabled=${!this.activePath} @click=${this.save}>
+                        <app-icon name="save" size="16"></app-icon>
+                        <span>${t("actions.save")}</span>
+                      </button>
+                      <button class="btn primary action-btn primary" ?disabled=${!this.activePath} @click=${this.save}>
+                        <app-icon name="save-all" size="16"></app-icon>
+                        <span>${t("actions.save_all")}</span>
+                      </button>
+                      <button class="btn action-btn ghost" ?disabled=${!this.activePath || this.indenting} @click=${() => this.indentFile()}>
+                        <app-icon name="indent" size="16"></app-icon>
+                        ${this.indenting ? t("status.yaml_formatting") : `${t("actions.indent_file")}…`}
                       </button>
                     </div>`}
               </div>
@@ -2724,7 +2825,7 @@ export class AppRoot extends LitElement {
                       <textarea
                         ${ref((el) => (this.editorRef = el instanceof HTMLTextAreaElement ? el : null))}
                         .value=${this.content}
-                        placeholder="Seleziona un file a sinistra…"
+                        placeholder=${t("editor.placeholder.select_file")}
                         spellcheck="false"
                         wrap="off"
                         @scroll=${this.syncScroll}
@@ -2768,7 +2869,7 @@ export class AppRoot extends LitElement {
                       <textarea
                         ${ref((el) => (this.editorRef = el instanceof HTMLTextAreaElement ? el : null))}
                         .value=${this.content}
-                        placeholder="Seleziona un file a sinistra…"
+                        placeholder=${t("editor.placeholder.select_file")}
                         spellcheck="false"
                         wrap="off"
                         @scroll=${this.syncScroll}
@@ -2795,11 +2896,11 @@ export class AppRoot extends LitElement {
               style="top:${this.contextMenuY}px; left:${this.contextMenuX}px;"
               @click=${(e: Event) => e.stopPropagation()}
             >
-              <div class="contextMenuItem" @click=${() => this.handleCopyCut("cut")}>✂️ Cut</div>
-              <div class="contextMenuItem" @click=${() => this.handleCopyCut("copy")}>📋 Copy</div>
-              <div class="contextMenuItem" @click=${() => this.handlePaste()}>📥 Paste</div>
-              <div class="contextMenuItem" @click=${() => this.reindentAll()}>🔧 Auto-indent</div>
-              <div class="contextMenuItem" @click=${() => this.handleCompareFromContext()}>🧩 Compare…</div>
+              <div class="contextMenuItem" @click=${() => this.handleCopyCut("cut")}><app-icon name="cut" size="16" aria-hidden="true"></app-icon> ${t("actions.cut")}</div>
+              <div class="contextMenuItem" @click=${() => this.handleCopyCut("copy")}><app-icon name="copy" size="16" aria-hidden="true"></app-icon> ${t("actions.copy")}</div>
+              <div class="contextMenuItem" @click=${() => this.handlePaste()}><app-icon name="paste" size="16" aria-hidden="true"></app-icon> ${t("actions.paste")}</div>
+              <div class="contextMenuItem" @click=${() => this.reindentAll()}><app-icon name="indent" size="16" aria-hidden="true"></app-icon> ${t("actions.auto_indent")}</div>
+              <div class="contextMenuItem" @click=${() => this.handleCompareFromContext()}><app-icon name="git-branch" size="16" aria-hidden="true"></app-icon> ${t("view.compare")}</div>
             </div>`
           : nothing}
 
@@ -2811,22 +2912,22 @@ export class AppRoot extends LitElement {
             >
               ${this.treeMenuType === "dir"
                 ? html`<div class="contextMenuItem" @click=${() => this.createFromContext("file")}>
-                      📄 New File ${this.treeMenuFromBlank ? "" : "here"}
+                      <app-icon name="file-plus" size="16" aria-hidden="true"></app-icon> ${t("explorer.context.new_file")} ${this.treeMenuFromBlank ? "" : t("labels.here")}
                     </div>
                     <div class="contextMenuItem" @click=${() => this.createFromContext("folder")}>
-                      📁 New Folder ${this.treeMenuFromBlank ? "" : "here"}
+                      <app-icon name="folder-plus" size="16" aria-hidden="true"></app-icon> ${t("explorer.context.new_folder")} ${this.treeMenuFromBlank ? "" : t("labels.here")}
                     </div>`
                 : nothing}
               ${!this.treeMenuFromBlank
                 ? html`
-                    <div class="contextMenuItem" @click=${() => this.copyTreeItem()}>📋 Copia</div>
+                    <div class="contextMenuItem" @click=${() => this.copyTreeItem()}><app-icon name="copy" size="16" aria-hidden="true"></app-icon> ${t("actions.copy")}</div>
                     <div
                       class="contextMenuItem ${this.treeClipboard ? "" : "disabled"}"
                       @click=${() => this.pasteTreeItem()}
                     >
-                      📥 Incolla
+                      <app-icon name="paste" size="16" aria-hidden="true"></app-icon> ${t("actions.paste")}
                     </div>
-                    <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}>🗑️ Elimina</div>
+                    <div class="contextMenuItem" @click=${() => this.confirmTreeDelete()}><app-icon name="trash" size="16" aria-hidden="true"></app-icon> ${t("btn.delete")}</div>
                   `
                 : nothing}
             </div>`
@@ -2847,11 +2948,11 @@ export class AppRoot extends LitElement {
                   }}
                 >
                   <span class="suggestItemLabel">
-                    ${s.type === "entity" ? "🧭" : ""}
+                    ${s.type === "entity" ? html`<app-icon name="git-branch" size="14" aria-hidden="true"></app-icon>` : nothing}
                     <span>${s.type === "mdi" ? `mdi:${s.value}` : s.value}</span>
                   </span>
                   ${s.type === "mdi"
-                    ? html`<span class="suggestItemIcon">${this.renderMdiGlyph(s.codepoint)}</span>`
+                    ? html`<span class="suggestItemIcon"><app-icon name="settings" size="14" aria-hidden="true"></app-icon></span>`
                     : nothing}
                 </div>`
               )}
@@ -2861,14 +2962,14 @@ export class AppRoot extends LitElement {
         ${this.showTreeDeleteModal
           ? html`<div class="modalBackdrop" @click=${() => this.cancelTreeDelete()}>
               <div class="modal" @click=${(e: Event) => e.stopPropagation()}>
-                <h3>Conferma eliminazione</h3>
+                <h3>${t("modal.delete_confirm.title")}</h3>
                 <div class="muted" style="font-size: var(--font-size-sm);">
-                  Vuoi eliminare ${this.deleteTargetType === "dir" ? "la cartella" : "il file"}:
+                  ${t("modal.delete_confirm.message_prefix")} ${this.deleteTargetType === "dir" ? t("labels.folder") : t("labels.file")}:
                   <strong>${this.deleteTargetPath}</strong>?
                 </div>
                 <div class="actions">
-                  <button class="btn" @click=${() => this.cancelTreeDelete()}>Cancel</button>
-                  <button class="btn danger" @click=${() => this.executeTreeDelete()}>Delete</button>
+                  <button class="btn" @click=${() => this.cancelTreeDelete()}>${t("btn.cancel")}</button>
+                  <button class="btn danger" @click=${() => this.executeTreeDelete()}>${t("btn.delete")}</button>
                 </div>
               </div>
             </div>`
@@ -2906,8 +3007,8 @@ export class AppRoot extends LitElement {
                       </label>`
                     : nothing}
                   <div class="actions">
-                    <button class="btn" @click=${() => this.cancelNewItem()}>Cancel</button>
-                    <button class="btn primary" @click=${() => this.createNewItem()}>Create</button>
+                    <button class="btn" @click=${() => this.cancelNewItem()}>${t("btn.cancel")}</button>
+                    <button class="btn primary" @click=${() => this.createNewItem()}>${t("btn.create")}</button>
                   </div>
                 </div>
               </div>
@@ -2920,19 +3021,19 @@ export class AppRoot extends LitElement {
                 <div class="modal aboutModal" @click=${(e: Event) => e.stopPropagation()}>
                   <div class="aboutHeader">
                     <img class="aboutLogo" src=${this.iconUrl} alt="File Editor Plus" />
-                    <h3>About</h3>
+                    <h3>${t("modal.about.title")}</h3>
                   </div>
                   <div class="aboutBody">
                     <div class="aboutRow">
-                      <div class="aboutLabel">Developer</div>
+                      <div class="aboutLabel">${t("modal.about.developer")}</div>
                       <div class="aboutValue">Juri Zanella</div>
                     </div>
                     <div class="aboutRow">
-                      <div class="aboutLabel">GitHub</div>
+                      <div class="aboutLabel">${t("modal.about.github")}</div>
                       <div class="aboutValue">TheWhiteWolf1985</div>
                     </div>
                     <div class="aboutRow">
-                      <div class="aboutLabel">Repository</div>
+                      <div class="aboutLabel">${t("modal.about.repository")}</div>
                       <div class="aboutValue">
                         <a href="https://github.com/TheWhiteWolf1985/File-editor-plus" target="_blank" rel="noopener">
                           https://github.com/TheWhiteWolf1985/File-editor-plus
@@ -2940,16 +3041,16 @@ export class AppRoot extends LitElement {
                       </div>
                     </div>
                     <div class="aboutRow">
-                      <div class="aboutLabel">Version</div>
+                      <div class="aboutLabel">${t("status.version")}</div>
                       <div class="aboutValue">${this.appVersion}</div>
                     </div>
                     <div class="aboutRow">
-                      <div class="aboutLabel">License</div>
+                      <div class="aboutLabel">${t("modal.about.license")}</div>
                       <div class="aboutValue">MIT</div>
                     </div>
                   </div>
                   <div class="actions">
-                    <button class="btn" @click=${() => this.closeAboutModal()}>Close</button>
+                    <button class="btn" @click=${() => this.closeAboutModal()}>${t("btn.close")}</button>
                   </div>
                 </div>
               </div>
@@ -2959,22 +3060,22 @@ export class AppRoot extends LitElement {
         ${this.showSettingsModal
           ? html`
               <div class="modalBackdrop" @click=${() => this.cancelSettingsModal()}>
-                <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:520px;">
-                  <h3>Settings</h3>
+                <div class="modal settingsModal" @click=${(e: Event) => e.stopPropagation()}>
+                  <h3>${t("settings.title")}</h3>
                   <div class="settingsTabs">
                     <button
                       class="settingsTab ${this.settingsTab === "localization" ? "active" : ""}"
                       type="button"
                       @click=${() => (this.settingsTab = "localization")}
                     >
-                      Localizzazione
+                      ${t("settings.tabs.localization")}
                     </button>
                     <button
                       class="settingsTab ${this.settingsTab === "appearance" ? "active" : ""}"
                       type="button"
                       @click=${() => (this.settingsTab = "appearance")}
                     >
-                      Aspetto
+                      ${t("settings.tabs.appearance")}
                     </button>
                   </div>
                   ${this.settingsTab === "appearance"
@@ -2982,8 +3083,8 @@ export class AppRoot extends LitElement {
                         <div class="settingsBody">
                           <div class="settingsRow">
                             <div>
-                              <div class="settingsLabel">Dimensione caratteri</div>
-                              <div class="settingsHint">Regola in tempo reale, salva con Apply.</div>
+                              <div class="settingsLabel">${t("settings.appearance.font_size")}</div>
+                              <div class="settingsHint">${t("settings.appearance.font_size_hint")}</div>
                             </div>
                             <div class="settingsValue">${Math.round(this.settingsFontBaseRem * 16)}px</div>
                           </div>
@@ -3000,12 +3101,30 @@ export class AppRoot extends LitElement {
                       `
                     : html`
                         <div class="settingsBody">
-                          <div class="settingsHint">Impostazioni di localizzazione in arrivo.</div>
+                          <div class="settingsHint">${t("settings.localization.hint")}</div>
+                          <div class="localeGrid" role="radiogroup" aria-label=${t("settings.localization.select_aria")}>
+                            ${SUPPORTED_LOCALES.map(
+                              (locale) => html`
+                                <button
+                                  class="localeTile ${this.selectedLocale === locale.code ? "selected" : ""}"
+                                  type="button"
+                                  role="radio"
+                                  aria-checked=${this.selectedLocale === locale.code ? "true" : "false"}
+                                  @click=${() => {
+                                    void this.selectLocale(locale.code);
+                                  }}
+                                >
+                                  <span class="localeBadge" aria-hidden="true">${locale.badge}</span>
+                                  <span class="localeName">${locale.label}</span>
+                                </button>
+                              `
+                            )}
+                          </div>
                         </div>
                       `}
                   <div class="actions">
-                    <button class="btn" @click=${() => this.cancelSettingsModal()}>Cancel</button>
-                    <button class="btn primary" @click=${() => this.applySettingsModal()}>Apply</button>
+                    <button class="btn" @click=${() => this.cancelSettingsModal()}>${t("btn.cancel")}</button>
+                    <button class="btn primary" @click=${() => this.applySettingsModal()}>${t("btn.apply")}</button>
                   </div>
                 </div>
               </div>
@@ -3016,9 +3135,9 @@ export class AppRoot extends LitElement {
           ? html`
               <div class="modalBackdrop" @click=${() => this.closeSnippetModal()}>
                 <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:480px;">
-                  <h3>New snippet</h3>
+                  <h3>${t("modal.snippet.new_title")}</h3>
                   <label>
-                    Title (max 100)
+                    ${t("snippets.form.title_max_100")}
                     <input
                       type="text"
                       .value=${this.snippetName}
@@ -3028,7 +3147,7 @@ export class AppRoot extends LitElement {
                     />
                   </label>
                   <label>
-                    Description (max 250)
+                    ${t("snippets.form.description_max_250")}
                     <input
                       type="text"
                       .value=${this.snippetDescription}
@@ -3038,7 +3157,7 @@ export class AppRoot extends LitElement {
                     />
                   </label>
                   <label>
-                    Content
+                    ${t("snippets.form.content")}
                     <textarea
                       style="min-height:160px; background: var(--input-bg); color: var(--text-color); border:1px solid var(--border-color); border-radius:8px; padding:8px;"
                       .value=${this.snippetContent}
@@ -3047,8 +3166,8 @@ export class AppRoot extends LitElement {
                     ></textarea>
                   </label>
                   <div class="actions">
-                    <button class="btn" ?disabled=${this.snippetSaving} @click=${() => this.closeSnippetModal()}>Cancel</button>
-                    <button class="btn primary" ?disabled=${this.snippetSaving} @click=${() => this.saveSnippet()}>Save</button>
+                    <button class="btn" ?disabled=${this.snippetSaving} @click=${() => this.closeSnippetModal()}>${t("btn.cancel")}</button>
+                    <button class="btn primary" ?disabled=${this.snippetSaving} @click=${() => this.saveSnippet()}>${t("btn.save")}</button>
                   </div>
                 </div>
               </div>
@@ -3058,14 +3177,14 @@ export class AppRoot extends LitElement {
         ${this.showUnsavedModal
           ? html`<div class="modalBackdrop" @click=${() => this.cancelUnsavedModal()}>
               <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:480px;">
-                <h3>Modifiche non salvate</h3>
+                <h3>${t("modal.unsaved.title")}</h3>
                 <p style="margin-top:8px; color:var(--muted-color);">
-                  Hai modifiche non salvate su ${this.activePath ?? "file corrente"}.
+                  ${t("modal.unsaved.message", { path: this.activePath ?? t("modal.unsaved.current_file") })}
                 </p>
                 <div class="actions">
-                  <button class="btn" @click=${() => this.cancelUnsavedModal()}>Annulla</button>
-                  <button class="btn" @click=${() => this.confirmUnsavedDiscard()}>Non salvare</button>
-                  <button class="btn primary" @click=${() => this.confirmUnsavedSave()}>Salva</button>
+                  <button class="btn" @click=${() => this.cancelUnsavedModal()}>${t("btn.cancel")}</button>
+                  <button class="btn" @click=${() => this.confirmUnsavedDiscard()}>${t("modal.unsaved.discard")}</button>
+                  <button class="btn primary" @click=${() => this.confirmUnsavedSave()}>${t("btn.save")}</button>
                 </div>
               </div>
             </div>`
@@ -3074,9 +3193,9 @@ export class AppRoot extends LitElement {
         ${this.showUploadModal
           ? html`<div class="modalBackdrop" @click=${() => this.closeUploadModal()}>
               <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:520px;">
-                <h3>Upload file</h3>
+                <h3>${t("modal.upload.title")}</h3>
                 <div class="formRow" style="margin-top:12px; display:grid; gap:6px;">
-                  <label style="font-size:var(--font-size-sm); color:var(--muted-color);">File</label>
+                  <label style="font-size:var(--font-size-sm); color:var(--muted-color);">${t("labels.file")}</label>
                   <input type="file" multiple @change=${this.handleUploadFileChange} />
                 </div>
                 ${this.uploadFiles && this.uploadFiles.length
@@ -3093,7 +3212,7 @@ export class AppRoot extends LitElement {
                     </div>`
                   : nothing}
                 <div class="formRow" style="margin-top:12px; display:grid; gap:6px;">
-                  <label style="font-size:var(--font-size-sm); color:var(--muted-color);">Cartella destinazione</label>
+                  <label style="font-size:var(--font-size-sm); color:var(--muted-color);">${t("modal.upload.destination_folder")}</label>
                   <select
                     .value=${this.uploadTargetDir}
                     @change=${(e: Event) => (this.uploadTargetDir = this.normalizeDir((e.target as HTMLSelectElement).value))}
@@ -3107,7 +3226,7 @@ export class AppRoot extends LitElement {
                   </select>
                 </div>
                 <div class="actions">
-                  <button class="btn" @click=${() => this.closeUploadModal()} ?disabled=${this.uploadInProgress}>Annulla</button>
+                  <button class="btn" @click=${() => this.closeUploadModal()} ?disabled=${this.uploadInProgress}>${t("btn.cancel")}</button>
                   <button
                     class="btn primary"
                     @click=${() => this.submitUpload()}
@@ -3115,9 +3234,9 @@ export class AppRoot extends LitElement {
                   >
                     ${this.uploadInProgress
                       ? this.uploadProgress
-                        ? `Caricamento... ${this.uploadProgress.done}/${this.uploadProgress.total}`
-                        : "Caricamento..."
-                      : "Upload"}
+                        ? t("modal.upload.progress", { done: this.uploadProgress.done, total: this.uploadProgress.total })
+                        : t("modal.upload.uploading")
+                      : t("explorer.action.upload")}
                   </button>
                 </div>
               </div>
@@ -3127,14 +3246,16 @@ export class AppRoot extends LitElement {
         ${this.moveConfirmOpen && this.pendingMove
           ? html`<div class="modalBackdrop" @click=${() => this.cancelMoveConfirm()}>
               <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:460px;">
-                <h3>Conferma spostamento</h3>
+                <h3>${t("modal.move_confirm.title")}</h3>
                 <p style="margin-top:8px; color:var(--muted-color);">
-                  Spostare <strong>${this.pendingMove.src.split("/").pop() || this.pendingMove.src}</strong>
-                  in <strong>${this.pendingMove.dstDir || "/"}</strong>?
+                  ${t("modal.move_confirm.message", {
+                    source: this.pendingMove.src.split("/").pop() || this.pendingMove.src,
+                    target: this.pendingMove.dstDir || "/"
+                  })}
                 </p>
                 <div class="actions">
-                  <button class="btn" @click=${() => this.cancelMoveConfirm()}>Annulla</button>
-                  <button class="btn primary" @click=${() => this.confirmMove()}>Sposta</button>
+                  <button class="btn" @click=${() => this.cancelMoveConfirm()}>${t("btn.cancel")}</button>
+                  <button class="btn primary" @click=${() => this.confirmMove()}>${t("actions.move")}</button>
                 </div>
               </div>
             </div>`
@@ -3143,14 +3264,14 @@ export class AppRoot extends LitElement {
         ${this.conflictDialogOpen && this.conflictData
           ? html`<div class="modalBackdrop" @click=${() => { if (!this.uploadInProgress) this.resolveConflict("skip"); }}>
               <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:480px;">
-                <h3>Conflitto nome</h3>
+                <h3>${t("modal.conflict.title")}</h3>
                 <p style="margin-top:8px; color:var(--muted-color);">
-                  Esiste già <strong>${this.conflictData.name}</strong> in <strong>${this.conflictData.target}</strong>.
+                  ${t("modal.conflict.message", { name: this.conflictData.name, target: this.conflictData.target })}
                 </p>
                 <div class="actions">
-                  <button class="btn" @click=${() => this.resolveConflict("skip")}>Annulla</button>
-                  <button class="btn" @click=${() => this.resolveConflict("autorename")}>Rinomina</button>
-                  <button class="btn primary" @click=${() => this.resolveConflict("overwrite")}>Sovrascrivi</button>
+                  <button class="btn" @click=${() => this.resolveConflict("skip")}>${t("btn.cancel")}</button>
+                  <button class="btn" @click=${() => this.resolveConflict("autorename")}>${t("actions.rename")}</button>
+                  <button class="btn primary" @click=${() => this.resolveConflict("overwrite")}>${t("actions.overwrite")}</button>
                 </div>
               </div>
             </div>`
@@ -3159,35 +3280,42 @@ export class AppRoot extends LitElement {
         ${this.showResetSessionModal
           ? html`<div class="modalBackdrop" @click=${() => (this.showResetSessionModal = false)}>
               <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:460px;">
-                <h3>Reset session</h3>
+                <h3>${t("session.reset.title")}</h3>
                 <p style="margin-top:8px; color:var(--muted-color);">
-                  Questo chiuderà tutte le schede e cancellerà la sessione salvata (session.json e buffer).
+                  ${t("session.reset.confirm_message")}
                 </p>
                 <div class="actions">
-                  <button class="btn" @click=${() => (this.showResetSessionModal = false)}>Annulla</button>
-                  <button class="btn primary" @click=${() => this.resetSession()}>Reset</button>
+                  <button class="btn" @click=${() => (this.showResetSessionModal = false)}>${t("btn.cancel")}</button>
+                  <button class="btn primary" @click=${() => this.resetSession()}>${t("btn.reset")}</button>
                 </div>
               </div>
             </div>`
           : nothing}
 
-        <div class="statusbar">
-          <div>${this.status}</div>
-          <div class="version">v${this.appVersion}</div>
-          <div class="right">
-            <button class="statusToggle" @click=${() => (this.autoIndentEnabled = !this.autoIndentEnabled)}>
-              Auto-indent: ${this.autoIndentEnabled ? "On" : "Off"}
+        <div class="statusbar status-bar">
+          <div class="status-bar-left">
+            <div class="status-item">
+              <app-icon name="wifi" size="14" aria-hidden="true"></app-icon>
+              <span>${this.status}</span>
+            </div>
+            <div class="version status-item">v${this.appVersion === "unknown" ? "?.?.?" : this.appVersion}</div>
+          </div>
+          <div class="right status-bar-right">
+            <button class="statusToggle status-item" @click=${() => (this.autoIndentEnabled = !this.autoIndentEnabled)}>
+              ${t("status.auto_indent")}: ${this.autoIndentEnabled ? t("labels.on") : t("labels.off")}
             </button>
-            <button class="statusToggle" @click=${() => this.cycleTheme()}>
-              Theme: ${this.themeMode.charAt(0).toUpperCase()}${this.themeMode.slice(1)}
+            <button class="statusToggle status-item" @click=${() => this.cycleTheme()}>
+              ${t("status.theme")}: ${t(`status.theme_${this.themeMode}`)}
             </button>
-            <span>Ln ${this.cursorLine}</span>
-            <span>Col ${this.cursorCol}</span>
-            <span>UTF-8</span>
-            <span>LF</span>
-            <span>Lit</span>
+            <span class="status-item">${t("status.line_short")} ${this.cursorLine}</span>
+            <span class="status-item">${t("status.column_short")} ${this.cursorCol}</span>
+            <span class="status-item">${t("status.encoding_utf8")}</span>
+            <span class="status-item">${t("status.eol_lf")}</span>
+            <span class="status-item">${t("status.runtime_lit")}</span>
           </div>
         </div>
+        <div class="overlay-root" ${ref((el) => (this.overlayRootRef = el instanceof HTMLDivElement ? el : null))}></div>
+      </div>
       </div>
     `;
   }

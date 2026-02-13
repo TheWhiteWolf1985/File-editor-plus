@@ -6,6 +6,7 @@ WORKDIR /fe
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+COPY config.yaml /fe/config.yaml
 RUN npm run build
 
 # ---------- runtime ----------

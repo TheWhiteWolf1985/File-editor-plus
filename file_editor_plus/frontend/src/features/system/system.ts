@@ -1,4 +1,5 @@
 import { apiGetBackup, apiPostHaAction } from "../../services/api";
+import { t } from "../../i18n";
 
 const getBackupFilenameFromHeader = (res: Response) => {
   const header = res.headers.get("content-disposition") || "";
@@ -27,7 +28,7 @@ const triggerBackupDownload = (apiBase: string) => {
   link.href = url;
   link.download = "";
   link.rel = "noopener";
-  document.body.appendChild(link);
+  document.documentElement.appendChild(link);
   link.click();
   link.remove();
 };
@@ -35,7 +36,7 @@ const triggerBackupDownload = (apiBase: string) => {
 export async function runSystemAction(this: any, action: string, label: string, confirm: boolean) {
   if (this.systemActionLoading) return;
   if (confirm) {
-    const ok = window.confirm(`Confermi: ${label}?`);
+    const ok = window.confirm(t("system.confirm.action", { label }));
     if (!ok) return;
   }
   this.systemActionLoading = true;
@@ -53,9 +54,9 @@ export async function runSystemAction(this: any, action: string, label: string, 
       this.showToast(msg, "error");
       return;
     }
-    this.showToast(`${label} avviato`);
+    this.showToast(t("system.toast.action_started", { label }));
   } catch {
-    this.showToast("Errore chiamata sistema", "error");
+    this.showToast(t("system.toast.call_error"), "error");
   } finally {
     this.systemActionLoading = false;
     this.systemActionPending = null;
@@ -65,7 +66,7 @@ export async function runSystemAction(this: any, action: string, label: string, 
 export async function runBackup(this: any, mode: "download" | "saveas" | "cloud") {
   if (this.backupLoading) return;
   if (mode === "cloud") {
-    this.showToast("Backup cloud in arrivo", "info");
+    this.showToast(t("system.toast.cloud_coming_soon"), "info");
     return;
   }
   this.backupLoading = true;
@@ -73,12 +74,12 @@ export async function runBackup(this: any, mode: "download" | "saveas" | "cloud"
   try {
     if (mode === "download") {
       triggerBackupDownload(this.apiBase);
-      this.showToast("Download backup avviato");
+      this.showToast(t("system.toast.download_started"));
       return;
     }
     const picker = (window as unknown as { showSaveFilePicker?: Function }).showSaveFilePicker;
     if (!picker) {
-      this.showToast("Salvataggio non supportato, avvio download", "info");
+      this.showToast(t("system.toast.save_not_supported"), "info");
       triggerBackupDownload(this.apiBase);
       return;
     }
@@ -93,17 +94,17 @@ export async function runBackup(this: any, mode: "download" | "saveas" | "cloud"
     const filename = getBackupFilenameFromHeader(res) || defaultBackupFilename();
     const handle = await picker({
       suggestedName: filename,
-      types: [{ description: "Zip", accept: { "application/zip": [".zip"] } }],
+      types: [{ description: t("labels.zip"), accept: { "application/zip": [".zip"] } }],
     });
     const writable = await handle.createWritable();
     await writable.write(blob);
     await writable.close();
-    this.showToast("Backup salvato");
+    this.showToast(t("system.toast.saved"));
   } catch (e: any) {
     if (e?.name === "AbortError") {
-      this.showToast("Salvataggio annullato", "info");
+      this.showToast(t("system.toast.save_cancelled"), "info");
     } else {
-      this.showToast("Errore backup", "error");
+      this.showToast(t("system.toast.backup_error"), "error");
     }
   } finally {
     this.backupLoading = false;

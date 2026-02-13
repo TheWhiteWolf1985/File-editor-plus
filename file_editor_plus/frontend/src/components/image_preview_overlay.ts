@@ -4,24 +4,25 @@ export type ImagePreviewOverlayOptions = {
   sizeBytes?: number;
   ext?: string;
   onError?: (message?: string) => void;
+  mountRoot?: ParentNode;
 };
 
 const STYLE = `
-.fep-img-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:99999;}
-.fep-img-panel{background:var(--panel-color,#1f1f1f);color:var(--text-color,#f5f5f5);border:1px solid var(--border-color,#333);border-radius:10px;max-width:92vw;max-height:92vh;overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,0.45);position:relative;display:grid;grid-template-rows:auto 1fr auto;min-width:320px;}
-.fep-img-header{display:flex;align-items:center;padding:10px 14px;gap:10px;background:var(--panel-strong,#262626);border-bottom:1px solid var(--border-color,#333);}
+.fep-img-overlay{position:fixed;inset:0;background:var(--overlay-backdrop);display:flex;align-items:center;justify-content:center;z-index:99999;}
+.fep-img-panel{background:var(--overlay-surface);color:var(--text-color);border:1px solid var(--overlay-border);border-radius:10px;max-width:92vw;max-height:92vh;overflow:hidden;box-shadow:var(--modal-shadow);position:relative;display:grid;grid-template-rows:auto 1fr auto;min-width:320px;}
+.fep-img-header{display:flex;align-items:center;padding:10px 14px;gap:10px;background:var(--overlay-surface-strong);border-bottom:1px solid var(--overlay-border);}
 .fep-img-title{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .fep-img-close{border:none;background:transparent;color:inherit;font-size:18px;cursor:pointer;}
 .fep-img-body{padding:12px 14px;overflow:auto;display:grid;gap:10px;justify-items:center;}
-.fep-img-preview{max-width:88vw;max-height:68vh;object-fit:contain;border:1px solid var(--border-color,#333);border-radius:6px;background:var(--code-bg,#1e1e1e);}
+.fep-img-preview{max-width:88vw;max-height:68vh;object-fit:contain;border:1px solid var(--overlay-border);border-radius:6px;background:var(--code-bg);}
 .fep-img-meta{width:100%;display:grid;gap:6px;font-size:var(--font-size-sm,0.9rem);} 
 .fep-img-row{display:flex;gap:8px;} 
-.fep-img-label{width:90px;color:var(--muted-color,#aaa);flex-shrink:0;text-align:right;} 
+.fep-img-label{width:90px;color:var(--overlay-muted);flex-shrink:0;text-align:right;} 
 .fep-img-value{flex:1;word-break:break-all;font-family:"JetBrains Mono","Fira Code",monospace;}
 `;
 
 export function openImagePreviewOverlay(opts: ImagePreviewOverlayOptions): void {
-  const { srcUrl, filename, sizeBytes, ext, onError } = opts;
+  const { srcUrl, filename, sizeBytes, ext, onError, mountRoot } = opts;
 
   const overlay = document.createElement("div");
   overlay.className = "fep-img-overlay";
@@ -41,7 +42,11 @@ export function openImagePreviewOverlay(opts: ImagePreviewOverlayOptions): void 
   const closeBtn = document.createElement("button");
   closeBtn.className = "fep-img-close";
   closeBtn.setAttribute("aria-label", "Chiudi anteprima");
-  closeBtn.textContent = "✕";
+  const closeIcon = document.createElement("app-icon");
+  closeIcon.setAttribute("name", "x");
+  closeIcon.setAttribute("size", "20");
+  closeIcon.setAttribute("aria-hidden", "true");
+  closeBtn.appendChild(closeIcon);
   header.appendChild(title);
   header.appendChild(closeBtn);
   panel.appendChild(header);
@@ -106,7 +111,7 @@ export function openImagePreviewOverlay(opts: ImagePreviewOverlayOptions): void 
   });
   closeBtn.addEventListener("click", () => close());
 
-  document.body.appendChild(overlay);
+  (mountRoot ?? document.documentElement).appendChild(overlay);
 }
 
 function formatSize(bytes?: number) {

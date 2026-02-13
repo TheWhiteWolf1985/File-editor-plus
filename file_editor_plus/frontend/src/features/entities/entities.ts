@@ -3,6 +3,7 @@ import { HAClient, type HassState } from "../../ha-client";
 import { apiMdiSearch } from "../../services/api";
 import type { MdiIcon } from "../../types/api";
 import type { SuggestItem } from "../../types/editor";
+import { t } from "../../i18n";
 
 export function closeSuggestions(this: any, block = false) {
   if (this.suggestOpen) {
@@ -166,15 +167,6 @@ export async function fetchMdiSuggestions(this: any, query: string): Promise<Mdi
   }
 }
 
-export function renderMdiGlyph(this: any, codepoint?: string) {
-  if (!codepoint) return "";
-  const normalized = codepoint.trim().replace(/^0x/i, "");
-  if (!normalized) return "";
-  const value = Number.parseInt(normalized, 16);
-  if (Number.isNaN(value)) return "";
-  return String.fromCodePoint(value);
-}
-
 export function applySuggestion(this: any) {
   if (!this.editorRef || !this.suggestOpen || this.suggestItems.length === 0) return;
   const ta = this.editorRef;
@@ -258,8 +250,8 @@ export async function initEntities(this: any) {
     this.entities = next;
     this.entityError = null;
   } catch (e) {
-    this.entityError = "Errore caricamento entità";
-    this.showToast("Errore caricamento entità", "error");
+    this.entityError = t("errors.entities.loading");
+    this.showToast(t("errors.entities.loading"), "error");
   }
 }
 
@@ -275,7 +267,7 @@ export function toggleDomain(this: any, domain: string) {
 
 export function insertEntityId(this: any, entityId: string) {
   if (!this.activePath || !this.editorRef) {
-    this.showToast("Apri un file prima di inserire", "error");
+    this.showToast(t("errors.entities.open_file_first"), "error");
     return;
   }
   const ta = this.editorRef;
@@ -343,25 +335,27 @@ export function renderEntityPane(this: any) {
   });
   const domains = Object.keys(grouped).sort();
   return html`<div class="sidebarContent entityPane">
-    <div class="entityHeader">Entities</div>
+    <div class="entityHeader">${t("entities.title")}</div>
     <input
       class="entitySearch"
       type="text"
       .value=${this.entityFilter}
       @input=${(e: Event) => (this.entityFilter = (e.target as HTMLInputElement).value)}
-      placeholder="Search entity id or name"
+      placeholder=${t("entities.search.placeholder")}
     />
     ${this.entityError
       ? html`<div class="entityError">${this.entityError}</div>`
       : html`<div class="entityList">
           ${domains.length === 0
-            ? html`<div class="entityEmpty">No entities</div>`
+            ? html`<div class="entityEmpty">${t("entities.empty")}</div>`
             : domains.map((domain: string) => {
                 const items = grouped[domain];
                 const isOpen = !this.collapsedDomains.has(domain);
                 return html`<div class="entityGroup">
                   <button class="entityGroupHeader" type="button" @click=${() => this.toggleDomain(domain)}>
-                    <span class="chevron">${isOpen ? "▾" : "▸"}</span>
+                    ${isOpen
+                      ? html`<app-icon name="chevron-down" size="14" class="chevron" aria-hidden="true"></app-icon>`
+                      : html`<app-icon name="chevron-right" size="14" class="chevron" aria-hidden="true"></app-icon>`}
                     <span class="entityGroupTitle">${domain}</span>
                     <span style="margin-left:auto; opacity:0.75; font-size:var(--font-size-sm);">${items.length}</span>
                   </button>
@@ -372,9 +366,9 @@ export function renderEntityPane(this: any) {
                           return html`<div class="entityCard">
                             <div class="entityName">${name}</div>
                             <div class="entityId">${e.entity_id}</div>
-                            <div class="entityMeta">${domain} • State: ${e.state}</div>
-                            <button class="entityInsert" title="Insert.." @click=${(ev: Event) => { ev.stopPropagation(); this.insertEntityId(e.entity_id); }}>
-                              ➕ <span>Insert</span>
+                            <div class="entityMeta">${domain} • ${t("labels.state")}: ${e.state}</div>
+                            <button class="entityInsert" title=${t("entities.action.insert_title")} @click=${(ev: Event) => { ev.stopPropagation(); this.insertEntityId(e.entity_id); }}>
+                              <app-icon name="plus" size="14" aria-hidden="true"></app-icon><span>${t("entities.action.insert")}</span>
                             </button>
                           </div>`;
                         })}

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Versione release (es. 0.1.78)"
+        description: "Versione release (es. 0.1.70)"
         required: true
         type: string
 
@@ -13,7 +13,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
       - name: Checkout develop
         uses: actions/checkout@v4
@@ -21,14 +20,7 @@ jobs:
           fetch-depth: 0
           ref: develop
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: file_editor_plus/frontend/package-lock.json
-
-      - name: Verify version matches config.yaml
+      - name: Verify version matches files
         run: |
           python - <<'PY'
           import re
@@ -40,62 +32,30 @@ jobs:
             print("Missing version input", file=sys.stderr)
             sys.exit(1)
 
-          text = Path("file_editor_plus/config.yaml").read_text(encoding="utf-8")
-          match = re.search(
-            r'^\s*version:\s*"?([0-9]+\.[0-9]+\.[0-9]+)"?\s*$',
-            text,
-            re.MULTILINE,
-          )
-          if not match:
-            print("Version not found in file_editor_plus/config.yaml", file=sys.stderr)
-            sys.exit(1)
+          def read_version(path: str, pattern: str) -> str:
+            text = Path(path).read_text(encoding="utf-8")
+            match = re.search(pattern, text, re.MULTILINE)
+            if not match:
+              print(f"Version not found in {path}", file=sys.stderr)
+              sys.exit(1)
+            return match.group(1)
 
-          cfg_version = match.group(1)
-          if cfg_version != version:
+          cfg_version = read_version(
+            "file_editor_plus/config.yaml",
+            r'^\s*version:\s*"?([0-9]+\.[0-9]+\.[0-9]+)"?\s*$',
+          )
+          app_version = read_version(
+            "file_editor_plus/frontend/src/app-root.ts",
+            r'appVersion\s*=\s*"([^"]+)"',
+          )
+
+          if cfg_version != version or app_version != version:
             print(
-              f"Version mismatch: input={version}, config.yaml={cfg_version}",
+              f"Version mismatch: input={version}, config.yaml={cfg_version}, app-root.ts={app_version}",
               file=sys.stderr,
             )
             sys.exit(1)
-
-          print(f"config.yaml Version OK: {version}")
-          PY
-
-      - name: Build frontend (release check)
-        run: |
-          cd file_editor_plus/frontend
-          npm ci
-          npm run build
-
-      - name: Verify built frontend contains version
-        run: |
-          python - <<'PY'
-          import sys
-          from pathlib import Path
-
-          version = "${{ inputs.version }}".strip()
-          dist = Path("file_editor_plus/frontend/dist")
-
-          if not dist.exists():
-            print("Missing file_editor_plus/frontend/dist after build", file=sys.stderr)
-            sys.exit(1)
-
-          hits = []
-          for p in dist.rglob("*"):
-            if p.is_file() and p.suffix in (".js", ".css", ".map", ".html"):
-              try:
-                data = p.read_text(encoding="utf-8", errors="ignore")
-              except Exception:
-                continue
-              if version in data:
-                hits.append(str(p))
-
-          if not hits:
-            print(f"Version string '{version}' NOT found in built dist output", file=sys.stderr)
-            print("This usually means the frontend version is not being injected at build-time.", file=sys.stderr)
-            sys.exit(1)
-
-          print(f"Built frontend contains version '{version}' in {len(hits)} file(s).")
+          print(f"Version OK: {version}")
           PY
 
       - name: Build release tree

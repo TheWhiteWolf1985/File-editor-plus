@@ -1,2 +1,3 @@
-import "@mdi/font/css/materialdesignicons.css";
 import "./app-root";
+import "./components/app-icon";
+import "./i18n";

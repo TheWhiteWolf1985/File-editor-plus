@@ -1,0 +1,445 @@
+{
+  "meta": {
+    "language": "it",
+    "version": 5
+  },
+  "btn": {
+    "cancel": "Annulla",
+    "create": "Crea",
+    "apply": "Applica",
+    "delete": "Elimina",
+    "reset": "Reset",
+    "close": "Chiudi",
+    "save": "Salva"
+  },
+  "menu": {
+    "file": "File",
+    "edit": "Modifica",
+    "view": "Vista",
+    "help": "Aiuto"
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "tabs": {
+      "localization": "Localizzazione",
+      "appearance": "Aspetto"
+    },
+    "appearance": {
+      "font_size": "Dimensione caratteri",
+      "font_size_hint": "Regola in tempo reale, salva con Applica."
+    },
+    "localization": {
+      "hint": "Seleziona la lingua dell'interfaccia.",
+      "select_aria": "Seleziona lingua"
+    },
+    "toast": {
+      "save_theme_error": "Errore salvataggio tema",
+      "save_error": "Errore salvataggio impostazioni",
+      "applied": "Impostazioni applicate"
+    }
+  },
+  "status": {
+    "unknown": "sconosciuto",
+    "ready": "Pronto",
+    "loading_file": "Caricamento file...",
+    "error_loading_file": "Errore caricamento file",
+    "session_reset": "Sessione resettata",
+    "yaml_formatting": "Formattazione YAML...",
+    "formatted_unsaved": "Formattato (non salvato)",
+    "format_error": "Errore formattazione",
+    "debug_log_generating": "Generazione debug log...",
+    "debug_log_error": "Errore debug log",
+    "auto_indent": "Auto-indent",
+    "theme": "Tema",
+    "theme_auto": "Auto",
+    "theme_light": "Chiaro",
+    "theme_dark": "Scuro",
+    "line_short": "Ln",
+    "column_short": "Col",
+    "version": "Versione",
+    "encoding_utf8": "UTF-8",
+    "eol_lf": "LF",
+    "runtime_lit": "Lit",
+    "saving": "Salvataggio...",
+    "saved": "Salvato",
+    "in_progress": "In corso..."
+  },
+  "tree": {
+    "status": {
+      "loading": "Caricamento tree...",
+      "empty": "Nessun file",
+      "error_loading": "Errore caricamento tree"
+    },
+    "toast": {
+      "reloaded": "Tree ricaricato",
+      "readonly_folder": "Cartella in sola lettura",
+      "invalid_move_self": "Non puoi spostare una cartella dentro se stessa",
+      "copy_error": "Errore copia",
+      "copied": "Copiato: {path}",
+      "pasted": "Incollato: {path}",
+      "deleted": "Elemento eliminato",
+      "delete_error": "Errore eliminazione"
+    },
+    "validation": {
+      "file_name_required": "Nome file richiesto",
+      "file_exists": "File già esistente",
+      "folder_name_required": "Nome cartella richiesto",
+      "folder_exists": "Cartella già esistente"
+    },
+    "error": {
+      "create_file": "Errore creazione file",
+      "create_folder_exists": "Cartella esiste già o errore",
+      "create_folder": "Errore creazione cartella",
+      "copy_http": "Errore copia (HTTP {status})",
+      "delete_http": "Errore eliminazione (HTTP {status})"
+    },
+    "action": {
+      "reload": "Ricarica tree"
+    }
+  },
+  "modal": {
+    "preview": {
+      "close_aria": "Chiudi anteprima",
+      "title": "Anteprima immagine",
+      "error_load": "Impossibile caricare anteprima immagine",
+      "not_available": "Anteprima non disponibile",
+      "image_not_available": "Immagine non disponibile",
+      "meta": {
+        "name": "Nome",
+        "path": "Percorso",
+        "dimensions": "Dimensioni",
+        "size": "Peso"
+      }
+    },
+    "delete_confirm": {
+      "title": "Conferma eliminazione",
+      "message_prefix": "Vuoi eliminare"
+    },
+    "upload": {
+      "title": "Carica file",
+      "destination_folder": "Cartella destinazione",
+      "error_select_files": "Seleziona almeno un file da caricare",
+      "error_readonly_destination": "Cartella in sola lettura: scegli un'altra destinazione",
+      "error_upload_file": "Errore upload {name}",
+      "error_file_too_large": "File troppo grande: {name}",
+      "error_destination_not_found": "Cartella di destinazione non trovata",
+      "error_invalid_name": "Nome non valido: {name}",
+      "error_file_detail": "{name}: {detail}",
+      "file_uploaded": "Caricato: {name}",
+      "completed": "Upload completato: {success}/{total}",
+      "uploading": "Caricamento...",
+      "progress": "Caricamento... {done}/{total}"
+    },
+    "about": {
+      "title": "Informazioni",
+      "developer": "Sviluppatore",
+      "github": "GitHub",
+      "repository": "Repository",
+      "license": "Licenza"
+    },
+    "settings": {
+      "title": "Impostazioni"
+    },
+    "snippet": {
+      "new_title": "Nuovo snippet"
+    },
+    "unsaved": {
+      "title": "Modifiche non salvate",
+      "discard": "Non salvare",
+      "message": "Hai modifiche non salvate su {path}.",
+      "current_file": "file corrente"
+    },
+    "move_confirm": {
+      "title": "Conferma spostamento",
+      "message": "Spostare {source} in {target}?"
+    },
+    "conflict": {
+      "title": "Conflitto nome",
+      "message": "Esiste già {name} in {target}."
+    }
+  },
+  "errors": {
+    "entities": {
+      "loading": "Errore caricamento entità",
+      "open_file_first": "Apri un file prima di inserire"
+    },
+    "snippets": {
+      "missing_id": "ID snippet mancante"
+    }
+  },
+  "labels": {
+    "zip": "Zip",
+    "state": "Stato",
+    "here": "qui",
+    "on": "On",
+    "off": "Off",
+    "folder": "cartella",
+    "file": "file"
+  },
+  "tabs": {
+    "unsaved": "Non salvato",
+    "welcome": "Benvenuto"
+  },
+  "actions": {
+    "new_file": "Nuovo file",
+    "new_folder": "Nuova cartella",
+    "save": "Salva",
+    "save_as": "Salva con nome…",
+    "import": "Importa…",
+    "export": "Esporta…",
+    "undo": "Annulla",
+    "redo": "Ripeti",
+    "cut": "Taglia",
+    "copy": "Copia",
+    "paste": "Incolla",
+    "save_all": "Salva tutto",
+    "search": "Cerca",
+    "replace": "Sostituisci",
+    "indent_file": "Indenta file",
+    "auto_indent": "Auto-indent",
+    "close": "Chiudi",
+    "move": "Sposta",
+    "rename": "Rinomina",
+    "overwrite": "Sovrascrivi"
+  },
+  "search": {
+    "toast": {
+      "query_required": "Inserisci un termine di ricerca",
+      "error": "Errore ricerca",
+      "run_search_first": "Esegui prima una ricerca",
+      "no_result_replace": "Nessun risultato da sostituire",
+      "no_occurrence": "Nessuna occorrenza da sostituire",
+      "error_replace": "Errore sostituzione",
+      "stale": "File modificato nel frattempo (stale)",
+      "match_not_found": "Occorrenza non trovata",
+      "replaced_one": "Sostituito 1 match",
+      "replace_completed": "Replace completato: {modified} file aggiornati{stale}",
+      "replace_completed_stale_suffix": ", {stale} stale",
+      "file_dirty_not_reloaded": "File aperto con modifiche non salvate: non ricaricato",
+      "error_replace_one": "Errore sostituzione singola"
+    },
+    "status": {
+      "loading": "Ricerca in corso...",
+      "searching": "Ricerca...",
+      "empty": "Nessun risultato",
+      "truncated": "Risultati troncati dai limiti impostati"
+    },
+    "labels": {
+      "hits": "{count} hit",
+      "case_sensitive": "Case sensitive"
+    },
+    "summary": {
+      "hits_in_files": "{hits} hit in {files_with_matches}/{files_scanned} file",
+      "truncated_suffix": "(troncato)"
+    },
+    "action": {
+      "find": "Trova",
+      "replace_match_title": "Sostituisci questo match",
+      "replace": "Sostituisci",
+      "working": "Elaborazione...",
+      "replace_all": "Sostituisci tutto"
+    },
+    "confirm": {
+      "replace_all": "Sostituire {replacements} occorrenze in {files} file?"
+    }
+  },
+  "entities": {
+    "title": "Entità",
+    "empty": "Nessuna entità",
+    "search": {
+      "placeholder": "Cerca ID o nome entità"
+    },
+    "action": {
+      "insert_title": "Inserisci",
+      "insert": "Inserisci"
+    }
+  },
+  "snippets": {
+    "action": {
+      "add": "Aggiungi snippet…",
+      "modify": "Modifica"
+    },
+    "field": {
+      "title": "Titolo",
+      "description": "Descrizione"
+    },
+    "search": {
+      "placeholder": "Cerca snippet..."
+    },
+    "form": {
+      "title_max_100": "Titolo (max 100)",
+      "description_max_250": "Descrizione (max 250)",
+      "content": "Contenuto"
+    },
+    "validation": {
+      "fill_all": "Compila tutti i campi",
+      "title_too_long": "Titolo troppo lungo (max 100)",
+      "description_too_long": "Descrizione troppo lunga (max 250)"
+    },
+    "toast": {
+      "offline_mock": "Snippet offline (mock)",
+      "updated": "Snippet aggiornato",
+      "saved": "Snippet salvato",
+      "save_error": "Errore salvataggio snippet",
+      "inserted": "Snippet inserito: {name}",
+      "deleted": "Snippet eliminato",
+      "delete_error": "Errore eliminazione snippet"
+    },
+    "error": {
+      "missing_id": "ID snippet mancante"
+    }
+  },
+  "system": {
+    "actions": {
+      "reload_yaml": {
+        "label": "Reload YAML",
+        "desc": "Ricarica configuration.yaml e include."
+      },
+      "restart_core": {
+        "label": "Restart Core",
+        "desc": "Riavvia Home Assistant Core."
+      },
+      "restart_supervisor": {
+        "label": "Restart Supervisor",
+        "desc": "Riavvia Supervisor (gestione add-on)."
+      },
+      "reboot_host": {
+        "label": "Reboot Host",
+        "desc": "Riavvia il dispositivo/OS."
+      },
+      "shutdown_host": {
+        "label": "Shutdown Host",
+        "desc": "Spegni il dispositivo/OS."
+      }
+    },
+    "confirm": {
+      "action": "Confermi: {label}?"
+    },
+    "toast": {
+      "action_started": "{label} avviato",
+      "call_error": "Errore chiamata sistema",
+      "cloud_coming_soon": "Backup cloud in arrivo",
+      "download_started": "Download backup avviato",
+      "save_not_supported": "Salvataggio non supportato, avvio download",
+      "saved": "Backup salvato",
+      "save_cancelled": "Salvataggio annullato",
+      "backup_error": "Errore backup"
+    }
+  },
+  "view": {
+    "toolbar_toggle": "Menu strumenti",
+    "indent_guides": "Guide rientro",
+    "split": "Vista divisa",
+    "split_short": "Dividi",
+    "compare": "Confronta…"
+  },
+  "help": {
+    "docs": "Documentazione"
+  },
+  "about": {
+    "title": "Informazioni"
+  },
+  "activity": {
+    "explorer": "Explorer",
+    "entity": "Entità",
+    "snippet": "Snippet",
+    "backup": "Backup",
+    "utility": "Utilità",
+    "system": "Sistema"
+  },
+  "backup": {
+    "local": "Backup locale",
+    "local_loading": "Backup locale...",
+    "local_desc": "Crea uno zip della cartella /config e avvia il download.",
+    "network": "Backup in rete",
+    "network_loading": "Backup in rete...",
+    "network_desc": "Salva lo zip con la finestra di sistema (se supportata).",
+    "cloud": "Backup su cloud",
+    "cloud_coming_soon_desc": "Disponibile a breve."
+  },
+  "utility": {
+    "generating": "Generazione...",
+    "generate_debug_log": "Genera debug log",
+    "generate_debug_log_desc": "Crea un file di debug in /config/.fep-config con info di sistema e log Supervisor."
+  },
+  "editor": {
+    "empty_open_from_explorer": "Apri un file dall'Explorer",
+    "placeholder": {
+      "select_file": "Seleziona un file a sinistra…"
+    }
+  },
+  "explorer": {
+    "action": {
+      "new_file": "Nuovo file",
+      "new_folder": "Nuova cartella",
+      "upload": "Carica"
+    },
+    "context": {
+      "new_file": "Nuovo file",
+      "new_folder": "Nuova cartella"
+    }
+  },
+  "session": {
+    "reset": {
+      "title": "Reset sessione",
+      "desc": "Cancella tabs salvati e buffer, chiude tutte le schede.",
+      "confirm_message": "Questo chiuderà tutte le schede e cancellerà la sessione salvata (session.json e buffer)."
+    }
+  },
+  "toast": {
+    "debug_log_created": "Creato debug log: {filename}",
+    "debug_log_error": "Errore generazione debug log",
+    "file": {
+      "save_error": "Errore salvataggio",
+      "save_as_not_implemented": "Save as non implementato"
+    },
+    "diff": {
+      "error": "Errore diff"
+    },
+    "clipboard": {
+      "nothing_to_copy": "Niente da copiare",
+      "copied": "Copiato",
+      "cut": "Tagliato",
+      "nothing_to_paste": "Niente da incollare",
+      "pasted": "Incollato",
+      "unavailable": "Clipboard non disponibile"
+    },
+    "editor": {
+      "open_file_first": "Apri un file prima di modificare",
+      "undo_unavailable": "Undo non disponibile",
+      "redo_unavailable": "Redo non disponibile",
+      "auto_indent_completed": "Auto-indent completato"
+    },
+    "yaml": {
+      "invalid": "YAML non valido",
+      "formatted": "YAML formattato",
+      "format_error": "Errore formattazione",
+      "format_http_error": "Impossibile formattare YAML (HTTP {status})."
+    },
+    "view": {
+      "enable_split_first": "Attiva prima Split view",
+      "open_file_to_compare": "Apri un file per confrontare"
+    },
+    "help": {
+      "docs_unavailable": "Docs non disponibili"
+    },
+    "move": {
+      "missing_source": "Spostamento non valido (origine mancante)",
+      "destination_conflict": "Esiste già un elemento con lo stesso nome nella destinazione",
+      "invalid": "Spostamento non valido",
+      "not_found": "Origine o destinazione non trovata",
+      "error_http": "Errore move (HTTP {status})",
+      "moved": "Spostato: {name}",
+      "file_reopen_needed": "File spostato: riaprilo dalla nuova posizione",
+      "error": "Errore spostamento"
+    },
+    "session": {
+      "restored_defaults_corrupted": "Sessione ripristinata ai valori predefiniti (session file corrotto)",
+      "unsaved_reopened_from_disk": "Sessione precedente con modifiche non salvate. I file sono stati riaperti dalla versione su disco.",
+      "restored_unsaved_files": "Ripristinati {count} file non salvati dalla sessione precedente",
+      "restored_defaults_error": "Sessione ripristinata ai valori predefiniti (errore)",
+      "reset_done": "Sessione resettata",
+      "reset_error": "Errore reset sessione"
+    }
+  }
+}
