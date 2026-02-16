@@ -2292,6 +2292,18 @@ def docs_index():
         ["system", "Sistema"],
         ["troubleshooting", "Troubleshooting"],
       ];
+      const PAGE_WHITELIST = new Set(PAGES.map(([page]) => page));
+      const LANG_WHITELIST = new Set(["it", "en", "fr", "es", "de"]);
+
+      function resolveUserLang() {
+        try {
+          const stored = (window.localStorage.getItem("locale") || "").toLowerCase();
+          if (LANG_WHITELIST.has(stored)) return stored;
+        } catch (_) {}
+        const navLang = (navigator.language || "en").slice(0, 2).toLowerCase();
+        if (LANG_WHITELIST.has(navLang)) return navLang;
+        return "en";
+      }
 
       function resolveTheme(themeMode) {
         if (themeMode === "dark" || themeMode === "light") return themeMode;
@@ -2383,13 +2395,20 @@ def docs_index():
 
       function safePageName(input) {
         const name = String(input || "index").toLowerCase();
-        return /^[a-z0-9_-]+$/.test(name) ? name : "index";
+        return PAGE_WHITELIST.has(name) ? name : "index";
       }
 
-      async function loadPage(page) {
+      function safeLang(input) {
+        const lang = String(input || "").toLowerCase();
+        return LANG_WHITELIST.has(lang) ? lang : "";
+      }
+
+      async function loadPage(page, lang) {
         const article = document.getElementById("article");
         const target = safePageName(page);
+        const selectedLang = safeLang(lang) || resolveUserLang();
         const url = new URL(`./${target}.md`, window.location.href);
+        url.searchParams.set("lang", selectedLang);
         try {
           const res = await fetch(url);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -2400,12 +2419,13 @@ def docs_index():
         }
       }
 
-      function buildNav(currentPage) {
+      function buildNav(currentPage, lang) {
+        const selectedLang = safeLang(lang) || resolveUserLang();
         const nav = document.getElementById("nav");
         nav.innerHTML = "";
         for (const [page, label] of PAGES) {
           const link = document.createElement("a");
-          link.href = `?page=${encodeURIComponent(page)}`;
+          link.href = `?page=${encodeURIComponent(page)}&lang=${encodeURIComponent(selectedLang)}`;
           link.textContent = label;
           if (page === currentPage) link.classList.add("active");
           nav.appendChild(link);
@@ -2416,8 +2436,9 @@ def docs_index():
         await applyTheme();
         const qs = new URLSearchParams(window.location.search);
         const page = safePageName(qs.get("page") || "index");
-        buildNav(page);
-        await loadPage(page);
+        const lang = safeLang(qs.get("lang")) || resolveUserLang();
+        buildNav(page, lang);
+        await loadPage(page, lang);
       }
 
       boot();

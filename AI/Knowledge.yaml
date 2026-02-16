@@ -72,10 +72,11 @@ epics:
   documentation_i18n:
     source_of_truth: .temp/document.md
     status: in_progress
-    last_completed_step: 1
+    last_completed_step: 2
     decisions:
       - "Step 1: migrated docs to docs/it/* and created placeholder sets for en/fr/es/de."
       - "Temporary compatibility: /docs/{page}.md now serves docs/it/{page}.md pending lang-aware route in Step 2/3."
+      - "Step 2: docs viewer now supports query contract ?page=<slug>&lang=<code> with whitelist and lang-preserving nav links."
     routes_current:
       - /docs
       - /docs/{page}.md
