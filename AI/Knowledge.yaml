@@ -69,3 +69,22 @@ epics:
       - .temp/docs_repo_map.md
       - .temp/docs_step1_decision.md
       - .temp/docs_test_report.md
+  documentation_i18n:
+    source_of_truth: .temp/document.md
+    status: in_progress
+    last_completed_step: 0
+    routes_current:
+      - /docs
+      - /docs/{page}.md
+    docs_layout_current: file_editor_plus/docs/*.md
+    language_source:
+      i18n_file: file_editor_plus/frontend/src/i18n/index.ts
+      storage_key: locale
+      supported: [it, en, de, fr, es]
+    menu_wiring:
+      file: file_editor_plus/frontend/src/app-root.ts
+      function: openDocumentation
+      opens: ./docs/
+    reports:
+      - .temp/docs_i18n_repo_map.md
+      - .temp/docs_i18n_test_report.md
