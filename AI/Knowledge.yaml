@@ -1,0 +1,40 @@
+project:
+  name: ha-file-editor-plus
+  root: /mnt/supervisor/addons/local/ha-file-editor-plus
+  stack:
+    frontend: Lit + TypeScript + Vite
+    backend: FastAPI (Python)
+  addon:
+    slug: file_editor_plus
+    current_version: "0.2.80"
+
+frontend:
+  entrypoints:
+    - file_editor_plus/frontend/src/main.ts
+    - file_editor_plus/frontend/src/app-root.ts
+  topbar:
+    component: file_editor_plus/frontend/src/app-root.ts
+    menu_handler: handleMenuAction
+  theme:
+    host_attribute: data-theme
+    resolved_in: file_editor_plus/frontend/src/app-root.ts
+    palette_applied_in: file_editor_plus/frontend/src/features/settings/settings.ts
+
+backend:
+  app: file_editor_plus/backend/app.py
+  static_serving:
+    assets_mount: /assets
+    frontend_mount: /frontend
+    spa_fallback_route: /{full_path:path}
+
+epics:
+  documentation_base:
+    source_of_truth: .temp/document.md
+    status: in_progress
+    last_completed_step: 0
+    decisions:
+      - "Step 0 completed: topbar/help wiring and theme handling mapped from app-root."
+      - "Preferred docs serving direction identified for Step 1: backend-served docs routes."
+    reports:
+      - .temp/docs_repo_map.md
+      - .temp/docs_test_report.md
