@@ -1,1 +1,445 @@
-{}
+{
+  "meta": {
+    "language": "en",
+    "version": 5
+  },
+  "btn": {
+    "cancel": "Cancel",
+    "create": "Create",
+    "apply": "Apply",
+    "delete": "Delete",
+    "reset": "Reset",
+    "close": "Close",
+    "save": "Save"
+  },
+  "menu": {
+    "file": "File",
+    "edit": "Edit",
+    "view": "View",
+    "help": "Help"
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "localization": "Location",
+      "appearance": "I wait"
+    },
+    "appearance": {
+      "font_size": "Font size",
+      "font_size_hint": "Adjust in real time, save with Apply."
+    },
+    "localization": {
+      "hint": "Select the interface language.",
+      "select_aria": "Select language"
+    },
+    "toast": {
+      "save_theme_error": "Theme saving error",
+      "save_error": "Error saving settings",
+      "applied": "Settings applied"
+    }
+  },
+  "status": {
+    "unknown": "unknown",
+    "ready": "Ready",
+    "loading_file": "Loading files...",
+    "error_loading_file": "File loading error",
+    "session_reset": "Session reset",
+    "yaml_formatting": "Formatting YAML...",
+    "formatted_unsaved": "Formatted (not saved)",
+    "format_error": "Formatting error",
+    "debug_log_generating": "Generating debug log...",
+    "debug_log_error": "Debug log error",
+    "auto_indent": "Auto-indent",
+    "theme": "Theme",
+    "theme_auto": "Car",
+    "theme_light": "Clear",
+    "theme_dark": "Dark",
+    "line_short": "Ln",
+    "column_short": "With the",
+    "version": "Version",
+    "encoding_utf8": "UTF-8",
+    "eol_lf": "LF",
+    "runtime_lit": "Lit",
+    "saving": "Rescue...",
+    "saved": "Saved",
+    "in_progress": "In progress..."
+  },
+  "tree": {
+    "status": {
+      "loading": "Loading tree...",
+      "empty": "No files",
+      "error_loading": "Tree loading error"
+    },
+    "toast": {
+      "reloaded": "Tree reloaded",
+      "readonly_folder": "Read-only folder",
+      "invalid_move_self": "You can't move a folder within itself",
+      "copy_error": "Copy error",
+      "copied": "Copied: {path}",
+      "pasted": "Pasted: {path}",
+      "deleted": "Item deleted",
+      "delete_error": "Delete error"
+    },
+    "validation": {
+      "file_name_required": "File name required",
+      "file_exists": "File already exists",
+      "folder_name_required": "Folder name required",
+      "folder_exists": "Folder already exists"
+    },
+    "error": {
+      "create_file": "File creation error",
+      "create_folder_exists": "Folder already exists or error",
+      "create_folder": "Folder creation error",
+      "copy_http": "Copy Error (HTTP {status})",
+      "delete_http": "Delete Error (HTTP {status})"
+    },
+    "action": {
+      "reload": "Reload tree"
+    }
+  },
+  "modal": {
+    "preview": {
+      "close_aria": "Close preview",
+      "title": "Preview image",
+      "error_load": "Unable to load image preview",
+      "not_available": "Preview not available",
+      "image_not_available": "Image not available",
+      "meta": {
+        "name": "Name",
+        "path": "Path",
+        "dimensions": "Dimensions",
+        "size": "Weight"
+      }
+    },
+    "delete_confirm": {
+      "title": "Confirm deletion",
+      "message_prefix": "You want to delete"
+    },
+    "upload": {
+      "title": "Upload files",
+      "destination_folder": "Destination folder",
+      "error_select_files": "Select at least one file to upload",
+      "error_readonly_destination": "Read-only folder: Choose another destination",
+      "error_upload_file": "Upload error {name}",
+      "error_file_too_large": "File too large: {name}",
+      "error_destination_not_found": "Destination folder not found",
+      "error_invalid_name": "Invalid name: {name}",
+      "error_file_detail": "{name}: {detail}",
+      "file_uploaded": "Loaded: {name}",
+      "completed": "Upload completed: {success}/{total}",
+      "uploading": "Loading...",
+      "progress": "Loading... {done}/{total}"
+    },
+    "about": {
+      "title": "Information",
+      "developer": "Developer",
+      "github": "GitHub",
+      "repository": "Repositories",
+      "license": "License"
+    },
+    "settings": {
+      "title": "Settings"
+    },
+    "snippet": {
+      "new_title": "New snippet"
+    },
+    "unsaved": {
+      "title": "Unsaved changes",
+      "discard": "Don't save",
+      "message": "You have unsaved changes on {path}.",
+      "current_file": "current file"
+    },
+    "move_confirm": {
+      "title": "Confirm move",
+      "message": "Move {source} to {target}?"
+    },
+    "conflict": {
+      "title": "Name conflict",
+      "message": "{name} already exists in {target}."
+    }
+  },
+  "errors": {
+    "entities": {
+      "loading": "Entity loading error",
+      "open_file_first": "Open a file before inserting"
+    },
+    "snippets": {
+      "missing_id": "Missing snippet ID"
+    }
+  },
+  "labels": {
+    "zip": "Zip",
+    "state": "State",
+    "here": "here",
+    "on": "Hon",
+    "off": "Off",
+    "folder": "folder",
+    "file": "file"
+  },
+  "tabs": {
+    "unsaved": "Not saved",
+    "welcome": "Welcome"
+  },
+  "actions": {
+    "new_file": "New file",
+    "new_folder": "New folder",
+    "save": "Save",
+    "save_as": "Save as…",
+    "import": "It matters…",
+    "export": "Export…",
+    "undo": "Cancel",
+    "redo": "Repeat",
+    "cut": "Cut",
+    "copy": "Copy",
+    "paste": "Paste",
+    "save_all": "Save everything",
+    "search": "Near",
+    "replace": "Replace",
+    "indent_file": "Indent files",
+    "auto_indent": "Auto-indent",
+    "close": "Close",
+    "move": "Move",
+    "rename": "Rename",
+    "overwrite": "Overwrite"
+  },
+  "search": {
+    "toast": {
+      "query_required": "Enter a search term",
+      "error": "Search error",
+      "run_search_first": "Do a search first",
+      "no_result_replace": "No results to replace",
+      "no_occurrence": "No occurrences to replace",
+      "error_replace": "Replacement error",
+      "stale": "File modified in the meantime (stale)",
+      "match_not_found": "Occurrence not found",
+      "replaced_one": "Replaced 1 match",
+      "replace_completed": "Replace completed: {modified} files updated{stale}",
+      "replace_completed_stale_suffix": ", {stale} stale",
+      "file_dirty_not_reloaded": "File opened with unsaved changes: not reloaded",
+      "error_replace_one": "Single substitution error"
+    },
+    "status": {
+      "loading": "Searching...",
+      "searching": "Research...",
+      "empty": "No results",
+      "truncated": "Results truncated by set limits"
+    },
+    "labels": {
+      "hits": "{count} hit",
+      "case_sensitive": "Case sensitive"
+    },
+    "summary": {
+      "hits_in_files": "{hits} hit in {files_with_matches}/{files_scanned} file",
+      "truncated_suffix": "(truncated)"
+    },
+    "action": {
+      "find": "Finds",
+      "replace_match_title": "Replace this match",
+      "replace": "Replace",
+      "working": "Processing...",
+      "replace_all": "Replace everything"
+    },
+    "confirm": {
+      "replace_all": "Replace {replacements} occurrences in {files} file?"
+    }
+  },
+  "entities": {
+    "title": "Entity",
+    "empty": "No entities",
+    "search": {
+      "placeholder": "Search for ID or entity name"
+    },
+    "action": {
+      "insert_title": "Enter",
+      "insert": "Enter"
+    }
+  },
+  "snippets": {
+    "action": {
+      "add": "Add snippet…",
+      "modify": "Edit"
+    },
+    "field": {
+      "title": "Title",
+      "description": "Description"
+    },
+    "search": {
+      "placeholder": "Search snippet..."
+    },
+    "form": {
+      "title_max_100": "Title (max 100)",
+      "description_max_250": "Description (max 250)",
+      "content": "Content"
+    },
+    "validation": {
+      "fill_all": "Fill in all fields",
+      "title_too_long": "Title too long (max 100)",
+      "description_too_long": "Description too long (max 250)"
+    },
+    "toast": {
+      "offline_mock": "Offline snippet (mock)",
+      "updated": "Updated snippet",
+      "saved": "Snippet saved",
+      "save_error": "Error saving snippet",
+      "inserted": "Snippet inserted: {name}",
+      "deleted": "Snippet deleted",
+      "delete_error": "Error deleting snippet"
+    },
+    "error": {
+      "missing_id": "Missing snippet ID"
+    }
+  },
+  "system": {
+    "actions": {
+      "reload_yaml": {
+        "label": "Reload YAML",
+        "desc": "Reload configuration.yaml and include."
+      },
+      "restart_core": {
+        "label": "Restart Core",
+        "desc": "Restart Home Assistant Core."
+      },
+      "restart_supervisor": {
+        "label": "Restart Supervisor",
+        "desc": "Restart Supervisor (add-on management)."
+      },
+      "reboot_host": {
+        "label": "Reboot Host",
+        "desc": "Reboot your device/OS."
+      },
+      "shutdown_host": {
+        "label": "Shutdown Host",
+        "desc": "Turn off your device/OS."
+      }
+    },
+    "confirm": {
+      "action": "Do you confirm: {label}?"
+    },
+    "toast": {
+      "action_started": "{label} started",
+      "call_error": "System call error",
+      "cloud_coming_soon": "Cloud backup coming soon",
+      "download_started": "Backup download started",
+      "save_not_supported": "Saving not supported, starting download",
+      "saved": "Backup saved",
+      "save_cancelled": "Saving cancelled",
+      "backup_error": "Backup error"
+    }
+  },
+  "view": {
+    "toolbar_toggle": "Tools menu",
+    "indent_guides": "Return guides",
+    "split": "Split view",
+    "split_short": "Divide",
+    "compare": "Compare…"
+  },
+  "help": {
+    "docs": "Documentation"
+  },
+  "about": {
+    "title": "Information"
+  },
+  "activity": {
+    "explorer": "Explorer",
+    "entity": "Entity",
+    "snippet": "Snippets",
+    "backup": "Backups",
+    "utility": "Utility",
+    "system": "System"
+  },
+  "backup": {
+    "local": "Local backup",
+    "local_loading": "Local backup...",
+    "local_desc": "Create a zip of the /config folder and start the download.",
+    "network": "Network backup",
+    "network_loading": "Network backup...",
+    "network_desc": "Save the zip with the system window (if supported).",
+    "cloud": "Cloud backup",
+    "cloud_coming_soon_desc": "Available soon."
+  },
+  "utility": {
+    "generating": "Generation...",
+    "generate_debug_log": "Generate debug log",
+    "generate_debug_log_desc": "Create a debug file in /config/.fep-config with system info and Supervisor logs."
+  },
+  "editor": {
+    "empty_open_from_explorer": "Open a file from Explorer",
+    "placeholder": {
+      "select_file": "Select a file on the left…"
+    }
+  },
+  "explorer": {
+    "action": {
+      "new_file": "New file",
+      "new_folder": "New folder",
+      "upload": "Load"
+    },
+    "context": {
+      "new_file": "New file",
+      "new_folder": "New folder"
+    }
+  },
+  "session": {
+    "reset": {
+      "title": "Reset session",
+      "desc": "Clears saved tabs and buffers, closes all tabs.",
+      "confirm_message": "This will close all tabs and delete the saved session (session.json and buffer)."
+    }
+  },
+  "toast": {
+    "debug_log_created": "Created debug log: {filename}",
+    "debug_log_error": "Error generating debug log",
+    "file": {
+      "save_error": "Save error",
+      "save_as_not_implemented": "Save as not implemented"
+    },
+    "diff": {
+      "error": "Error diff"
+    },
+    "clipboard": {
+      "nothing_to_copy": "Nothing to copy",
+      "copied": "Copied",
+      "cut": "Cut",
+      "nothing_to_paste": "Nothing to glue",
+      "pasted": "Glued",
+      "unavailable": "Clipboard not available"
+    },
+    "editor": {
+      "open_file_first": "Open a file before editing",
+      "undo_unavailable": "Undo not available",
+      "redo_unavailable": "Redo not available",
+      "auto_indent_completed": "Auto-indent completed"
+    },
+    "yaml": {
+      "invalid": "YAML invalid",
+      "formatted": "YAML formatted",
+      "format_error": "Formatting error",
+      "format_http_error": "Unable to format YAML (HTTP {status})."
+    },
+    "view": {
+      "enable_split_first": "Activate Split view first",
+      "open_file_to_compare": "Open a file to compare"
+    },
+    "help": {
+      "docs_unavailable": "Docs not available"
+    },
+    "move": {
+      "missing_source": "Invalid move (missing origin)",
+      "destination_conflict": "An item with the same name already exists in the destination",
+      "invalid": "Invalid move",
+      "not_found": "Source or destination not found",
+      "error_http": "Move error (HTTP {status})",
+      "moved": "Moved: {name}",
+      "file_reopen_needed": "Moved file: Reopen it from the new location",
+      "error": "Shift error"
+    },
+    "session": {
+      "restored_defaults_corrupted": "Session restored to default values ​​(session file corrupted)",
+      "unsaved_reopened_from_disk": "Previous session with unsaved changes. The files were reopened from the disk version.",
+      "restored_unsaved_files": "Restored {count} unsaved files from the previous session",
+      "restored_defaults_error": "Session reset to defaults (error)",
+      "reset_done": "Session reset",
+      "reset_error": "Session reset error"
+    }
+  }
+}

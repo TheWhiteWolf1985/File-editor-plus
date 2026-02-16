@@ -714,6 +714,36 @@ export const figmaEditorStyles = css`
   color: var(--light-text-primary);
 }
 
+:host([data-theme="dark"]) .editor-tab.active,
+:host([data-theme="dark"]) .tab.active {
+  background: rgba(20, 184, 166, 0.1);
+  color: var(--dark-text-primary);
+  border-color: rgba(94, 234, 212, 0.55);
+  box-shadow:
+    0 0 0 2px var(--accent-light),
+    0 6px 16px rgba(20, 184, 166, 0.2);
+}
+
+:host([data-theme="light"]) .editor-tab.active,
+:host([data-theme="light"]) .tab.active {
+  background: rgba(13, 148, 136, 0.08);
+  color: var(--light-text-primary);
+  border-color: rgba(94, 234, 212, 0.55);
+  box-shadow:
+    0 0 0 2px var(--accent-light),
+    0 6px 16px rgba(20, 184, 166, 0.2);
+}
+
+:host([data-theme="dark"]) .editor-tab.active:hover,
+:host([data-theme="dark"]) .tab.active:hover,
+:host([data-theme="light"]) .editor-tab.active:hover,
+:host([data-theme="light"]) .tab.active:hover {
+  border-color: rgba(94, 234, 212, 0.55);
+  box-shadow:
+    0 0 0 2px var(--accent-light),
+    0 6px 16px rgba(20, 184, 166, 0.2);
+}
+
 .editor-tab-name {
   display: block;
   font-size: 14px;

@@ -159,11 +159,12 @@ export const apiSearchReplaceOne = (apiBase: string, payload: SearchReplaceOnePa
   });
 };
 
-export const apiPostHaAction = (apiBase: string, action: string) => {
+export const apiPostHaAction = (apiBase: string, action: string, signal?: AbortSignal) => {
   const url = `${apiBase}api/ha/action`;
   return fetch(url, {
     method: "POST",
     headers: jsonHeaders,
+    signal,
     body: JSON.stringify({ action }),
   });
 };

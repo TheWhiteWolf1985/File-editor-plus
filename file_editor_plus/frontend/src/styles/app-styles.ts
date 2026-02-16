@@ -762,7 +762,7 @@ export const appStyles = css`
       pointer-events: none;
       user-select: none;
       -webkit-user-select: none;
-      overflow: hidden;
+      overflow: auto;
       min-width: 100%;
       width: max-content;
       min-height: 100%;
