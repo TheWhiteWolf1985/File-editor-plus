@@ -2432,10 +2432,10 @@ def docs_markdown(page: str):
     if not re.fullmatch(r"[A-Za-z0-9_-]+", page):
         raise HTTPException(404, "Invalid docs page")
     docs_dir = _resolve_docs_dir()
-    target = (docs_dir / f"{page}.md").resolve()
+    target = (docs_dir / "it" / f"{page}.md").resolve()
     if not target.exists() or not target.is_file():
         raise HTTPException(404, "Docs page not found")
-    if target.parent != docs_dir:
+    if target.parent != (docs_dir / "it").resolve():
         raise HTTPException(403, "Access denied")
     return FileResponse(str(target), media_type="text/markdown; charset=utf-8")
 

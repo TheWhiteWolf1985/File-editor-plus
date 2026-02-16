@@ -72,11 +72,14 @@ epics:
   documentation_i18n:
     source_of_truth: .temp/document.md
     status: in_progress
-    last_completed_step: 0
+    last_completed_step: 1
+    decisions:
+      - "Step 1: migrated docs to docs/it/* and created placeholder sets for en/fr/es/de."
+      - "Temporary compatibility: /docs/{page}.md now serves docs/it/{page}.md pending lang-aware route in Step 2/3."
     routes_current:
       - /docs
       - /docs/{page}.md
-    docs_layout_current: file_editor_plus/docs/*.md
+    docs_layout_current: file_editor_plus/docs/<lang>/*.md
     language_source:
       i18n_file: file_editor_plus/frontend/src/i18n/index.ts
       storage_key: locale
