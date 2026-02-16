@@ -24,12 +24,13 @@ import json
 import httpx
 import websockets
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect, UploadFile, File, Form
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 BASE_DIR = Path("/config").resolve()
 BACKUP_DIR = (BASE_DIR / ".fep-backups").resolve()
 FRONTEND_DIR = Path("/app/frontend").resolve()
+DOCS_DIR = Path("/app/docs").resolve()
 FEP_CONFIG_DIR = (BASE_DIR / ".fep-config").resolve()
 BUFFER_DIR = (FEP_CONFIG_DIR / "session_buffers").resolve()
 SNIPPET_DIR = FEP_CONFIG_DIR
@@ -97,6 +98,13 @@ def _is_within_base(p: Path) -> bool:
         return True
     except Exception:
         return False
+
+
+def _resolve_docs_dir() -> Path:
+    if DOCS_DIR.exists():
+        return DOCS_DIR
+    local_docs = (Path(__file__).resolve().parents[1] / "docs").resolve()
+    return local_docs
 
 
 def safe_path(rel: str) -> Path:
@@ -2138,6 +2146,298 @@ def index():
     if not idx.exists():
         return JSONResponse({"error": "frontend not built"}, status_code=500)
     return FileResponse(str(idx))
+
+
+@app.get("/docs", response_class=HTMLResponse)
+@app.get("/docs/", response_class=HTMLResponse)
+def docs_index():
+    html = """<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>File Editor Plus — Documentazione</title>
+    <style>
+      :root {
+        --accent-primary: #14b8a6;
+        --accent-light: #5eead4;
+      }
+      [data-theme="dark"] {
+        --bg: #0a0a0a;
+        --panel: #141414;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --border: rgba(255, 255, 255, 0.1);
+        --code-bg: #101010;
+      }
+      [data-theme="light"] {
+        --bg: #f8f9fa;
+        --panel: #ffffff;
+        --text: #1f2937;
+        --muted: #4b5563;
+        --border: rgba(0, 0, 0, 0.14);
+        --code-bg: #f3f4f6;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 14px;
+      }
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(220px, 280px) 1fr;
+        min-height: 100vh;
+      }
+      .sidebar {
+        border-right: 1px solid var(--border);
+        background: var(--panel);
+        padding: 16px;
+      }
+      .sidebar h1 {
+        margin: 0 0 8px;
+        font-size: 18px;
+      }
+      .sidebar p {
+        margin: 0 0 16px;
+        color: var(--muted);
+      }
+      .nav {
+        display: grid;
+        gap: 6px;
+      }
+      .nav a {
+        border: 1px solid transparent;
+        border-radius: 8px;
+        color: var(--text);
+        padding: 8px 10px;
+        text-decoration: none;
+      }
+      .nav a:hover {
+        border-color: var(--accent-primary);
+        background: rgba(20, 184, 166, 0.12);
+      }
+      .nav a.active {
+        border-color: var(--accent-light);
+        box-shadow: 0 0 0 1px var(--accent-light);
+      }
+      .content {
+        min-width: 0;
+        padding: 24px;
+      }
+      article {
+        max-width: 900px;
+        margin: 0 auto;
+        line-height: 1.65;
+      }
+      article h1, article h2, article h3 { line-height: 1.3; }
+      article h1 { margin-top: 0; }
+      article a { color: var(--accent-primary); }
+      article code {
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 2px 6px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      article pre {
+        overflow: auto;
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+      }
+      article pre code {
+        border: 0;
+        background: transparent;
+        padding: 0;
+      }
+      .error {
+        border: 1px solid #ef4444;
+        color: #ef4444;
+        border-radius: 8px;
+        padding: 12px;
+      }
+      @media (max-width: 860px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar">
+        <h1>Documentazione</h1>
+        <p>Guida rapida, pratica e adatta alle prime armi.</p>
+        <nav id="nav" class="nav"></nav>
+      </aside>
+      <main class="content">
+        <article id="article">Caricamento documentazione…</article>
+      </main>
+    </div>
+    <script>
+      const PAGES = [
+        ["index", "Start here"],
+        ["editor", "Editor"],
+        ["files", "File e cartelle"],
+        ["settings", "Impostazioni"],
+        ["system", "Sistema"],
+        ["troubleshooting", "Troubleshooting"],
+      ];
+
+      function resolveTheme(themeMode) {
+        if (themeMode === "dark" || themeMode === "light") return themeMode;
+        return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+
+      async function applyTheme() {
+        try {
+          const res = await fetch(new URL("../api/user-config", window.location.href));
+          if (res.ok) {
+            const data = await res.json();
+            const mode = data?.config?.theme_mode || data?.theme_mode || "auto";
+            document.documentElement.setAttribute("data-theme", resolveTheme(mode));
+            return;
+          }
+        } catch (_) {}
+        document.documentElement.setAttribute("data-theme", resolveTheme("auto"));
+      }
+
+      function escapeHtml(s) {
+        return s
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;");
+      }
+
+      function inlineMd(text) {
+        return text
+          .replace(/`([^`]+)`/g, "<code>$1</code>")
+          .replace(/\\*\\*([^*]+)\\*\\*/g, "<strong>$1</strong>")
+          .replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, "<a href=\\"$2\\">$1</a>");
+      }
+
+      function renderMarkdown(md) {
+        const lines = md.replace(/\\r\\n/g, "\\n").split("\\n");
+        const out = [];
+        let inCode = false;
+        let inUl = false;
+        let inOl = false;
+        for (const raw of lines) {
+          const line = raw;
+          if (line.startsWith("```")) {
+            if (!inCode) out.push("<pre><code>");
+            else out.push("</code></pre>");
+            inCode = !inCode;
+            continue;
+          }
+          if (inCode) {
+            out.push(escapeHtml(line) + "\\n");
+            continue;
+          }
+          if (/^\\s*[-*]\\s+/.test(line)) {
+            if (!inUl) { out.push("<ul>"); inUl = true; }
+            if (inOl) { out.push("</ol>"); inOl = false; }
+            out.push("<li>" + inlineMd(line.replace(/^\\s*[-*]\\s+/, "")) + "</li>");
+            continue;
+          }
+          if (/^\\s*\\d+\\.\\s+/.test(line)) {
+            if (!inOl) { out.push("<ol>"); inOl = true; }
+            if (inUl) { out.push("</ul>"); inUl = false; }
+            out.push("<li>" + inlineMd(line.replace(/^\\s*\\d+\\.\\s+/, "")) + "</li>");
+            continue;
+          }
+          if (inUl) { out.push("</ul>"); inUl = false; }
+          if (inOl) { out.push("</ol>"); inOl = false; }
+          if (!line.trim()) {
+            out.push("");
+            continue;
+          }
+          if (line.startsWith("### ")) {
+            out.push("<h3>" + inlineMd(line.slice(4)) + "</h3>");
+            continue;
+          }
+          if (line.startsWith("## ")) {
+            out.push("<h2>" + inlineMd(line.slice(3)) + "</h2>");
+            continue;
+          }
+          if (line.startsWith("# ")) {
+            out.push("<h1>" + inlineMd(line.slice(2)) + "</h1>");
+            continue;
+          }
+          out.push("<p>" + inlineMd(line) + "</p>");
+        }
+        if (inUl) out.push("</ul>");
+        if (inOl) out.push("</ol>");
+        if (inCode) out.push("</code></pre>");
+        return out.join("\\n");
+      }
+
+      function safePageName(input) {
+        const name = String(input || "index").toLowerCase();
+        return /^[a-z0-9_-]+$/.test(name) ? name : "index";
+      }
+
+      async function loadPage(page) {
+        const article = document.getElementById("article");
+        const target = safePageName(page);
+        const url = new URL(`./${target}.md`, window.location.href);
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const md = await res.text();
+          article.innerHTML = renderMarkdown(md);
+        } catch (err) {
+          article.innerHTML = `<div class=\\"error\\">Impossibile caricare la pagina <code>${target}.md</code> (${String(err)}).</div>`;
+        }
+      }
+
+      function buildNav(currentPage) {
+        const nav = document.getElementById("nav");
+        nav.innerHTML = "";
+        for (const [page, label] of PAGES) {
+          const link = document.createElement("a");
+          link.href = `?page=${encodeURIComponent(page)}`;
+          link.textContent = label;
+          if (page === currentPage) link.classList.add("active");
+          nav.appendChild(link);
+        }
+      }
+
+      async function boot() {
+        await applyTheme();
+        const qs = new URLSearchParams(window.location.search);
+        const page = safePageName(qs.get("page") || "index");
+        buildNav(page);
+        await loadPage(page);
+      }
+
+      boot();
+    </script>
+  </body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
+@app.get("/docs/{page}.md")
+def docs_markdown(page: str):
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", page):
+        raise HTTPException(404, "Invalid docs page")
+    docs_dir = _resolve_docs_dir()
+    target = (docs_dir / f"{page}.md").resolve()
+    if not target.exists() or not target.is_file():
+        raise HTTPException(404, "Docs page not found")
+    if target.parent != docs_dir:
+        raise HTTPException(403, "Access denied")
+    return FileResponse(str(target), media_type="text/markdown; charset=utf-8")
 
 
 @app.get("/{full_path:path}")

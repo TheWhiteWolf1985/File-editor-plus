@@ -31,11 +31,12 @@ epics:
   documentation_base:
     source_of_truth: .temp/document.md
     status: in_progress
-    last_completed_step: 2
+    last_completed_step: 3
     decisions:
       - "Step 0 completed: topbar/help wiring and theme handling mapped from app-root."
       - "Step 1 decision: use backend-served docs routes (/docs + /docs/{page}.md) instead of SPA routing."
       - "Step 2 completed: docs markdown corpus created under file_editor_plus/docs."
+      - "Step 3 completed: backend docs viewer route implemented with local markdown rendering and theme sync."
     planned_files:
       - file_editor_plus/backend/app.py
       - file_editor_plus/frontend/src/app-root.ts
@@ -45,6 +46,15 @@ epics:
       - file_editor_plus/docs/settings.md
       - file_editor_plus/docs/system.md
       - file_editor_plus/docs/troubleshooting.md
+      - file_editor_plus/Dockerfile
+    docs_runtime:
+      backend_routes:
+        - /docs
+        - /docs/{page}.md
+      source_dir: /app/docs
+      theme_source:
+        - /api/user-config theme_mode
+        - prefers-color-scheme fallback
     docs_pages:
       - file_editor_plus/docs/index.md
       - file_editor_plus/docs/editor.md

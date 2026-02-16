@@ -25,6 +25,7 @@ RUN pip install --no-cache-dir -r /app/backend/requirements.txt
 
 # Frontend dist -> /app/frontend
 COPY --from=fe /fe/dist /app/frontend
+COPY docs/ /app/docs/
 
 # s6 service
 COPY rootfs/ /
