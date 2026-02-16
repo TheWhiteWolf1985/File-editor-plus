@@ -2403,19 +2403,46 @@ def docs_index():
         return LANG_WHITELIST.has(lang) ? lang : "";
       }
 
-      async function loadPage(page, lang) {
+      function isDevRuntime() {
+        return ["localhost", "127.0.0.1"].includes(window.location.hostname);
+      }
+
+      async function loadDoc(page, lang) {
         const article = document.getElementById("article");
         const target = safePageName(page);
         const selectedLang = safeLang(lang) || resolveUserLang();
-        const url = new URL(`./${target}.md`, window.location.href);
-        url.searchParams.set("lang", selectedLang);
-        try {
-          const res = await fetch(url);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const md = await res.text();
-          article.innerHTML = renderMarkdown(md);
-        } catch (err) {
-          article.innerHTML = `<div class=\\"error\\">Impossibile caricare la pagina <code>${target}.md</code> (${String(err)}).</div>`;
+        const attempts = [selectedLang, "en", "it"].filter((value, index, arr) => arr.indexOf(value) === index);
+        let lastError = "unknown";
+
+        for (const candidateLang of attempts) {
+          const url = new URL(`./${candidateLang}/${target}.md`, window.location.href);
+          try {
+            const res = await fetch(url);
+            if (isDevRuntime()) {
+              console.info("[docs] load attempt", { page: target, lang: candidateLang, status: res.status, url: url.toString() });
+            }
+            if (res.ok) {
+              const md = await res.text();
+              article.innerHTML = renderMarkdown(md);
+              return;
+            }
+            if (res.status === 404) {
+              lastError = "404";
+              continue;
+            }
+            lastError = `HTTP ${res.status}`;
+            article.innerHTML = `<div class=\\"error\\">Non riesco a caricare la doc. Riprova.</div>`;
+            return;
+          } catch (err) {
+            lastError = String(err);
+            article.innerHTML = `<div class=\\"error\\">Non riesco a caricare la doc. Riprova.</div>`;
+            return;
+          }
+        }
+
+        article.innerHTML = `<div class=\\"error\\">Doc non trovata. Torna alla <a href=\\"?page=index&lang=${encodeURIComponent(selectedLang)}\\">pagina iniziale</a>.</div>`;
+        if (isDevRuntime()) {
+          console.warn("[docs] fallback exhausted", { page: target, requestedLang: selectedLang, attempts, lastError });
         }
       }
 
@@ -2438,7 +2465,7 @@ def docs_index():
         const page = safePageName(qs.get("page") || "index");
         const lang = safeLang(qs.get("lang")) || resolveUserLang();
         buildNav(page, lang);
-        await loadPage(page, lang);
+        await loadDoc(page, lang);
       }
 
       boot();
@@ -2448,17 +2475,28 @@ def docs_index():
     return HTMLResponse(content=html)
 
 
-@app.get("/docs/{page}.md")
-def docs_markdown(page: str):
+@app.get("/docs/{lang}/{page}.md")
+def docs_markdown_lang(lang: str, page: str):
+    if not re.fullmatch(r"[A-Za-z]{2}", lang):
+        raise HTTPException(404, "Invalid docs language")
     if not re.fullmatch(r"[A-Za-z0-9_-]+", page):
         raise HTTPException(404, "Invalid docs page")
+    normalized_lang = lang.lower()
+    if normalized_lang not in {"it", "en", "fr", "es", "de"}:
+        raise HTTPException(404, "Unsupported docs language")
     docs_dir = _resolve_docs_dir()
-    target = (docs_dir / "it" / f"{page}.md").resolve()
+    lang_dir = (docs_dir / normalized_lang).resolve()
+    target = (lang_dir / f"{page}.md").resolve()
     if not target.exists() or not target.is_file():
         raise HTTPException(404, "Docs page not found")
-    if target.parent != (docs_dir / "it").resolve():
+    if target.parent != lang_dir:
         raise HTTPException(403, "Access denied")
     return FileResponse(str(target), media_type="text/markdown; charset=utf-8")
+
+
+@app.get("/docs/{page}.md")
+def docs_markdown_legacy(page: str):
+    return docs_markdown_lang("it", page)
 
 
 @app.get("/{full_path:path}")
