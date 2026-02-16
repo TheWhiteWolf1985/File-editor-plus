@@ -1878,6 +1878,11 @@ export class AppRoot extends LitElement {
     }, 5000);
   }
 
+  private openDocumentation() {
+    const docsUrl = new URL("./docs/", window.location.href);
+    window.open(docsUrl.toString(), "_blank", "noopener,noreferrer");
+  }
+
   private handleMenuAction(menu: string, action: string) {
     this.openMenu = null;
     if (menu === "file") {
@@ -1951,7 +1956,7 @@ export class AppRoot extends LitElement {
       if (action === "About") {
         this.openAboutModal();
       } else if (action === "Docs") {
-        this.showToast(t("toast.help.docs_unavailable"), "info");
+        this.openDocumentation();
       }
     }
   }
