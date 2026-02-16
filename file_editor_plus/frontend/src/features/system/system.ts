@@ -41,8 +41,12 @@ export async function runSystemAction(this: any, action: string, label: string, 
   }
   this.systemActionLoading = true;
   this.systemActionPending = action;
+  const controller = new AbortController();
+  const timeoutMs = 45000;
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  this.showToast(`${label} in corso…`, "info");
   try {
-    const res = await apiPostHaAction(this.apiBase, action);
+    const res = await apiPostHaAction(this.apiBase, action, controller.signal);
     let payload: any = null;
     try {
       payload = await res.json();
@@ -50,14 +54,40 @@ export async function runSystemAction(this: any, action: string, label: string, 
       payload = null;
     }
     if (!res.ok || payload?.ok !== true) {
-      const msg = payload?.error?.message || payload?.detail || `Errore azione (HTTP ${res.status})`;
-      this.showToast(msg, "error");
+      if (import.meta.env.DEV) {
+        console.warn("runSystemAction failed", {
+          action,
+          status: res.status,
+          payload,
+        });
+      }
+      const rawMsg = payload?.error?.message || payload?.detail || `Errore azione (HTTP ${res.status})`;
+      const msg =
+        res.status === 503 || /supervisor environment not available/i.test(rawMsg)
+          ? "Ambiente Home Assistant Supervisor non disponibile"
+          : rawMsg;
+      this.showToast(`${label} fallito: ${msg}`, "error");
       return;
     }
-    this.showToast(t("system.toast.action_started", { label }));
-  } catch {
-    this.showToast(t("system.toast.call_error"), "error");
+    if (import.meta.env.DEV && action === "reload_yaml") {
+      console.info("reload_yaml execution details", {
+        used: payload?.used,
+        steps: payload?.steps,
+      });
+    }
+    this.showToast(`${label} completato`);
+  } catch (error) {
+    const timeout = error instanceof DOMException && error.name === "AbortError";
+    if (import.meta.env.DEV) {
+      console.warn("runSystemAction exception", { action, timeout, error });
+    }
+    if (timeout) {
+      this.showToast(`${label} fallito: operazione in timeout`, "error");
+    } else {
+      this.showToast(`${label} fallito: ${t("system.toast.call_error")}`, "error");
+    }
   } finally {
+    window.clearTimeout(timeoutId);
     this.systemActionLoading = false;
     this.systemActionPending = null;
   }

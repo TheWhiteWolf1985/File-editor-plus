@@ -72,7 +72,7 @@ MAX_BUFFER_FILES = 10
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
 CONFLICT_MODES = {"fail", "overwrite", "autorename"}
 HA_ACTIONS = {
-    "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_core_config"},
+    "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_all"},
     "restart_core": {"type": "service", "domain": "homeassistant", "service": "restart"},
     "restart_supervisor": {"type": "supervisor", "path": "/supervisor/restart"},
     "reboot_host": {"type": "supervisor", "path": "/host/reboot"},
@@ -961,15 +961,232 @@ async def ha_action(request: Request):
     if action not in HA_ACTIONS:
         raise HTTPException(400, "Invalid action")
     if not SUPERVISOR_TOKEN:
-        logger.error("ha_action: missing SUPERVISOR_TOKEN for %s", action)
-        raise HTTPException(500, "Missing supervisor token")
+        logger.warning("ha_action: missing SUPERVISOR_TOKEN for action=%s", action)
+        return JSONResponse(
+            status_code=503,
+            content={
+                "ok": False,
+                "action": action,
+                "error": {
+                    "message": "Supervisor environment not available",
+                    "status": 503,
+                    "details": "Missing supervisor token",
+                },
+            },
+        )
     cfg = HA_ACTIONS[action]
+
+    def clip_text(value: str, max_len: int = 2048) -> str:
+        if len(value) <= max_len:
+            return value
+        return value[:max_len] + "...(truncated)"
+
+    def is_service_unavailable(status_code: int, body: str) -> bool:
+        text = (body or "").lower()
+        if status_code == 404:
+            return True
+        return (
+            "service not found" in text
+            or "unknown service" in text
+            or ("not found" in text and "service" in text)
+        )
+
+    def classify_request_error(err: Exception):
+        msg = str(err).lower()
+        if "name or service not known" in msg or "nodename nor servname provided" in msg:
+            return 503, "Supervisor environment not available"
+        if "connection refused" in msg or "connecterror" in msg:
+            return 503, "Supervisor API not reachable"
+        if "timed out" in msg or "timeout" in msg:
+            return 503, "Home Assistant service timeout"
+        return 502, "Error calling Home Assistant"
+
+    async def post_core_service(domain: str, service: str):
+        target = f"http://supervisor/core/api/services/{domain}/{service}"
+        async with httpx.AsyncClient(base_url="http://supervisor/core/api", timeout=15) as client:
+            res = await client.post(
+                f"/services/{domain}/{service}",
+                headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+                json={},
+            )
+        return res, target, clip_text(res.text or "")
+
     try:
-        token_preview = SUPERVISOR_TOKEN[:8] + "..." if SUPERVISOR_TOKEN else ""
+        if action == "reload_yaml":
+            steps = []
+            primary_domain, primary_service = "homeassistant", "reload_all"
+            fallback_domain, fallback_service = "homeassistant", "reload_core_config"
+            logger.info("ha_action reload_yaml received action=%s target_service=%s.%s", action, primary_domain, primary_service)
+            try:
+                primary_res, primary_target, primary_body = await post_core_service(primary_domain, primary_service)
+            except httpx.RequestError as e:
+                logger.warning("ha_action reload_yaml upstream request error target=%s error=%s", "http://supervisor/core/api/services/homeassistant/reload_all", str(e))
+                err_status, err_message = classify_request_error(e)
+                return JSONResponse(
+                    status_code=err_status,
+                    content={
+                        "ok": False,
+                        "action": action,
+                        "error": {
+                            "message": err_message,
+                            "status": err_status,
+                            "details": str(e),
+                        },
+                    },
+                )
+
+            logger.info(
+                "ha_action reload_yaml upstream status=%s target=%s body=%s",
+                primary_res.status_code,
+                primary_target,
+                primary_body,
+            )
+
+            if primary_res.status_code < 400:
+                steps.append(
+                    {
+                        "name": f"{primary_domain}.{primary_service}",
+                        "status": "ok",
+                        "http_status": primary_res.status_code,
+                    }
+                )
+                try:
+                    primary_data = primary_res.json()
+                except Exception:
+                    primary_data = None
+                return {
+                    "ok": True,
+                    "action": action,
+                    "used": "reload_all",
+                    "steps": steps,
+                    "result": primary_data,
+                }
+
+            if primary_res.status_code in (401, 403):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "ok": False,
+                        "action": action,
+                        "error": {
+                            "message": "Unauthorized to call Home Assistant",
+                            "status": 403,
+                            "details": primary_body,
+                        },
+                    },
+                )
+
+            if is_service_unavailable(primary_res.status_code, primary_body):
+                steps.append(
+                    {
+                        "name": f"{primary_domain}.{primary_service}",
+                        "status": "unavailable",
+                        "http_status": primary_res.status_code,
+                    }
+                )
+                logger.warning(
+                    "ha_action reload_yaml fallback to %s.%s due to unavailable primary service",
+                    fallback_domain,
+                    fallback_service,
+                )
+                try:
+                    fallback_res, fallback_target, fallback_body = await post_core_service(fallback_domain, fallback_service)
+                except httpx.RequestError as e:
+                    logger.warning("ha_action reload_yaml fallback request error target=%s error=%s", "http://supervisor/core/api/services/homeassistant/reload_core_config", str(e))
+                    err_status, err_message = classify_request_error(e)
+                    return JSONResponse(
+                        status_code=err_status,
+                        content={
+                            "ok": False,
+                            "action": action,
+                            "error": {
+                                "message": err_message,
+                                "status": err_status,
+                                "details": str(e),
+                            },
+                            "steps": steps,
+                        },
+                    )
+
+                logger.info(
+                    "ha_action reload_yaml fallback upstream status=%s target=%s body=%s",
+                    fallback_res.status_code,
+                    fallback_target,
+                    fallback_body,
+                )
+
+                if fallback_res.status_code < 400:
+                    steps.append(
+                        {
+                            "name": f"{fallback_domain}.{fallback_service}",
+                            "status": "ok",
+                            "http_status": fallback_res.status_code,
+                        }
+                    )
+                    try:
+                        fallback_data = fallback_res.json()
+                    except Exception:
+                        fallback_data = None
+                    return {
+                        "ok": True,
+                        "action": action,
+                        "used": "fallback",
+                        "steps": steps,
+                        "result": fallback_data,
+                    }
+
+                if fallback_res.status_code in (401, 403):
+                    return JSONResponse(
+                        status_code=403,
+                        content={
+                            "ok": False,
+                            "action": action,
+                            "error": {
+                                "message": "Unauthorized to call Home Assistant",
+                                "status": 403,
+                                "details": fallback_body,
+                            },
+                            "steps": steps,
+                        },
+                    )
+
+                steps.append(
+                    {
+                        "name": f"{fallback_domain}.{fallback_service}",
+                        "status": "failed",
+                        "http_status": fallback_res.status_code,
+                    }
+                )
+                return JSONResponse(
+                    status_code=fallback_res.status_code,
+                    content={
+                        "ok": False,
+                        "action": action,
+                        "error": {
+                            "message": "Home Assistant returned an error",
+                            "status": fallback_res.status_code,
+                            "details": fallback_body,
+                        },
+                        "steps": steps,
+                    },
+                )
+
+            return JSONResponse(
+                status_code=primary_res.status_code,
+                content={
+                    "ok": False,
+                    "action": action,
+                    "error": {
+                        "message": "Home Assistant returned an error",
+                        "status": primary_res.status_code,
+                        "details": primary_body,
+                    },
+                },
+            )
+
         if cfg["type"] == "service":
             domain = cfg["domain"]
             service = cfg["service"]
-            logger.info("ha_action: core service %s.%s token_prefix=%s", domain, service, token_preview)
             async with httpx.AsyncClient(base_url="http://supervisor/core/api", timeout=15) as client:
                 res = await client.post(
                     f"/services/{domain}/{service}",
@@ -978,15 +1195,38 @@ async def ha_action(request: Request):
                 )
         else:
             path = cfg["path"]
-            logger.info("ha_action: supervisor %s token_prefix=%s", path, token_preview)
             async with httpx.AsyncClient(base_url="http://supervisor", timeout=15) as client:
                 res = await client.post(
                     path,
                     headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
                 )
+        response_body = clip_text(res.text or "")
         if res.status_code in (401, 403):
-            raise HTTPException(403, "Unauthorized to call Home Assistant")
-        res.raise_for_status()
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "ok": False,
+                    "action": action,
+                    "error": {
+                        "message": "Unauthorized to call Home Assistant",
+                        "status": 403,
+                        "details": response_body,
+                    },
+                },
+            )
+        if res.status_code >= 400:
+            return JSONResponse(
+                status_code=res.status_code,
+                content={
+                    "ok": False,
+                    "action": action,
+                    "error": {
+                        "message": "Home Assistant returned an error",
+                        "status": res.status_code,
+                        "details": response_body,
+                    },
+                },
+            )
         try:
             data = res.json()
         except Exception:
@@ -994,9 +1234,34 @@ async def ha_action(request: Request):
         return {"ok": True, "action": action, "result": data}
     except HTTPException:
         raise
+    except httpx.RequestError as e:
+        err_status, err_message = classify_request_error(e)
+        return JSONResponse(
+            status_code=err_status,
+            content={
+                "ok": False,
+                "action": action,
+                "error": {
+                    "message": err_message,
+                    "status": err_status,
+                    "details": str(e),
+                },
+            },
+        )
     except Exception as e:
         logger.exception("ha_action: error on %s: %s", action, e)
-        raise HTTPException(500, f"Error calling Home Assistant: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "ok": False,
+                "action": action,
+                "error": {
+                    "message": "Error calling Home Assistant",
+                    "status": 500,
+                    "details": str(e),
+                },
+            },
+        )
 
 
 async def supervisor_get_json(path: str):

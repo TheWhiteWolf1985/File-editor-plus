@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.80
+
+- Chore release: bump versione add-on e ricostruzione completa (build frontend + update/rebuild/restart addon).
+
+## 0.2.79
+
+- Chore release: bump versione add-on e ricostruzione completa (build frontend + update/restart addon).
+
+## 0.2.78
+
+- Fix editor overlay scroll sync su file lunghi: sincronizzazione `textarea -> .code` tramite `scrollTop/scrollLeft`, con sync iniziale dopo render (`updated`).
+- `.code` ora usa `overflow: auto` mantenendo `pointer-events: none`; testo textarea resta trasparente (caret/selection invariati).
+
 ## 0.2.77
 
 - Chore release: bump versione add-on e ricostruzione completa (build frontend + update/restart addon).

@@ -1,4 +1,4 @@
-import { LitElement, html, nothing } from "lit";
+import { LitElement, html, nothing, type PropertyValues } from "lit";
 import { customElement } from "lit/decorators.js";
 import { ref } from "lit/directives/ref.js";
 import "./components/app-icon";
@@ -674,6 +674,20 @@ export class AppRoot extends LitElement {
     super.disconnectedCallback();
   }
 
+  protected updated(changedProperties: PropertyValues<this>): void {
+    super.updated(changedProperties);
+    if (
+      changedProperties.has("content") ||
+      changedProperties.has("activePath") ||
+      changedProperties.has("splitViewEnabled")
+    ) {
+      requestAnimationFrame(() => {
+        this.syncEditorOverlay();
+        this.syncBaseOverlay();
+      });
+    }
+  }
+
   private async selectLocale(locale: SupportedLocaleCode) {
     this.selectedLocale = locale;
     setLocale(locale);
@@ -1274,11 +1288,6 @@ export class AppRoot extends LitElement {
     const ta = this.editorRef;
     const pos = ta.selectionStart ?? 0;
     this.updateCursorFromPos(pos, ta.value);
-  }
-
-  private syncEditorOverlay() {
-    if (!this.editorRef) return;
-    this.syncScroll({ target: this.editorRef } as unknown as Event);
   }
 
   private syncBaseOverlay() {
@@ -2005,17 +2014,31 @@ export class AppRoot extends LitElement {
   }
 
   private syncScroll(e: Event) {
-    const top = (e.target as HTMLElement).scrollTop;
-    const left = (e.target as HTMLElement).scrollLeft;
-    if (this.codeRef) this.codeRef.style.transform = `translate(${-left}px, -${top}px)`;
-    if (this.gutterRef) this.gutterRef.style.transform = `translateY(-${top}px)`;
+    const source = e.target as HTMLElement;
+    const top = source.scrollTop;
+    const left = source.scrollLeft;
+    this.syncEditorOverlay(top, left);
   }
 
   private syncBaseScroll(e: Event) {
     const top = (e.target as HTMLElement).scrollTop;
     const left = (e.target as HTMLElement).scrollLeft;
-    if (this.baseCodeRef) this.baseCodeRef.style.transform = `translate(${-left}px, -${top}px)`;
+    if (this.baseCodeRef) {
+      this.baseCodeRef.scrollTop = top;
+      this.baseCodeRef.scrollLeft = left;
+    }
     if (this.baseGutterRef) this.baseGutterRef.style.transform = `translateY(-${top}px)`;
+  }
+
+  // Keep overlay + gutter aligned with the transparent textarea scroll position.
+  private syncEditorOverlay(top?: number, left?: number) {
+    const sourceTop = top ?? this.editorRef?.scrollTop ?? 0;
+    const sourceLeft = left ?? this.editorRef?.scrollLeft ?? 0;
+    if (this.codeRef) {
+      this.codeRef.scrollTop = sourceTop;
+      this.codeRef.scrollLeft = sourceLeft;
+    }
+    if (this.gutterRef) this.gutterRef.style.transform = `translateY(-${sourceTop}px)`;
   }
 
   private isNarrowLayout() {
