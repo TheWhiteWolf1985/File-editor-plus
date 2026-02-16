@@ -72,7 +72,7 @@ epics:
   documentation_i18n:
     source_of_truth: .temp/document.md
     status: in_progress
-    last_completed_step: 5
+    last_completed_step: 6
     decisions:
       - "Step 1: migrated docs to docs/it/* and created placeholder sets for en/fr/es/de."
       - "Temporary compatibility: /docs/{page}.md now serves docs/it/{page}.md pending lang-aware route in Step 2/3."
@@ -80,6 +80,7 @@ epics:
       - "Step 3: viewer uses loadDoc(page, lang) with fallback lang->en->it and backend route /docs/{lang}/{page}.md."
       - "Step 4: Help->Documentation now passes page=index and current user lang in query string."
       - "Step 5: docs markdown translated for en/fr/es/de with internal links preserving ?page & ?lang."
+      - "Step 6: packaging validated; Docker runtime copies docs to /app/docs and backend serves multilang files."
     routes_current:
       - /docs
       - /docs/{lang}/{page}.md
