@@ -71,8 +71,8 @@ epics:
       - .temp/docs_test_report.md
   documentation_i18n:
     source_of_truth: .temp/document.md
-    status: in_progress
-    last_completed_step: 6
+    status: completed
+    last_completed_step: 7
     decisions:
       - "Step 1: migrated docs to docs/it/* and created placeholder sets for en/fr/es/de."
       - "Temporary compatibility: /docs/{page}.md now serves docs/it/{page}.md pending lang-aware route in Step 2/3."
@@ -81,6 +81,7 @@ epics:
       - "Step 4: Help->Documentation now passes page=index and current user lang in query string."
       - "Step 5: docs markdown translated for en/fr/es/de with internal links preserving ?page & ?lang."
       - "Step 6: packaging validated; Docker runtime copies docs to /app/docs and backend serves multilang files."
+      - "Step 7: QA checklist/report completed in .temp/docs_i18n_test_report.md with build pass."
     routes_current:
       - /docs
       - /docs/{lang}/{page}.md
