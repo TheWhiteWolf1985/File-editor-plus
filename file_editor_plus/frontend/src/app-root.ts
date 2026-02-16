@@ -1879,7 +1879,13 @@ export class AppRoot extends LitElement {
   }
 
   private openDocumentation() {
+    const supported = new Set(SUPPORTED_LOCALES.map((item) => item.code));
+    const stored = getPersistedLocale();
+    const navLang = (navigator.language || "en").slice(0, 2).toLowerCase() as SupportedLocaleCode;
+    const lang = supported.has(stored) ? stored : supported.has(navLang) ? navLang : "en";
     const docsUrl = new URL("./docs/", window.location.href);
+    docsUrl.searchParams.set("page", "index");
+    docsUrl.searchParams.set("lang", lang);
     window.open(docsUrl.toString(), "_blank", "noopener,noreferrer");
   }
 

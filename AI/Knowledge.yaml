@@ -72,12 +72,13 @@ epics:
   documentation_i18n:
     source_of_truth: .temp/document.md
     status: in_progress
-    last_completed_step: 3
+    last_completed_step: 4
     decisions:
       - "Step 1: migrated docs to docs/it/* and created placeholder sets for en/fr/es/de."
       - "Temporary compatibility: /docs/{page}.md now serves docs/it/{page}.md pending lang-aware route in Step 2/3."
       - "Step 2: docs viewer now supports query contract ?page=<slug>&lang=<code> with whitelist and lang-preserving nav links."
       - "Step 3: viewer uses loadDoc(page, lang) with fallback lang->en->it and backend route /docs/{lang}/{page}.md."
+      - "Step 4: Help->Documentation now passes page=index and current user lang in query string."
     routes_current:
       - /docs
       - /docs/{lang}/{page}.md
@@ -90,7 +91,7 @@ epics:
     menu_wiring:
       file: file_editor_plus/frontend/src/app-root.ts
       function: openDocumentation
-      opens: ./docs/
+      opens: ./docs/?page=index&lang=<userLang>
     reports:
       - .temp/docs_i18n_repo_map.md
       - .temp/docs_i18n_test_report.md
