@@ -1,20 +1,20 @@
-# Impostazioni
+# Ajustes
 
-Le impostazioni principali sono pensate per leggibilità e comodità.
+Los ajustes principales están enfocados en legibilidad y comodidad.
 
 ## Tema
-Puoi usare:
-- **Auto** (segue il tema di sistema)
+Puedes usar:
+- **Auto** (sigue el tema del sistema)
 - **Light**
 - **Dark**
 
-## Dimensione font
-- È disponibile una regolazione della dimensione base del font.
-- Se vuoi più leggibilità, aumenta il valore e applica.
+## Tamaño de fuente
+- Puedes ajustar el tamaño base de la fuente.
+- Si quieres más legibilidad, aumenta el valor y aplica.
 
-## Localizzazione
-- È presente una sezione localizzazione.
-- Alcune lingue possono essere in stato iniziale o parziale.
+## Localización
+- Hay una sección de localización disponible.
+- Algunos idiomas pueden estar todavía incompletos.
 
-## Suggerimento rapido
-Se cambi più opzioni insieme, applica e verifica subito nell'editor che il contrasto sia comodo per te.
+## Consejo rápido
+Si cambias varias opciones, aplícalas y revisa enseguida el contraste y la legibilidad en el editor.

@@ -1,34 +1,34 @@
 # Troubleshooting
 
-Quando qualcosa non va, usa questa pagina come checklist rapida.
+Usa esta página como checklist rápida cuando algo no funciona.
 
-## Non vedo le icone
-- Ricarica la pagina una volta.
-- Controlla che la build frontend sia aggiornata.
-- Se sei in Ingress, prova a chiudere e riaprire la tab.
+## No veo iconos
+- Recarga la página una vez.
+- Verifica que la build frontend esté actualizada.
+- En Ingress, prueba cerrar y volver a abrir la pestaña.
 
-## Il testo sembra sparire su file lunghi
-- Verifica di avere l'ultima versione dell'add-on.
-- Prova a cambiare tab e tornare al file.
-- Se succede ancora, raccogli log e segnala il file coinvolto.
+## El texto parece desaparecer en archivos largos
+- Verifica que estés en la última versión del add-on.
+- Cambia de pestaña y vuelve al archivo.
+- Si continúa, recoge logs y reporta el archivo afectado.
 
-## Reload YAML parte ma non cambia nulla
-- Controlla se il file modificato è davvero ricaricabile con reload.
-- Verifica eventuali errori YAML.
-- Se serve, usa Restart Core.
+## Reload YAML inicia pero no cambia nada
+- Revisa si el archivo editado es realmente reloadable.
+- Valida la sintaxis YAML.
+- Si hace falta, ejecuta Restart Core.
 
-## Dove guardare i log
-- Log add-on:
+## Dónde ver logs
+- Logs del add-on:
 ```bash
 docker exec hassio_cli ha apps logs local_file_editor_plus --follow
 ```
-- Log Supervisor:
+- Logs de Supervisor:
 ```bash
 docker exec hassio_cli ha supervisor logs -n 220
 ```
 
-## Cosa allegare quando segnali un problema
-- Versione add-on
-- Azione fatta (passi esatti)
-- Messaggio errore visto in UI
-- Estratto log (senza dati sensibili)
+## Qué incluir en un reporte
+- Versión del add-on
+- Pasos exactos realizados
+- Mensaje de error en UI
+- Extracto de logs relevante (sin datos sensibles)

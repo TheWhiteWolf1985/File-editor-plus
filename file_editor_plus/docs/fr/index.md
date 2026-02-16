@@ -1,35 +1,35 @@
-# Documentazione File Editor Plus
+# Documentation File Editor Plus
 
-Benvenuto. Se è la prima volta che apri File Editor Plus, sei nel posto giusto.
-Qui trovi una guida pratica e veloce, pensata per iniziare senza stress.
+Bienvenue. Si c'est votre première ouverture de File Editor Plus, vous êtes au bon endroit.
+Ce guide est court, pratique et pensé pour démarrer facilement.
 
 ## TL;DR
-- Apri i file dalla sidebar (Explorer).
-- Modifica nel pannello editor.
-- Salva con **Save** o **Save All**.
-- Usa il menu **Sistema** solo quando sai cosa fa ogni comando.
+- Ouvrez les fichiers depuis la barre latérale (Explorer).
+- Modifiez dans l'éditeur principal.
+- Enregistrez avec **Save** ou **Save All**.
+- Utilisez le menu **System** uniquement si vous connaissez l'effet de chaque action.
 
-## Cosa puoi fare
-- Navigare le cartelle di `/config`.
-- Aprire più file in tab.
-- Modificare e salvare file YAML/testo.
-- Cercare testo nei file.
-- Gestire snippet e alcune utility.
+## Ce que vous pouvez faire
+- Parcourir les dossiers dans `/config`.
+- Ouvrir plusieurs fichiers dans des onglets.
+- Modifier et enregistrer des fichiers YAML/texte.
+- Rechercher du texte dans les fichiers.
+- Gérer des snippets et quelques utilitaires.
 
-## Cosa non fa (al momento)
-- **Save as…** è presente nel menu ma non è ancora implementato.
-- Alcune azioni dipendono dall'ambiente Home Assistant Supervisor (es. comandi di sistema).
+## Limites actuelles
+- **Save as…** apparaît dans le menu mais n'est pas encore implémenté.
+- Certaines actions dépendent de l'environnement Home Assistant Supervisor (ex. commandes système).
 
-## Mini tour dell'interfaccia
-- **Top bar**: menu File / Edit / View / Help.
-- **Activity bar + sidebar**: Explorer, Search, Sistema e altre aree.
-- **Tabs**: ogni file aperto resta in alto come tab.
-- **Editor**: area centrale dove scrivi.
-- **Status bar**: informazioni rapide (tema, stato, versione).
+## Tour rapide de l'interface
+- **Top bar** : File / Edit / View / Help.
+- **Activity bar + sidebar** : Explorer, Search, System, etc.
+- **Tabs** : chaque fichier ouvert reste en haut.
+- **Editor** : zone centrale d'édition.
+- **Status bar** : informations rapides (thème, état, version).
 
-## Prossimi passi
-- [Usare l'editor](./editor.md)
-- [Gestire file e cartelle](./files.md)
-- [Impostazioni (tema, font, lingua)](./settings.md)
-- [Comandi di sistema](./system.md)
-- [Risoluzione problemi](./troubleshooting.md)
+## Étapes suivantes
+- [Utiliser l'éditeur](?page=editor&lang=fr)
+- [Gérer fichiers et dossiers](?page=files&lang=fr)
+- [Paramètres (thème, police, langue)](?page=settings&lang=fr)
+- [Commandes système](?page=system&lang=fr)
+- [Résolution de problèmes](?page=troubleshooting&lang=fr)

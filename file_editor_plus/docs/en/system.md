@@ -1,28 +1,28 @@
-# Sistema
+# System
 
-⚠️ Queste azioni possono impattare Home Assistant. Usale con attenzione.
+⚠️ These actions can affect Home Assistant availability. Use them carefully.
 
 ## Reload YAML
-- Prova a ricaricare configurazioni YAML supportate.
-- In base alla versione/ambiente HA, può usare strategie diverse di reload.
-- Se il reload non basta, potrebbe servire un riavvio del Core.
+- Tries to reload supported YAML configuration.
+- Depending on HA version/environment, different reload strategies may be used.
+- If reload is not enough, a Core restart may still be needed.
 
 ## Restart Core
-- Riavvia Home Assistant Core.
-- Durante il riavvio puoi perdere la connessione temporaneamente.
+- Restarts Home Assistant Core.
+- Temporary disconnection is expected during restart.
 
 ## Restart Supervisor
-- Riavvia il Supervisor (gestione add-on).
-- Anche qui è normale vedere una breve disconnessione.
+- Restarts Supervisor (add-on management).
+- A short disconnection is normal here too.
 
 ## Reboot Host
-- Riavvia l'host/sistema operativo.
-- Impatta tutti i servizi in esecuzione.
+- Reboots the host/operating system.
+- Affects all running services.
 
 ## Shutdown Host
-- Spegne l'host/sistema operativo.
-- Da usare solo se sai come riaccendere il sistema.
+- Shuts down the host/operating system.
+- Use only if you know how to power it back on.
 
-## Prerequisiti
-- L'add-on deve avere accesso al contesto Supervisor.
-- Se mancano token/permessi, vedrai un errore esplicito in UI.
+## Prerequisites
+- The add-on must run with Supervisor context.
+- If token/permissions are missing, the UI shows a clear error.

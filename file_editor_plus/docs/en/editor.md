@@ -1,27 +1,27 @@
 # Editor
 
-Questa pagina ti aiuta a usare l'editor in modo semplice e sicuro.
+This page helps you use the editor in a simple and safe way.
 
-## Aprire file e usare i tab
-- Clicca un file nell'Explorer per aprirlo.
-- Ogni file aperto compare come tab sopra l'editor.
-- Clicca un tab per tornare rapidamente a quel file.
+## Open files and use tabs
+- Click a file in Explorer to open it.
+- Every open file appears as a tab above the editor.
+- Click a tab to jump back to that file quickly.
 
-## Salvare
-- **Save** salva il file attivo.
-- **Save All** salva il contenuto corrente (nella UI è disponibile come azione principale).
-- Se vedi un indicatore di modifiche non salvate, salva prima di chiudere il tab.
+## Save
+- **Save** stores the active file.
+- **Save All** saves current content from the main actions area.
+- If you see an unsaved indicator, save before closing the tab.
 
-## Ricerca e confronto
-- Puoi aprire la sezione Search per trovare testo nei file.
-- È disponibile anche la modalità split/compare per confrontare modifiche.
+## Search and compare
+- You can use Search to find text across files.
+- Split/compare mode is available to review changes.
 
-## Se il file è lungo
-- Se lavori su file molto grandi e noti rallentamenti:
-  - chiudi tab non necessari
-  - disattiva funzioni non essenziali (es. viste avanzate)
-  - salva spesso in piccoli passi
+## If the file is large
+If you work on very large files and feel lag:
+- close tabs you do not need
+- disable non-essential visual helpers
+- save in small increments
 
 ## Shortcuts
-L'app gestisce azioni comuni dal menu (Undo/Redo/Cut/Copy/Paste).
-Se usi scorciatoie da tastiera, il comportamento dipende anche dal browser/OS.
+Common actions are available from the menu (Undo/Redo/Cut/Copy/Paste).
+Keyboard shortcuts may also depend on browser and OS.

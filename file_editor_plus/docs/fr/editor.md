@@ -1,27 +1,27 @@
 # Editor
 
-Questa pagina ti aiuta a usare l'editor in modo semplice e sicuro.
+Cette page vous aide à utiliser l'éditeur de façon simple et sûre.
 
-## Aprire file e usare i tab
-- Clicca un file nell'Explorer per aprirlo.
-- Ogni file aperto compare come tab sopra l'editor.
-- Clicca un tab per tornare rapidamente a quel file.
+## Ouvrir des fichiers et utiliser les onglets
+- Cliquez sur un fichier dans l'Explorer pour l'ouvrir.
+- Chaque fichier ouvert apparaît comme onglet en haut.
+- Cliquez sur un onglet pour revenir rapidement à ce fichier.
 
-## Salvare
-- **Save** salva il file attivo.
-- **Save All** salva il contenuto corrente (nella UI è disponibile come azione principale).
-- Se vedi un indicatore di modifiche non salvate, salva prima di chiudere il tab.
+## Enregistrer
+- **Save** enregistre le fichier actif.
+- **Save All** enregistre le contenu courant depuis la zone d'actions.
+- Si vous voyez un indicateur non enregistré, enregistrez avant de fermer l'onglet.
 
-## Ricerca e confronto
-- Puoi aprire la sezione Search per trovare testo nei file.
-- È disponibile anche la modalità split/compare per confrontare modifiche.
+## Recherche et comparaison
+- Utilisez Search pour trouver du texte dans les fichiers.
+- Le mode split/compare est disponible pour vérifier les changements.
 
-## Se il file è lungo
-- Se lavori su file molto grandi e noti rallentamenti:
-  - chiudi tab non necessari
-  - disattiva funzioni non essenziali (es. viste avanzate)
-  - salva spesso in piccoli passi
+## Si le fichier est volumineux
+Si vous travaillez sur de gros fichiers et que l'UI ralentit :
+- fermez les onglets inutiles
+- désactivez les aides visuelles non essentielles
+- enregistrez par petites étapes
 
-## Shortcuts
-L'app gestisce azioni comuni dal menu (Undo/Redo/Cut/Copy/Paste).
-Se usi scorciatoie da tastiera, il comportamento dipende anche dal browser/OS.
+## Raccourcis
+Les actions courantes sont disponibles dans le menu (Undo/Redo/Cut/Copy/Paste).
+Les raccourcis clavier peuvent aussi dépendre du navigateur et de l'OS.

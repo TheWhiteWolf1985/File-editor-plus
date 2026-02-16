@@ -1,20 +1,20 @@
-# Impostazioni
+# Paramètres
 
-Le impostazioni principali sono pensate per leggibilità e comodità.
+Les paramètres principaux visent la lisibilité et le confort.
 
-## Tema
-Puoi usare:
-- **Auto** (segue il tema di sistema)
+## Thème
+Vous pouvez utiliser :
+- **Auto** (suit le thème système)
 - **Light**
 - **Dark**
 
-## Dimensione font
-- È disponibile una regolazione della dimensione base del font.
-- Se vuoi più leggibilità, aumenta il valore e applica.
+## Taille de police
+- Vous pouvez ajuster la taille de base de la police.
+- Pour plus de lisibilité, augmentez la valeur puis appliquez.
 
-## Localizzazione
-- È presente una sezione localizzazione.
-- Alcune lingue possono essere in stato iniziale o parziale.
+## Localisation
+- Une section de localisation est disponible.
+- Certaines langues peuvent être encore partielles.
 
-## Suggerimento rapido
-Se cambi più opzioni insieme, applica e verifica subito nell'editor che il contrasto sia comodo per te.
+## Conseil rapide
+Si vous changez plusieurs options, appliquez puis vérifiez tout de suite le contraste et la lisibilité dans l'éditeur.

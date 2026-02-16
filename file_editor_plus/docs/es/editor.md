@@ -1,27 +1,27 @@
 # Editor
 
-Questa pagina ti aiuta a usare l'editor in modo semplice e sicuro.
+Esta página te ayuda a usar el editor de forma simple y segura.
 
-## Aprire file e usare i tab
-- Clicca un file nell'Explorer per aprirlo.
-- Ogni file aperto compare come tab sopra l'editor.
-- Clicca un tab per tornare rapidamente a quel file.
+## Abrir archivos y usar pestañas
+- Haz clic en un archivo del Explorer para abrirlo.
+- Cada archivo abierto aparece como pestaña arriba del editor.
+- Haz clic en una pestaña para volver rápido a ese archivo.
 
-## Salvare
-- **Save** salva il file attivo.
-- **Save All** salva il contenuto corrente (nella UI è disponibile come azione principale).
-- Se vedi un indicatore di modifiche non salvate, salva prima di chiudere il tab.
+## Guardar
+- **Save** guarda el archivo activo.
+- **Save All** guarda el contenido actual desde la zona de acciones.
+- Si ves un indicador de cambios sin guardar, guarda antes de cerrar la pestaña.
 
-## Ricerca e confronto
-- Puoi aprire la sezione Search per trovare testo nei file.
-- È disponibile anche la modalità split/compare per confrontare modifiche.
+## Búsqueda y comparación
+- Puedes usar Search para encontrar texto en archivos.
+- El modo split/compare está disponible para revisar cambios.
 
-## Se il file è lungo
-- Se lavori su file molto grandi e noti rallentamenti:
-  - chiudi tab non necessari
-  - disattiva funzioni non essenziali (es. viste avanzate)
-  - salva spesso in piccoli passi
+## Si el archivo es grande
+Si trabajas con archivos grandes y notas lentitud:
+- cierra pestañas que no necesites
+- desactiva ayudas visuales no esenciales
+- guarda en pasos pequeños
 
-## Shortcuts
-L'app gestisce azioni comuni dal menu (Undo/Redo/Cut/Copy/Paste).
-Se usi scorciatoie da tastiera, il comportamento dipende anche dal browser/OS.
+## Atajos
+Las acciones comunes están en el menú (Undo/Redo/Cut/Copy/Paste).
+Los atajos de teclado también dependen del navegador y del sistema operativo.

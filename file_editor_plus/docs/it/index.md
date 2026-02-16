@@ -28,8 +28,8 @@ Qui trovi una guida pratica e veloce, pensata per iniziare senza stress.
 - **Status bar**: informazioni rapide (tema, stato, versione).
 
 ## Prossimi passi
-- [Usare l'editor](./editor.md)
-- [Gestire file e cartelle](./files.md)
-- [Impostazioni (tema, font, lingua)](./settings.md)
-- [Comandi di sistema](./system.md)
-- [Risoluzione problemi](./troubleshooting.md)
+- [Usare l'editor](?page=editor&lang=it)
+- [Gestire file e cartelle](?page=files&lang=it)
+- [Impostazioni (tema, font, lingua)](?page=settings&lang=it)
+- [Comandi di sistema](?page=system&lang=it)
+- [Risoluzione problemi](?page=troubleshooting&lang=it)

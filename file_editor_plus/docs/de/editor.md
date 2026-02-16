@@ -1,27 +1,27 @@
 # Editor
 
-Questa pagina ti aiuta a usare l'editor in modo semplice e sicuro.
+Diese Seite hilft dir, den Editor einfach und sicher zu benutzen.
 
-## Aprire file e usare i tab
-- Clicca un file nell'Explorer per aprirlo.
-- Ogni file aperto compare come tab sopra l'editor.
-- Clicca un tab per tornare rapidamente a quel file.
+## Dateien öffnen und Tabs verwenden
+- Klicke im Explorer auf eine Datei, um sie zu öffnen.
+- Jede geöffnete Datei erscheint als Tab über dem Editor.
+- Klicke auf einen Tab, um schnell zu dieser Datei zurückzukehren.
 
-## Salvare
-- **Save** salva il file attivo.
-- **Save All** salva il contenuto corrente (nella UI è disponibile come azione principale).
-- Se vedi un indicatore di modifiche non salvate, salva prima di chiudere il tab.
+## Speichern
+- **Save** speichert die aktive Datei.
+- **Save All** speichert den aktuellen Inhalt im Aktionsbereich.
+- Wenn du einen Ungespeichert-Indikator siehst, speichere vor dem Schließen.
 
-## Ricerca e confronto
-- Puoi aprire la sezione Search per trovare testo nei file.
-- È disponibile anche la modalità split/compare per confrontare modifiche.
+## Suche und Vergleich
+- Mit Search kannst du Text in Dateien finden.
+- Split/Compare steht zur Verfügung, um Änderungen zu prüfen.
 
-## Se il file è lungo
-- Se lavori su file molto grandi e noti rallentamenti:
-  - chiudi tab non necessari
-  - disattiva funzioni non essenziali (es. viste avanzate)
-  - salva spesso in piccoli passi
+## Wenn die Datei groß ist
+Wenn du mit großen Dateien arbeitest und Verzögerung spürst:
+- schließe nicht benötigte Tabs
+- deaktiviere nicht notwendige visuelle Hilfen
+- speichere in kleinen Schritten
 
 ## Shortcuts
-L'app gestisce azioni comuni dal menu (Undo/Redo/Cut/Copy/Paste).
-Se usi scorciatoie da tastiera, il comportamento dipende anche dal browser/OS.
+Übliche Aktionen sind über das Menü verfügbar (Undo/Redo/Cut/Copy/Paste).
+Tastenkürzel hängen auch von Browser und Betriebssystem ab.

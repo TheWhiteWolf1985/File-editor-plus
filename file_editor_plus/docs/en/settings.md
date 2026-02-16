@@ -1,20 +1,20 @@
-# Impostazioni
+# Settings
 
-Le impostazioni principali sono pensate per leggibilità e comodità.
+Main settings are focused on readability and comfort.
 
-## Tema
-Puoi usare:
-- **Auto** (segue il tema di sistema)
+## Theme
+You can use:
+- **Auto** (follows system theme)
 - **Light**
 - **Dark**
 
-## Dimensione font
-- È disponibile una regolazione della dimensione base del font.
-- Se vuoi più leggibilità, aumenta il valore e applica.
+## Font size
+- You can adjust the base font size.
+- If you want more readability, increase the value and apply.
 
-## Localizzazione
-- È presente una sezione localizzazione.
-- Alcune lingue possono essere in stato iniziale o parziale.
+## Localization
+- A localization section is available.
+- Some languages may still be partial.
 
-## Suggerimento rapido
-Se cambi più opzioni insieme, applica e verifica subito nell'editor che il contrasto sia comodo per te.
+## Quick tip
+If you change multiple options, apply them and immediately verify contrast and readability in the editor.

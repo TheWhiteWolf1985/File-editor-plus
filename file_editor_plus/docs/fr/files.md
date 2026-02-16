@@ -1,22 +1,22 @@
-# File e cartelle
+# Fichiers et dossiers
 
-Qui trovi le operazioni base su file/cartelle.
+Cette page couvre les opérations de base sur les fichiers et dossiers.
 
-## Creare file o cartelle
-- Dal menu **File** puoi avviare la creazione di:
-  - nuovo file
-  - nuova cartella
-- In Explorer trovi anche azioni rapide dedicate.
+## Créer des fichiers ou dossiers
+- Depuis le menu **File**, vous pouvez créer :
+  - un nouveau fichier
+  - un nouveau dossier
+- L'Explorer propose aussi des actions rapides.
 
-## Upload e download
-- L'upload è disponibile nell'interfaccia Explorer.
-- Per esportazioni/backup, usa le azioni dedicate dove disponibili.
+## Upload et download
+- L'upload est disponible dans l'interface Explorer.
+- Pour l'export/sauvegarde, utilisez les actions dédiées lorsqu'elles existent.
 
-## Consigli pratici sui nomi
-- Usa nomi chiari e prevedibili (`automation_luci.yaml`, `script_backup.yaml`).
-- Evita spazi strani o caratteri non necessari.
+## Conseils de nommage
+- Utilisez des noms clairs (`automation_lights.yaml`, `script_backup.yaml`).
+- Évitez les caractères inhabituels si ce n'est pas nécessaire.
 
-## Limiti e attenzione
-- I path sono relativi a `/config`.
-- Operazioni distruttive (sposta/elimina) chiedono conferma in UI quando previsto.
-- Se sposti file usati da Home Assistant, verifica poi che i riferimenti siano ancora corretti.
+## Limites et prudence
+- Les chemins sont relatifs à `/config`.
+- Les opérations destructrices (move/delete) demandent une confirmation si prévue.
+- Si vous déplacez des fichiers utilisés par Home Assistant, vérifiez les références ensuite.

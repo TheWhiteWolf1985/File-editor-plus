@@ -1,35 +1,35 @@
-# Documentazione File Editor Plus
+# File Editor Plus Documentation
 
-Benvenuto. Se è la prima volta che apri File Editor Plus, sei nel posto giusto.
-Qui trovi una guida pratica e veloce, pensata per iniziare senza stress.
+Welcome. If this is your first time opening File Editor Plus, you are in the right place.
+This is a practical quick guide to get started without friction.
 
 ## TL;DR
-- Apri i file dalla sidebar (Explorer).
-- Modifica nel pannello editor.
-- Salva con **Save** o **Save All**.
-- Usa il menu **Sistema** solo quando sai cosa fa ogni comando.
+- Open files from the sidebar (Explorer).
+- Edit in the main editor panel.
+- Save with **Save** or **Save All**.
+- Use the **System** menu only when you know what each command does.
 
-## Cosa puoi fare
-- Navigare le cartelle di `/config`.
-- Aprire più file in tab.
-- Modificare e salvare file YAML/testo.
-- Cercare testo nei file.
-- Gestire snippet e alcune utility.
+## What you can do
+- Browse folders under `/config`.
+- Open multiple files in tabs.
+- Edit and save YAML/text files.
+- Search text across files.
+- Manage snippets and some utility actions.
 
-## Cosa non fa (al momento)
-- **Save as…** è presente nel menu ma non è ancora implementato.
-- Alcune azioni dipendono dall'ambiente Home Assistant Supervisor (es. comandi di sistema).
+## Current limits
+- **Save as…** is visible in the menu but not implemented yet.
+- Some actions depend on Home Assistant Supervisor environment (for example system commands).
 
-## Mini tour dell'interfaccia
-- **Top bar**: menu File / Edit / View / Help.
-- **Activity bar + sidebar**: Explorer, Search, Sistema e altre aree.
-- **Tabs**: ogni file aperto resta in alto come tab.
-- **Editor**: area centrale dove scrivi.
-- **Status bar**: informazioni rapide (tema, stato, versione).
+## Quick UI tour
+- **Top bar**: File / Edit / View / Help.
+- **Activity bar + sidebar**: Explorer, Search, System, and more.
+- **Tabs**: each open file stays available at the top.
+- **Editor**: central writing area.
+- **Status bar**: quick info (theme, status, version).
 
-## Prossimi passi
-- [Usare l'editor](./editor.md)
-- [Gestire file e cartelle](./files.md)
-- [Impostazioni (tema, font, lingua)](./settings.md)
-- [Comandi di sistema](./system.md)
-- [Risoluzione problemi](./troubleshooting.md)
+## Next steps
+- [Using the editor](?page=editor&lang=en)
+- [Managing files and folders](?page=files&lang=en)
+- [Settings (theme, font, language)](?page=settings&lang=en)
+- [System commands](?page=system&lang=en)
+- [Troubleshooting](?page=troubleshooting&lang=en)

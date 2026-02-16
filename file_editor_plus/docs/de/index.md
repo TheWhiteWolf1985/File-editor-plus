@@ -1,35 +1,35 @@
-# Documentazione File Editor Plus
+# File Editor Plus Dokumentation
 
-Benvenuto. Se è la prima volta che apri File Editor Plus, sei nel posto giusto.
-Qui trovi una guida pratica e veloce, pensata per iniziare senza stress.
+Willkommen. Wenn du File Editor Plus zum ersten Mal öffnest, bist du hier richtig.
+Diese Anleitung ist praktisch und kurz, damit du schnell starten kannst.
 
 ## TL;DR
-- Apri i file dalla sidebar (Explorer).
-- Modifica nel pannello editor.
-- Salva con **Save** o **Save All**.
-- Usa il menu **Sistema** solo quando sai cosa fa ogni comando.
+- Öffne Dateien über die Seitenleiste (Explorer).
+- Bearbeite im Haupteditor.
+- Speichere mit **Save** oder **Save All**.
+- Nutze das Menü **System** nur, wenn du die Wirkung der Aktionen kennst.
 
-## Cosa puoi fare
-- Navigare le cartelle di `/config`.
-- Aprire più file in tab.
-- Modificare e salvare file YAML/testo.
-- Cercare testo nei file.
-- Gestire snippet e alcune utility.
+## Was du tun kannst
+- Ordner unter `/config` durchsuchen.
+- Mehrere Dateien in Tabs öffnen.
+- YAML/Text-Dateien bearbeiten und speichern.
+- Text in Dateien suchen.
+- Snippets und einige Utility-Aktionen verwenden.
 
-## Cosa non fa (al momento)
-- **Save as…** è presente nel menu ma non è ancora implementato.
-- Alcune azioni dipendono dall'ambiente Home Assistant Supervisor (es. comandi di sistema).
+## Aktuelle Grenzen
+- **Save as…** ist im Menü sichtbar, aber noch nicht implementiert.
+- Einige Aktionen hängen von der Home Assistant Supervisor-Umgebung ab (z. B. Systembefehle).
 
-## Mini tour dell'interfaccia
-- **Top bar**: menu File / Edit / View / Help.
-- **Activity bar + sidebar**: Explorer, Search, Sistema e altre aree.
-- **Tabs**: ogni file aperto resta in alto come tab.
-- **Editor**: area centrale dove scrivi.
-- **Status bar**: informazioni rapide (tema, stato, versione).
+## Kurze UI-Tour
+- **Top bar**: File / Edit / View / Help.
+- **Activity bar + sidebar**: Explorer, Search, System usw.
+- **Tabs**: jede geöffnete Datei bleibt oben verfügbar.
+- **Editor**: zentraler Bearbeitungsbereich.
+- **Status bar**: schnelle Infos (Theme, Status, Version).
 
-## Prossimi passi
-- [Usare l'editor](./editor.md)
-- [Gestire file e cartelle](./files.md)
-- [Impostazioni (tema, font, lingua)](./settings.md)
-- [Comandi di sistema](./system.md)
-- [Risoluzione problemi](./troubleshooting.md)
+## Nächste Schritte
+- [Editor verwenden](?page=editor&lang=de)
+- [Dateien und Ordner verwalten](?page=files&lang=de)
+- [Einstellungen (Theme, Schrift, Sprache)](?page=settings&lang=de)
+- [Systembefehle](?page=system&lang=de)
+- [Fehlerbehebung](?page=troubleshooting&lang=de)
