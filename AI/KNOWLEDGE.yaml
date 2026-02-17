@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-17T20:19:07Z"
+  updated_at: "2026-02-17T20:21:14Z"
 
 commands:
   frontend_build:
@@ -91,6 +91,17 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "UI_NAV_AUDIT-STEP-006"
+    summary: "Smoke add-on: eseguito update + restart di `local_file_editor_plus` e verificato esito OK da supervisor logs."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker exec hassio_cli ha apps update local_file_editor_plus"
+      - "docker exec hassio_cli ha apps restart local_file_editor_plus"
+      - "docker exec hassio_cli ha supervisor logs -n 80"
+    notes: "Verifica statica: no 404/500 su Supervisor; verifica UI Ingress resta manuale."
+
   - step_id: "UI_NAV_AUDIT-STEP-005"
     summary: "Aggiornato audit UI Nav post-wiring: `Import…`/`Export…`/`Save as…` ora Connected; NOT CONNECTED resta solo per `Backup -> Cloud` (disabled)."
     files:

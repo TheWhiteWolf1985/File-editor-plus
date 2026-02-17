@@ -215,7 +215,7 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 ## STEP 006 — Smoke add-on (Ingress + azioni principali)
 
-- Status: TODO
+- Status: DONE
 - Goal: verificare che Ingress non sia stato rotto e che i click facciano cose vere.
 - Scope:
   - runtime add-on (dev/test)
@@ -231,7 +231,10 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
   - Nessun 404/500 per assets/API a causa di base path.
 
 - Commit message:
-  - N/A (solo verifica; se servono fix, commit dedicato)
+  - `docs(qa): record ingress smoke check`
+
+- What changed:
+  - Eseguiti update + restart add-on (`local_file_editor_plus`) e verificato da supervisor logs che il lifecycle job e' andato a buon fine.
 
 ---
 
