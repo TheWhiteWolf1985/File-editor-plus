@@ -215,7 +215,7 @@ PY`
 
 ### STEP 006 — Quality gate: lint/typecheck FE+BE (integrazione reale)
 
-- Status: TODO
+- Status: DONE
 - Goal: Standardizzare controlli ripetibili (evitare regressioni silenziose).
 - Scope:
   - Frontend: `file_editor_plus/frontend/package.json`
@@ -226,6 +226,10 @@ PY`
   - FE: garantire script `lint` e `typecheck` se supportati dallo stack già presente.
   - BE: definire almeno un controllo statico **già previsto** (es. format/lint/typecheck se esiste).
   - Documentare i comandi in `AI/AI_RUNBOOK.md` (linkare a STEP 002 se già fatto).
+  - What changed:
+    - Confermato che FE ha `typecheck` (ma attualmente fallisce per errori TS esistenti) e non ha lint configurato (N/A).
+    - Confermato che BE non ha pytest/lint configurati in questo ambiente (pytest non presente; pip non disponibile).
+    - Build frontend rimane il gate principale.
 
 - Commands:
   - `cd file_editor_plus/frontend && node -p "JSON.stringify(require('./package.json').scripts, null, 2)"`

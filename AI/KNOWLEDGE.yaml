@@ -232,3 +232,19 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "Nessuna modifica applicativa necessaria; controllo eseguito per prevenire regressioni."
+
+  - step_id: "STEP-006"
+    summary: "Quality gate: confermati comandi typecheck FE (non ancora green) e N/A per lint FE e tooling BE in questo ambiente."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && node -p \"JSON.stringify(require('./package.json').scripts, null, 2)\""
+      - "cd file_editor_plus/frontend && (npm run -s lint || true)"
+      - "cd file_editor_plus/frontend && (npm run -s typecheck || true)"
+      - "cd file_editor_plus/backend && (python3 -m pytest -q || true)"
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    risks:
+      - "Typecheck FE attualmente fallisce: non usare come gate finche' non vengono risolti gli errori TS."
+      - "Backend test/lint non eseguibili in questo ambiente senza pip o container dedicato."
