@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-17T20:18:13Z"
+  updated_at: "2026-02-17T20:19:07Z"
 
 commands:
   frontend_build:
@@ -91,6 +91,17 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "UI_NAV_AUDIT-STEP-005"
+    summary: "Aggiornato audit UI Nav post-wiring: `Import…`/`Export…`/`Save as…` ora Connected; NOT CONNECTED resta solo per `Backup -> Cloud` (disabled)."
+    files:
+      - "AI/AUDITS/UI_NAV_AUDIT.md"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Audit allineato con lo stato attuale del wiring (STEP 004)."
+
   - step_id: "UI_NAV_AUDIT-STEP-004"
     summary: "Wiring Topbar File: `Import…` ora apre upload; `Export…` e `Save as…` scaricano il file attivo via backend."
     files:

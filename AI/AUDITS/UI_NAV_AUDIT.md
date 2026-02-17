@@ -21,10 +21,10 @@ Legenda stato:
 | Topbar > File | New file | action | `file_editor_plus/frontend/src/app-root.ts:1894` | `handleMenuAction("file","New file")` | (state) `newItemKind="file"` -> create | `/api/file (PUT create_only=1)` | ✅ | Creazione effettiva avviene in flow "new item" |
 | Topbar > File | New folder | action | `file_editor_plus/frontend/src/app-root.ts:1898` | `handleMenuAction("file","New folder")` | (state) `newItemKind="folder"` -> create | `/api/folder (POST)` | ✅ |  |
 | Topbar > File | Save | action | `file_editor_plus/frontend/src/app-root.ts:1901` | `save()` | `apiSaveFile()` | `/api/file (PUT)` | ✅ |  |
-| Topbar > File | Save as… | action | `file_editor_plus/frontend/src/app-root.ts:1903` | stub (toast) | nessuna | N/A | ❌ | Mostra "non implementato" |
+| Topbar > File | Save as… | action | `file_editor_plus/frontend/src/app-root.ts:1903` | `triggerPathDownload(activePath)` | link download | `/api/fs/download (GET)` | ✅ | Download del file attivo |
 | Topbar > File | Settings | route/modal | `file_editor_plus/frontend/src/app-root.ts:1906` | `openSettingsModal()` | `apiPutUserConfig()` (on apply) | `/api/user-config (PUT)` | ✅ | Impostazioni UI |
-| Topbar > File | Import… | action | `file_editor_plus/frontend/src/app-root.ts:2684` | non gestito | N/A | N/A | ❌ | Voce presente nel menu, manca branch in `handleMenuAction` |
-| Topbar > File | Export… | action | `file_editor_plus/frontend/src/app-root.ts:2685` | non gestito | N/A | N/A | ❌ | Voce presente nel menu, manca branch in `handleMenuAction` |
+| Topbar > File | Import… | action | `file_editor_plus/frontend/src/app-root.ts:2684` | `openUploadModal()` | `apiUpload()` (nel modal) | `/api/upload (POST)` | ✅ | Apre modal upload |
+| Topbar > File | Export… | action | `file_editor_plus/frontend/src/app-root.ts:2685` | `triggerPathDownload(activePath)` | link download | `/api/fs/download (GET)` | ✅ | Download del file attivo |
 | Topbar > Edit | Undo | action | `file_editor_plus/frontend/src/app-root.ts:1910` | `handleUndoRedo("undo")` | N/A | N/A | ✅ | Gestione editor |
 | Topbar > Edit | Redo | action | `file_editor_plus/frontend/src/app-root.ts:1912` | `handleUndoRedo("redo")` | N/A | N/A | ✅ |  |
 | Topbar > Edit | Cut | action | `file_editor_plus/frontend/src/app-root.ts:1914` | `handleCopyCut("cut")` | N/A | N/A | ✅ | Clipboard |
@@ -62,23 +62,7 @@ Legenda stato:
 
 ## NOT CONNECTED
 
-1. File -> **Save as…**
-   - `file_editor_plus/frontend/src/app-root.ts:1903`
-   - Stato: stub (toast “non implementato”)
-   - Gap: manca implementazione save-as (scelta UX/API).
-
-2. File -> **Import…**
-   - `file_editor_plus/frontend/src/app-root.ts:2684`
-   - Stato: non gestito in `handleMenuAction()`
-   - Gap: decidere mapping (es. aprire upload modal) o disabilitare con motivazione.
-
-3. File -> **Export…**
-   - `file_editor_plus/frontend/src/app-root.ts:2685`
-   - Stato: non gestito in `handleMenuAction()`
-   - Gap: decidere mapping (es. download file attivo via `/api/fs/download?path=...`) o disabilitare.
-
-4. Backup -> **Cloud**
+1. Backup -> **Cloud**
    - `file_editor_plus/frontend/src/app-root.ts:2486`
    - Stato: disabilitato (coming soon)
    - Gap: OK se intenzionale; mantenere spiegazione in UI.
-

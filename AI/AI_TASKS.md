@@ -190,7 +190,7 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 ## STEP 005 — Aggiornare audit (NOT CONNECTED deve essere vuoto o giustificato)
 
-- Status: TODO
+- Status: DONE
 - Goal: audit aggiornato post-fix.
 - Scope:
   - `AI/AUDITS/UI_NAV_AUDIT.md`
@@ -207,6 +207,9 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 - Commit message:
   - `docs(audit): update ui nav audit after wiring`
+
+- What changed:
+  - Aggiornato `AI/AUDITS/UI_NAV_AUDIT.md`: `Import…`/`Export…`/`Save as…` ora risultano ✅ Connected; NOT CONNECTED resta solo per `Backup -> Cloud` (disabled/coming soon).
 
 ---
 
