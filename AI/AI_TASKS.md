@@ -315,7 +315,7 @@ PY`
 
 ### STEP 009 — Retention/cleanup backup (/config/.fep-backups)
 
-- Status: TODO
+- Status: DONE
 - Goal: Evitare crescita incontrollata dei backup.
 - Scope:
   - `file_editor_plus/backend/app.py` (backup)
@@ -325,6 +325,9 @@ PY`
 - Changes:
   - Definire policy retention (es. max N per file, max size totale, pruning manuale/automatico).
   - Implementare pruning se richiesto dallo scope reale (altrimenti solo doc + issue).
+  - What changed:
+    - Implementata retention best-effort in backend: keep-last-N per file (default 50) via `FEP_BACKUP_KEEP_LAST` (0 disabilita).
+    - Aggiunti test unitari per retention e aggiornate docs `files.md` (tutte le lingue) con policy.
 
 - Commands:
   - <<OPTIONAL>>

@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -68,7 +69,30 @@ class TestFsPrimitives(unittest.TestCase):
         leftovers = list(p.parent.glob(f".{p.name}.tmp.*"))
         self.assertEqual(leftovers, [])
 
+    def test_backup_retention_prunes_old_backups(self):
+        # Create multiple synthetic backups for the same rel path with increasing mtimes.
+        rel = Path("r/keep.txt")
+        created = []
+        for i in range(4):
+            day = f"2026010{i+1}"
+            dest = (app.BACKUP_DIR / day / rel).resolve()
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            bak = dest.with_name(dest.name + f".00000{i}.bak")
+            bak.write_text(f"v{i}", encoding="utf-8")
+            os.utime(bak, (100 + i, 100 + i))
+            created.append(bak)
+
+        deleted = app.prune_backups_for_rel(rel, keep_last=2)
+        self.assertEqual(deleted, 2)
+
+        remaining = sorted(
+            app.BACKUP_DIR.glob(f"*/{rel.as_posix()}.*.bak"), key=lambda p: p.stat().st_mtime
+        )
+        self.assertEqual(len(remaining), 2)
+        # Remaining are the newest two by mtime.
+        self.assertEqual(remaining[0].read_text(encoding="utf-8"), "v2")
+        self.assertEqual(remaining[1].read_text(encoding="utf-8"), "v3")
+
 
 if __name__ == "__main__":
     unittest.main()
-

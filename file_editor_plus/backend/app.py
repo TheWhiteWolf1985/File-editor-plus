@@ -72,6 +72,13 @@ MAX_BUFFER_BYTES = 256 * 1024  # 256KB
 MAX_BUFFER_FILES = 10
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
 CONFLICT_MODES = {"fail", "overwrite", "autorename"}
+
+# Backup retention: keep last N backup files per edited file (0 disables pruning).
+try:
+    BACKUP_KEEP_LAST = int(os.environ.get("FEP_BACKUP_KEEP_LAST", "50"))
+except Exception:
+    BACKUP_KEEP_LAST = 50
+BACKUP_KEEP_LAST = max(0, min(200, BACKUP_KEEP_LAST))
 HA_ACTIONS = {
     "reload_yaml": {"type": "service", "domain": "homeassistant", "service": "reload_all"},
     "restart_core": {"type": "service", "domain": "homeassistant", "service": "restart"},
@@ -98,6 +105,40 @@ def _is_within_base(p: Path) -> bool:
         return True
     except Exception:
         return False
+
+
+def prune_backups_for_rel(rel: Path, keep_last: int = BACKUP_KEEP_LAST) -> int:
+    """
+    Applica retention ai backup per un singolo file relativo a BASE_DIR.
+    Tiene gli ultimi `keep_last` (ordinati per mtime), rimuove gli altri.
+    """
+    try:
+        keep_last = int(keep_last)
+    except Exception:
+        keep_last = BACKUP_KEEP_LAST
+    if keep_last <= 0:
+        return 0
+
+    rel_posix = rel.as_posix().lstrip("/")
+    pattern = f"*/{rel_posix}.*.bak"
+    candidates = [p for p in BACKUP_DIR.glob(pattern) if p.is_file()]
+    if len(candidates) <= keep_last:
+        return 0
+
+    candidates.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    to_delete = candidates[keep_last:]
+
+    deleted = 0
+    for p in to_delete:
+        try:
+            rp = p.resolve()
+            if BACKUP_DIR not in rp.parents and rp != BACKUP_DIR:
+                continue
+            p.unlink(missing_ok=True)
+            deleted += 1
+        except Exception:
+            logger.warning("backup retention: failed to delete %s", p, exc_info=True)
+    return deleted
 
 
 def _resolve_docs_dir() -> Path:
@@ -155,6 +196,11 @@ def make_backup(target: Path) -> Optional[Path]:
     # es: file.yaml -> file.yaml.235959.bak
     bak = dest.with_name(dest.name + f".{stamp}.bak")
     shutil.copy2(target, bak)
+    try:
+        prune_backups_for_rel(rel, keep_last=BACKUP_KEEP_LAST)
+    except Exception:
+        # best-effort: retention non deve rompere l'operazione principale
+        logger.warning("backup retention: prune failed for %s", rel, exc_info=True)
     return bak
 
 

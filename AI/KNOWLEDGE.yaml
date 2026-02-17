@@ -272,3 +272,21 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "La modifica funzionale era gia' inclusa nello STEP 007; qui e' stata solo verificata e registrata come suite verde."
+
+  - step_id: "STEP-009"
+    summary: "Retention backup: keep-last-N per file in `.fep-backups` (default 50) + documentazione multilingua."
+    files:
+      - "file_editor_plus/backend/app.py"
+      - "file_editor_plus/backend/test_fs_primitives.py"
+      - "file_editor_plus/docs/it/files.md"
+      - "file_editor_plus/docs/en/files.md"
+      - "file_editor_plus/docs/fr/files.md"
+      - "file_editor_plus/docs/es/files.md"
+      - "file_editor_plus/docs/de/files.md"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Retention controllata via env `FEP_BACKUP_KEEP_LAST` (0 disabilita). Implementazione best-effort: la retention non deve rompere la creazione del backup."
