@@ -39,7 +39,7 @@ Esempio:
   - Frontend: `cd file_editor_plus/frontend && npm ci && npm run build`.
 - Lint/Format: <<OPTIONAL>> (non documentati nel repo in modo certo).
 - Unit test:
-  - Backend: test files presenti in `file_editor_plus/backend/test_*.py` (runner esatto: <<REQUIRED>>).
+  - Backend: test files presenti in `file_editor_plus/backend/test_*.py` (runner esatto: N/A, da definire in STEP 002).
 - Integration/E2E: <<OPTIONAL>>
 
 ## Sicurezza e Privacy

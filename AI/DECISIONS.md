@@ -1,9 +1,9 @@
 ﻿# DECISIONS (mini-ADR) — Migrazione da AI_old
 
-Nota: le fonti legacy non riportano sempre date esplicite per le decisioni; dove non deducibile con certezza, la data resta `<<REQUIRED>>`.
+Nota: le fonti legacy non riportano sempre date esplicite per le decisioni; quando non deducibile con certezza, usare `Date: N/A (...)`.
 
 ## ADR 001 — Runtime senza risorse esterne (no CDN / no fetch internet)
-- Date: <<REQUIRED>>
+- Date: N/A (non tracciata nelle fonti legacy)
 - Context:
   - Add-on Home Assistant usato via Ingress in ambienti dove l'accesso internet non e' garantito o desiderato.
   - Vincolo legacy esplicito.
@@ -18,7 +18,7 @@ Nota: le fonti legacy non riportano sempre date esplicite per le decisioni; dove
   - `AI_old/AI_PROJECT.md` "No CDN in runtime / No runtime fetch to external internet resources."
 
 ## ADR 002 — Documentazione servita dal backend (routes /docs) e apertura in nuova tab
-- Date: <<REQUIRED>>
+- Date: N/A (non tracciata nelle fonti legacy)
 - Context:
   - Ingress path prefix e routing SPA possono essere fragili; serve un viewer stabile e compatibile Ingress.
 - Decision:
@@ -33,7 +33,7 @@ Nota: le fonti legacy non riportano sempre date esplicite per le decisioni; dove
   - `AI_old/AI_PROJECT.md` vincolo aiuto->documentazione `_blank` + noopener/noreferrer.
 
 ## ADR 003 — Ingress-friendly paths: Vite base relativa e API base da location
-- Date: <<REQUIRED>>
+- Date: N/A (non tracciata nelle fonti legacy)
 - Context:
   - Add-on gira sotto path prefix Ingress (`/api/hassio_ingress/...`), quindi path assoluti si rompono.
 - Decision:

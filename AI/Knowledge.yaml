@@ -1,0 +1,8 @@
+﻿# Compatibility shim
+#
+# Canonical project knowledge file: `AI/KNOWLEDGE.yaml`
+# This file exists only to support older prompts that refer to `AI/Knowledge.yaml`.
+#
+# Do not update this file directly; update `AI/KNOWLEDGE.yaml`.
+redirect_to: "AI/KNOWLEDGE.yaml"
+

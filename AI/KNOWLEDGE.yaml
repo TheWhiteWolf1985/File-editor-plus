@@ -156,3 +156,22 @@ changes_log:
         field: "Dev locale"
         reason: "Nel repo non esiste un comando dev server ufficiale unico; serve conferma."
         source_hint: "AI_old/AI_RUNBOOK non presente; AI_old/AI_PROJECT.md contiene solo build."
+
+  - step_id: "STEP-001"
+    summary: "Finalizzato bump AI kit: metadata compilata, placeholder bloccanti rimossi dai documenti operativi, build frontend verificata."
+    files:
+      - "AI/METADATA.yaml"
+      - "AI/AI_PROJECT.md"
+      - "AI/AI_RUNBOOK.md"
+      - "AI/DECISIONS.md"
+      - "AI/AI_CONVENTIONS.md"
+      - "AI/AI_TASKS.md"
+      - "AI/Knowledge.yaml"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "git status --porcelain"
+      - "git diff --name-only"
+      - "rg -n \"<{2}REQUIRED>{2}\" AI -S --glob '!AI/AI_TASKS.md' --glob '!AI/README.md' --glob '!AI/EXAMPLES/**'"
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Placeholder `<<REQUIRED>>` rimangono solo in template/esempi (`AI/README.md`, `AI/EXAMPLES/*`) come previsto dal kit."

@@ -36,4 +36,4 @@ Esempio:
 
 ## Bump Legacy -> New AI Kit (regole)
 - Non modificare o cancellare contenuti in `AI_old/`.
-- Non inserire fatti non verificati: se non certo usare `<<REQUIRED>>` / `<<OPTIONAL>>`.
+- Non inserire fatti non verificati: se non certo usare i placeholder previsti dal kit (vedi `AI/README.md`).

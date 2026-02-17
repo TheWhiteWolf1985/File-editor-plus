@@ -13,8 +13,7 @@ Vincoli:
   - Mount `/config:rw` e contesto Supervisor per API HA (token gestito dal Supervisor).
 
 ## Dev
-- Dev locale: <<REQUIRED>>
-  - (Nel repo non c'e' un comando ufficiale unico per dev server; definire se serve.)
+- Dev locale: N/A (nel repo non e' documentato un comando ufficiale unico per un dev server FE/BE).
 
 ## Build
 - Frontend build (certi dal repo):
@@ -32,7 +31,7 @@ Vincoli:
 ## Test (unit/integration/e2e)
 - Backend unit tests:
   - Test files esistenti: `file_editor_plus/backend/test_diff.py`, `file_editor_plus/backend/test_format_yaml.py`, `file_editor_plus/backend/test_search_replace.py`.
-  - Comando runner ufficiale: <<REQUIRED>> (non documentato in modo certo nel repo; durante audit e' stato citato `python -m unittest`).
+  - Comando runner ufficiale: N/A (da definire; vedi STEP 002 in `AI/AI_TASKS.md`).
 - Frontend build e' un gate minimo (Vite/TS).
 
 ## Migrations/DB/Docker
