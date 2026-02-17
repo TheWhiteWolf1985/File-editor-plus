@@ -117,7 +117,7 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 ## STEP 003 — Audit report: compilare `AI/AUDITS/UI_NAV_AUDIT.md`
 
-- Status: TODO
+- Status: DONE
 - Goal: produrre il report completo con stato Connected/Not connected.
 - Scope:
   - `AI/AUDITS/UI_NAV_AUDIT.md` (nuovo)
@@ -148,6 +148,9 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 - Commit message:
   - `docs(audit): add ui nav audit (topbar/sidebar)`
+
+- What changed:
+  - Creato `AI/AUDITS/UI_NAV_AUDIT.md` con tabella completa Topbar/Sidebar, mapping a servizi/endpoints e sezione NOT CONNECTED.
 
 ---
 
