@@ -1,28 +1,58 @@
-# AI Project Guide
+﻿# AI_PROJECT — ha-file-editor-plus
 
-## Stack
-- Frontend: Lit + TypeScript + Vite
-- Backend: Python + FastAPI (served by uvicorn in add-on container)
-- Packaging: Home Assistant add-on (`file_editor_plus/config.yaml`)
+## Scope
+- Obiettivo principale: fornire un add-on Home Assistant per editare file sotto `/config` via Ingress, con backend FastAPI e frontend Lit.
+- Ambito incluso:
+  - UI editor + explorer per file/cartelle di `/config`.
+  - API backend per lettura/scrittura file con guardrail path, backup e write atomiche.
+  - Integrazione Home Assistant via Supervisor (states + websocket + azioni allowlisted).
+  - Documentazione utente in Markdown servita localmente (no risorse esterne runtime).
 
-## Build Commands
-- Frontend package manager detection:
-  - `pnpm-lock.yaml` -> `pnpm`
-  - `yarn.lock` -> `yarn`
-  - otherwise -> `npm`
-- Frontend build:
-  - `cd file_editor_plus/frontend`
-  - install deps if needed (`pnpm i` / `yarn` / `npm ci`)
-  - build (`pnpm run build` / `yarn build` / `npm run build`)
+Esempio:
+- Obiettivo principale: "Ridurre errori operativi nella gestione task AI."
 
-## Add-on Lifecycle Commands
-- Update: `docker exec hassio_cli ha apps update local_file_editor_plus`
-- Rebuild: `docker exec hassio_cli ha apps rebuild local_file_editor_plus`
-- Restart: `docker exec hassio_cli ha apps restart local_file_editor_plus`
-- Supervisor logs: `docker exec hassio_cli ha supervisor logs -n 220`
+## Non-goals
+- Fuori scope:
+  - Modificare percorsi fuori da `/config`.
+  - Dipendere da CDN o fetch runtime verso internet.
+  - Implementare auth applicativa separata da Home Assistant Ingress (se richiesta, va specificata).
 
-## Constraints
-- No CDN in runtime.
-- No runtime fetch to external internet resources.
-- Documentation files are Markdown.
-- Top Bar `Aiuto -> Documentazione` must open in `_blank` with `noopener,noreferrer`.
+Esempio:
+- Fuori scope: "Migrazione completa stack o redesign UI globale."
+
+## Vincoli
+- Modifiche minime necessarie.
+- Nessuna nuova dipendenza senza richiesta esplicita.
+- Nessun segreto reale nei file del repository.
+- Vincoli progetto specifici:
+  - Add-on con privilegi elevati (`hassio_role: admin`) e accesso Supervisor: evitare superfici d'attacco inutili.
+  - Ingress/base path: URL devono essere costruiti in modo relativo e robusto (no path assoluti fragili).
+  - Documentazione: Markdown per lingua in `file_editor_plus/docs/<lang>/<page>.md`.
+
+## DoD
+- Requisiti soddisfatti con evidenza verificabile.
+- Documenti AI aggiornati (`AI_TASKS`, `KNOWLEDGE`, `DECISIONS` quando serve).
+- Audit finale prodotto senza diff.
+
+## Quality gates
+- Build:
+  - Frontend: `cd file_editor_plus/frontend && npm ci && npm run build`.
+- Lint/Format: <<OPTIONAL>> (non documentati nel repo in modo certo).
+- Unit test:
+  - Backend: test files presenti in `file_editor_plus/backend/test_*.py` (runner esatto: <<REQUIRED>>).
+- Integration/E2E: <<OPTIONAL>>
+
+## Sicurezza e Privacy
+- Dati sensibili coinvolti:
+  - Contenuti dei file sotto `/config` (configurazione Home Assistant).
+  - Token Supervisor (`SUPERVISOR_TOKEN`) usato per chiamare API core/supervisor.
+- Gestione secret:
+  - Non loggare token/secret.
+  - Non persistere token nel frontend.
+  - In caso di errori, ritornare messaggi user-friendly senza leak (dettagli tecnici solo in log, senza segreti).
+- Regole data handling: <<OPTIONAL>>
+
+## Logging e Observability
+- Logging standard: log backend FastAPI/uvicorn (nessun token in log).
+- Metriche minime: <<OPTIONAL>>
+- Alerting/tracing: <<OPTIONAL>>

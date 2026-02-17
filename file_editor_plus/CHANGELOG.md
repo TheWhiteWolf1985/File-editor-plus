@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.82
+
+- Chore release: bump versione add-on e ricostruzione completa (build frontend + update/rebuild/restart addon).
+
 ## 0.2.81
 
 - Chore release: bump versione add-on e ricostruzione completa (build frontend + update/rebuild/restart addon).

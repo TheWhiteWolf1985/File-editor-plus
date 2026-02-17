@@ -1,0 +1,52 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/tasks.schema.json",
+  "title": "AI Tasks Export",
+  "type": "object",
+  "required": ["task_steps"],
+  "properties": {
+    "task_steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "status",
+          "goal",
+          "scope",
+          "changes",
+          "commands",
+          "acceptance_criteria",
+          "commit_message"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "status": { "type": "string", "enum": ["TODO", "DOING", "DONE"] },
+          "goal": { "type": "string" },
+          "scope": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "changes": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "commands": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "acceptance_criteria": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "commit_message": { "type": "string" },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}
