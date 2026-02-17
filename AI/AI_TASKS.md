@@ -28,7 +28,7 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 ## STEP 001 — Inventory: identificare Topbar/Sidebar e tutte le voci
 
-- Status: TODO
+- Status: DONE
 - Goal: elenco completo di voci/pulsanti (Topbar + Sidebar) con i riferimenti al codice.
 - Scope:
   - `file_editor_plus/frontend/src/**`
@@ -65,7 +65,10 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
   - Esiste una lista grezza completa (anche temporanea) con tutte le voci individuate.
 
 - Commit message:
-  - N/A (niente commit in questo step; è raccolta info)
+  - `docs(audit): inventory ui nav items`
+
+- What changed:
+  - Inventario completo raccolto da `file_editor_plus/frontend/src/app-root.ts` (topbar menu, toolbar, activity bar, sidebar panes) e pronto per il report in STEP 003.
 
 ---
 

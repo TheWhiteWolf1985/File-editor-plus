@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-17T12:04:04Z"
+  updated_at: "2026-02-17T20:09:42Z"
 
 commands:
   frontend_build:
@@ -91,6 +91,18 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "UI_NAV_AUDIT-STEP-001"
+    summary: "Raccolto inventario Topbar/Sidebar (voci UI e punti di rendering) per audit di wiring."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/frontend/src/app-root.ts"
+    commands:
+      - "rg -n -S \"Topbar|TopBar|AppBar|Toolbar|Sidebar|Drawer\" file_editor_plus/frontend/src"
+      - "rg -n -S \"menuItems|navItems|routes\" file_editor_plus/frontend/src"
+      - "rg -n -S \"navigate\\(|href=|@click=|onClick\" file_editor_plus/frontend/src/app-root.ts"
+    notes: "Inventario grezzo usato per compilare `AI/AUDITS/UI_NAV_AUDIT.md` nello STEP 003."
+
   - step_id: "AI_TASKS_POST_MIGRATION-001"
     summary: "Frontend: reso `npm run -s typecheck` green (typing Vite env + fix tipizzazioni locali)."
     files:
