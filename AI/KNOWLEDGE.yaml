@@ -248,3 +248,16 @@ changes_log:
     risks:
       - "Typecheck FE attualmente fallisce: non usare come gate finche' non vengono risolti gli errori TS."
       - "Backend test/lint non eseguibili in questo ambiente senza pip o container dedicato."
+
+  - step_id: "STEP-007"
+    summary: "Aggiunti test backend per safe_path/make_backup/atomic_write e allineato test traversal esistente; suite eseguita via Docker."
+    files:
+      - "file_editor_plus/backend/test_fs_primitives.py"
+      - "file_editor_plus/backend/test_search_replace.py"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "In questo workspace `python3` non include `pip`, quindi i test backend sono stati eseguiti in un container (immagine python gia' presente localmente)."

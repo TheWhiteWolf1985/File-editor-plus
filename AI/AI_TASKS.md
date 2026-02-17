@@ -252,7 +252,7 @@ PY`
 
 ### STEP 007 — Test: safe_path/make_backup/atomic_write
 
-- Status: TODO
+- Status: DONE
 - Goal: Aumentare copertura regressioni su operazioni file critiche sotto `/config`.
 - Scope:
   - `file_editor_plus/backend/app.py`
@@ -266,7 +266,7 @@ PY`
     - backup path
     - errori IO simulati (quando possibile)
 
-- Commands:
+  - Commands:
   - `cd file_editor_plus/backend && (python -m pytest -q || pytest -q)`
 
 - Acceptance criteria:
@@ -278,6 +278,10 @@ PY`
 
 - Blockers/Notes:
   - Se serve test fixture per `/config`, documentare chiaramente.
+  - What changed:
+    - Aggiunti test unitari per `safe_path`, `make_backup`, `atomic_write` in `file_editor_plus/backend/test_fs_primitives.py`.
+    - Corretto test esistente `test_traversal_blocked` per allinearlo al comportamento attuale (error entry invece di eccezione).
+    - Verifica eseguita via container `python:3.12-alpine` (pip install requirements + unittest).
 
 ---
 

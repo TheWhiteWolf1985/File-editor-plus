@@ -79,17 +79,19 @@ class SearchReplaceTest(unittest.TestCase):
         self.assertEqual((app.BASE_DIR / "stale.txt").read_text(encoding="utf-8"), "alpha gamma")
 
     def test_traversal_blocked(self):
-        with self.assertRaises(Exception):
-            _replace_on_files(
-                {
-                    "query": "x",
-                    "replace": "y",
-                    "case_sensitive": True,
-                    "scope": "files",
-                    "files": [{"path": "../evil.txt", "mtime": 0}],
-                },
-                apply=True,
-            )
+        res = _replace_on_files(
+            {
+                "query": "x",
+                "replace": "y",
+                "case_sensitive": True,
+                "scope": "files",
+                "files": [{"path": "../evil.txt", "mtime": 0}],
+            },
+            apply=True,
+        )
+        entry = next(e for e in res["per_file"] if e["path"] == "../evil.txt")
+        self.assertEqual(entry["status"], "error")
+        self.assertTrue(entry.get("error"))
 
 
 if __name__ == "__main__":
