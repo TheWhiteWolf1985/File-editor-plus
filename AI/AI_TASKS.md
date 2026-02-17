@@ -375,13 +375,15 @@ PY`
 
 ### STEP 011 — Hardening log: rimuovere token_prefix dai log
 
-- Status: TODO
+- Status: DONE
 - Goal: Ridurre rischio leakage credenziali nei log.
 - Scope:
   - `file_editor_plus/backend/app.py` (logging)
 
 - Changes:
   - Rimuovere/mascherare `token_prefix` e riferimenti a token nei log info/warn/error.
+  - What changed:
+    - Rimossi log `token_prefix` da HA proxy (ora logga solo `token_present=true/false`).
 
 - Commands:
   - `rg -n "token_prefix|token" file_editor_plus/backend -S`

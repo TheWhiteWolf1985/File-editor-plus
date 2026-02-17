@@ -301,3 +301,16 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "Change minimale: non altera semantica save, aggiunge solo rendering errori (toast + status reset)."
+
+  - step_id: "STEP-011"
+    summary: "Hardening log: rimossi riferimenti a token_prefix dai log del proxy HA."
+    files:
+      - "file_editor_plus/backend/app.py"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "rg -n \"token_prefix\" file_editor_plus/backend -S"
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Ora i log non includono piu' prefissi token; resta solo un flag booleano `token_present`."

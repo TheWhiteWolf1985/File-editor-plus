@@ -931,8 +931,7 @@ async def ha_states():
         logger.error("ha_states: missing SUPERVISOR_TOKEN env, cannot call HA API")
         raise HTTPException(500, "Missing supervisor token")
     try:
-        token_preview = SUPERVISOR_TOKEN[:8] + "..." if SUPERVISOR_TOKEN else ""
-        logger.info("ha_states: calling supervisor/core/api/states token_present=%s token_prefix=%s", bool(SUPERVISOR_TOKEN), token_preview)
+        logger.info("ha_states: calling supervisor/core/api/states token_present=%s", bool(SUPERVISOR_TOKEN))
         async with httpx.AsyncClient(base_url="http://supervisor/core/api", timeout=15) as client:
             res = await client.get("/states", headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"})
             if res.status_code in (401, 403):
@@ -956,8 +955,7 @@ async def ha_ws(ws: WebSocket):
         await ws.close(code=1011)
         return
     try:
-        token_preview = SUPERVISOR_TOKEN[:8] + "..." if SUPERVISOR_TOKEN else ""
-        logger.info("ha_ws: connecting to supervisor/core/websocket token_prefix=%s", token_preview)
+        logger.info("ha_ws: connecting to supervisor/core/websocket token_present=%s", bool(SUPERVISOR_TOKEN))
         async with websockets.connect("ws://supervisor/core/websocket") as upstream:
             first = await upstream.recv()
             try:
