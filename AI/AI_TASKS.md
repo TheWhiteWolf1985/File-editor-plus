@@ -59,7 +59,7 @@ Questo `AI_TASKS.md` **sostituisce** il backlog “migrato da AI_old” che cont
 
 ### STEP 002 — Definire comandi ufficiali (dev/build/lint/test) e aggiornare RUNBOOK
 
-- Status: TODO
+- Status: DONE
 - Goal: Rendere ripetibile la verifica (dev, build, lint/typecheck, test) senza “magia”.
 - Scope:
   - `AI/AI_RUNBOOK.md`
@@ -76,6 +76,10 @@ Questo `AI_TASKS.md` **sostituisce** il backlog “migrato da AI_old” che cont
     - Definire un comando “test backend” ufficiale.
 
   - Documentare tutto in `AI/AI_RUNBOOK.md` come comandi canonici.
+  - What changed:
+    - Aggiunti script FE `dev` e `typecheck` in `file_editor_plus/frontend/package.json`.
+    - Aggiornato `AI/AI_RUNBOOK.md` con comandi canonici per dev/build/typecheck/test (con prerequisito `pip` per backend).
+    - Validato build FE; typecheck FE esegue ma segnala errori TS esistenti nel codice.
 
 - Commands:
   - `cd file_editor_plus/frontend && node -p "JSON.stringify(require('./package.json').scripts, null, 2)"`

@@ -13,7 +13,12 @@ Vincoli:
   - Mount `/config:rw` e contesto Supervisor per API HA (token gestito dal Supervisor).
 
 ## Dev
-- Dev locale: N/A (nel repo non e' documentato un comando ufficiale unico per un dev server FE/BE).
+- Dev locale:
+  - Frontend (Vite):
+    - `cd file_editor_plus/frontend && npm ci && npm run dev`
+  - Backend (Uvicorn):
+    - Prerequisito: ambiente Python con `pip` disponibile e dipendenze installabili.
+    - `cd file_editor_plus/backend && python3 -m pip install -r requirements.txt && python3 -m uvicorn app:app --host 0.0.0.0 --port 8099`
 
 ## Build
 - Frontend build (certi dal repo):
@@ -26,12 +31,18 @@ Vincoli:
   - `docker exec hassio_cli ha apps restart local_file_editor_plus`
 
 ## Lint/Format/Typecheck
-- <<OPTIONAL>>
+- Frontend:
+  - Typecheck: `cd file_editor_plus/frontend && npm run -s typecheck` (nota: al momento puo' fallire per errori TS gia' presenti)
+  - Lint: N/A (nessun tooling lint configurato nel repo)
+- Backend:
+  - Lint/typecheck: N/A (nessun tooling esplicito nel repo)
 
 ## Test (unit/integration/e2e)
 - Backend unit tests:
   - Test files esistenti: `file_editor_plus/backend/test_diff.py`, `file_editor_plus/backend/test_format_yaml.py`, `file_editor_plus/backend/test_search_replace.py`.
-  - Comando runner ufficiale: N/A (da definire; vedi STEP 002 in `AI/AI_TASKS.md`).
+  - Comando runner ufficiale:
+    - Prerequisito: ambiente Python con `pip` disponibile e dipendenze installate.
+    - `cd file_editor_plus/backend && python3 -m pip install -r requirements.txt && python3 -m unittest -q`
 - Frontend build e' un gate minimo (Vite/TS).
 
 ## Migrations/DB/Docker

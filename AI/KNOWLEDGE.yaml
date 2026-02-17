@@ -175,3 +175,21 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "Placeholder `<<REQUIRED>>` rimangono solo in template/esempi (`AI/README.md`, `AI/EXAMPLES/*`) come previsto dal kit."
+
+  - step_id: "STEP-002"
+    summary: "Definiti comandi canonici per dev/build/typecheck/test e aggiornato runbook; aggiunti script FE `dev` e `typecheck`."
+    files:
+      - "AI/AI_RUNBOOK.md"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/frontend/package.json"
+    commands:
+      - "cd file_editor_plus/frontend && node -p \"JSON.stringify(require('./package.json').scripts, null, 2)\""
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+      - "cd file_editor_plus/frontend && npm run -s typecheck"
+      - "cd file_editor_plus/backend && ls -la"
+      - "cd file_editor_plus/backend && sed -n '1,160p' requirements.txt"
+      - "cd file_editor_plus/backend && python3 -m unittest -q (fails: deps non installate)"
+      - "python3 -m pip (not available in this environment)"
+    notes: "Backend: i test richiedono dipendenze (requirements.txt) ma in questo ambiente `python3` non include `pip`, quindi non e' stato possibile installarle e far girare la suite localmente."
