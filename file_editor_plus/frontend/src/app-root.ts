@@ -300,7 +300,6 @@ export class AppRoot extends LitElement {
   declare lineCount: number;
   declare cursorLine: number;
   declare cursorCol: number;
-  declare treeDirty: boolean;
   treeDirty = false;
   private loadedPaths = new Set<string>();
   private loadingPaths = new Set<string>();
@@ -2225,6 +2224,16 @@ export class AppRoot extends LitElement {
         (Array.isArray(data?.tabs) && data.tabs.length > 0) ||
         (typeof data?.active === "string" && data.active.length > 0) ||
         typeof data?.split === "boolean";
+      type StoredTabEntry = {
+        path: string;
+        dirty: boolean;
+        buffer_id?: string;
+        bufferId?: string;
+        buffer_size?: number;
+        bufferSize?: number;
+        lastEditAt?: number;
+        last_edit_at?: number | string;
+      };
       const rawTabs = Array.isArray(data?.tabs) ? data.tabs : [];
       const tabs = rawTabs
         .map((t: any) => {
@@ -2232,7 +2241,7 @@ export class AppRoot extends LitElement {
           if (t && typeof t.path === "string") return { path: t.path, dirty: !!t.dirty };
           return null;
         })
-        .filter((t: any) => t !== null) as { path: string; dirty: boolean }[];
+        .filter((t: any) => t !== null) as StoredTabEntry[];
       const active = typeof data?.active === "string" ? data.active : null;
       const split = typeof data?.split === "boolean" ? data.split : false;
       const restored: string[] = [];

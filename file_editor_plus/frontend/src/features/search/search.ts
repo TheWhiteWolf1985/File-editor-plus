@@ -1,6 +1,13 @@
 import { html, nothing } from "lit";
 import type { SearchMatch, SearchResult } from "../../types/api";
-import { apiSearch, apiSearchReplaceApply, apiSearchReplacePreview, apiSearchReplaceOne } from "../../services/api";
+import {
+  apiSearch,
+  apiSearchReplaceApply,
+  apiSearchReplacePreview,
+  apiSearchReplaceOne,
+  type SearchReplaceFile,
+  type SearchReplacePayload,
+} from "../../services/api";
 import { t } from "../../i18n";
 
 export async function performSearch(this: any) {
@@ -35,7 +42,7 @@ export async function performSearch(this: any) {
 }
 
 export async function replaceAll(this: any) {
-  const query = this.searchQuery.trim();
+  const query = String(this.searchQuery ?? "").trim();
   if (!query) {
     this.showToast(t("search.toast.run_search_first"), "error");
     return;
@@ -46,11 +53,11 @@ export async function replaceAll(this: any) {
   }
   this.searchLoading = true;
   try {
-    const files = this.searchResults.map((r: SearchResult) => ({ path: r.path, mtime: r.mtime }));
-    const payload = {
+    const files: SearchReplaceFile[] = this.searchResults.map((r: SearchResult) => ({ path: r.path, mtime: r.mtime }));
+    const payload: SearchReplacePayload = {
       query,
-      replace: this.searchReplace,
-      case_sensitive: this.searchCaseSensitive,
+      replace: String(this.searchReplace ?? ""),
+      case_sensitive: !!this.searchCaseSensitive,
       scope: "files",
       files,
     };

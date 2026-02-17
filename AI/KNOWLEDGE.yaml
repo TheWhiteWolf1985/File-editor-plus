@@ -1,7 +1,7 @@
 ﻿meta:
   project: "ha-file-editor-plus"
   ai_kit_version: "1.0.0"
-  updated_at: "2026-02-17T09:12:41Z"
+  updated_at: "2026-02-17T11:44:34Z"
 
 commands:
   frontend_build:
@@ -346,3 +346,18 @@ changes_log:
       - "cd file_editor_plus/frontend && npm run -s build"
       - "docker run --rm ... python -m unittest -q"
     notes: "Audit in `.temp/AUDIT_AI_TASKS.md` (file ignorato da git)."
+
+  - step_id: "AI_TASKS_POST_MIGRATION-001"
+    summary: "Frontend: reso `npm run -s typecheck` green (typing Vite env + fix tipizzazioni locali)."
+    files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/vite-env.d.ts"
+      - "file_editor_plus/frontend/src/features/entities/entities.ts"
+      - "file_editor_plus/frontend/src/features/search/search.ts"
+      - "file_editor_plus/frontend/src/features/tree/tree.ts"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm run -s typecheck"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Nessun cambio di behavior: solo correzioni tipizzazione/strict TS per abilitare quality gate typecheck."

@@ -57,7 +57,7 @@ export async function loadTree(this: any, path: string, force = false) {
 }
 
 export async function reloadTree(this: any, quiet = false) {
-  const expandedPaths = Array.from(this.expanded).filter((p: string) => p !== "");
+  const expandedPaths = Array.from(this.expanded as Set<string>).filter((p) => p !== "");
   this.loadedPaths.clear();
   this.loadingPaths.clear();
   this.treeData = {};

@@ -230,7 +230,7 @@ export function scrollSuggestIntoView(this: any) {
 export async function initEntities(this: any) {
   try {
     this.haClient = new HAClient(this.apiBase);
-    this.haClient.connect((ev) => {
+    this.haClient.connect((ev: { event: { data: { entity_id: string; new_state: HassState | null } } }) => {
       const id = ev.event.data.entity_id;
       const next = { ...this.entities };
       if (ev.event.data.new_state) {
@@ -314,7 +314,7 @@ export function syncCollapsedDomains(this: any, domains: string[]) {
 }
 
 export function renderEntityPane(this: any) {
-  const entries = Object.values(this.entities);
+  const entries = Object.values(this.entities) as HassState[];
   const filtered = entries
     .filter((e: HassState) => {
       const q = this.entityFilter.toLowerCase();

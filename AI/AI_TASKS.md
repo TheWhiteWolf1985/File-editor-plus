@@ -1,469 +1,192 @@
-﻿# AI_TASKS — Reset operativo e ripartenza
+﻿# AI_TASKS — Fix residui post-migrazione (Home Assistant Add-on)
 
-Data reset: 2026-02-17
-Repo target: `ha-file-editor-plus`
+Data: 2026-02-17
+Contesto: **progetto add-on Home Assistant** (attenzione a Ingress, path `/config`, containerizzazione e permessi).
+Obiettivo: chiudere i **4 punti residui** emersi dagli audit e ripartire con lavoro “pulito”.
 
-## Regole operative (mini)
+## Regole operative
 
 - Status ammessi: `TODO` → `DOING` → `DONE`.
-- Uno step = modifiche minime + verifiche + aggiornamento `AI/KNOWLEDGE.yaml` (e `AI/DECISIONS.md` se c’e una scelta non ovvia).
-- Niente refactor “tanto per”, niente dipendenze nuove senza richiesta esplicita.
-- Dopo ogni step: eseguire la checklist `AI/CHECKLISTS/SMOKE.md` (o motivare `N/A`).
-
-## Nota su questo file
-
-Questo `AI_TASKS.md` **sostituisce** il backlog “migrato da AI_old” che conteneva placeholder non eseguibili. L’obiettivo qui è avere step **eseguibili end-to-end** per ripartire senza attriti.
+- Ogni step deve essere **ripetibile** (comandi + acceptance criteria).
+- Non introdurre nuove dipendenze/tooling “a caso”. Se serve una scelta di progetto, scriverla in `AI/DECISIONS.md`.
+- Dopo ogni step: eseguire la smoke checklist dell’add-on (se esiste) o `AI/CHECKLISTS/SMOKE.md`.
 
 ---
 
-### STEP 001 — Chiudere bump AI kit (worktree pulito + metadata compilata)
+## STEP 001 — Frontend: `npm run -s typecheck` deve essere GREEN
 
 - Status: DONE
-- Goal: Chiudere definitivamente la migrazione `AI_old → AI` e togliere i blocker P0.
+- Problema:
+  - Typecheck TS fallisce (esempi audit: `Duplicate identifier 'treeDirty'`, `ImportMeta.env` non tipizzato, `implicit any`).
+
 - Scope:
-  - `AI/` (tutti i file)
-  - Root repo (solo per pulizia worktree)
+  - `file_editor_plus/frontend/`
 
-- Changes:
-  - Eseguire `git status`/diff e identificare modifiche **fuori** `AI/`.
-  - Se le modifiche fuori `AI/` non sono parte del bump: **revert**.
-  - Se sono volute: **isolarle in un commit separato** (messaggio coerente), poi continuare.
-  - Compilare `AI/METADATA.yaml`:
-    - `owner`
-    - `created_at` (ISO-8601)
+- Changes (minimali):
+  1. Eliminare il duplicato `treeDirty` (una sola dichiarazione, stessa semantica).
+  2. Sistemare typing Vite per `import.meta.env`:
+     - aggiungere/aggiornare un file declaration (tipicamente `src/vite-env.d.ts` o `vite-env.d.ts` in root FE) con:
+       - `/// <reference types="vite/client" />`
 
-  - Verificare che in `AI/` non restino placeholder bloccanti non intenzionali.
-  - What changed:
-    - `AI/METADATA.yaml` compilato (`owner`, `created_at`).
-    - Rimossi placeholder bloccanti dai doc operativi (`AI_PROJECT`, `AI_RUNBOOK`, `DECISIONS`).
-    - Aggiunto shim `AI/Knowledge.yaml` per compatibilita' (canonical: `AI/KNOWLEDGE.yaml`).
-    - Build frontend eseguita con successo.
+     - oppure adeguare l’uso se il progetto non è Vite (prima verificare).
+
+  3. Sistemare i punti con `implicit any` / overload su entities/tree/search con tipizzazioni esplicite **locali**.
+
+- What changed:
+  - Rimosso `declare treeDirty` duplicato in `file_editor_plus/frontend/src/app-root.ts`.
+  - Aggiunto `file_editor_plus/frontend/src/vite-env.d.ts` per tipizzare `import.meta.env` (Vite).
+  - Tipizzazioni locali per chiudere errori strict TS in:
+    - `file_editor_plus/frontend/src/features/entities/entities.ts`
+    - `file_editor_plus/frontend/src/features/search/search.ts`
+    - `file_editor_plus/frontend/src/features/tree/tree.ts`
 
 - Commands:
-  - `git status --porcelain`
-  - `git diff --name-only`
-  - `rg -n "<{2}REQUIRED>{2}" AI -S --glob '!AI/AI_TASKS.md' --glob '!AI/README.md' --glob '!AI/EXAMPLES/**'`
+  - `cd file_editor_plus/frontend && npm ci`
+  - `cd file_editor_plus/frontend && npm run -s typecheck`
+  - (optional) `cd file_editor_plus/frontend && npm run -s build`
 
 - Acceptance criteria:
-  - Worktree pulito **oppure** modifiche non-AI isolate e motivate in commit separato.
-  - `AI/METADATA.yaml` senza placeholder.
-  - Nessun placeholder bloccante residuo in `AI/` (salvo template/esempi intenzionali).
+  - `npm run -s typecheck` ritorna exit code 0.
+  - Nessun nuovo warning/errore TS introdotto.
+  - La build FE continua a funzionare.
 
 - Commit message:
-  - "chore(ai): finalize kit migration and metadata"
-
-- Blockers/Notes:
-  - Se serve split commit: prima commit non-AI (se voluto), poi questo.
+  - `fix(frontend): make typescript typecheck pass`
 
 ---
 
-### STEP 002 — Definire comandi ufficiali (dev/build/lint/test) e aggiornare RUNBOOK
+## STEP 002 — Backend: standardizzare i test via Docker (comando canonico per add-on)
 
-- Status: DONE
-- Goal: Rendere ripetibile la verifica (dev, build, lint/typecheck, test) senza “magia”.
+- Status: TODO
+- Problema:
+  - Nel workspace python host manca `pip` → test BE non eseguibili “nativamente”.
+  - Essendo un add-on HA, la via sana è: **test via container** (ripetibile, indipendente dall’host).
+
 - Scope:
   - `AI/AI_RUNBOOK.md`
-  - `file_editor_plus/frontend/package.json`
-  - `file_editor_plus/backend/` (config test/lint se esiste)
+  - `file_editor_plus/backend/` (solo per capire runner e requirements)
 
 - Changes:
-  - Frontend:
-    - Identificare gli script reali in `package.json` (`build`, `lint`, `typecheck`, `test` se presenti).
-    - Se mancano `lint`/`typecheck` ma esiste tooling già configurato, aggiungere **solo** script (senza introdurre tool nuovi).
+  1. Verificare il runner test backend reale:
+     - se esistono test `unittest` → usare `python -m unittest -q`
+     - se è configurato `pytest` → usare `pytest -q`
 
-  - Backend:
-    - Identificare runner test reale (es. `pytest`, `unittest`, altro) dai file di progetto (`pyproject.toml`, `requirements.txt`, `pytest.ini`, `tox.ini`, ecc.).
-    - Definire un comando “test backend” ufficiale.
+  2. Stabilire **un comando ufficiale** di test BE via Docker e scriverlo nel runbook.
+     - Comando base (da audit) — adattare solo se il repo richiede altro:
+       - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
 
-  - Documentare tutto in `AI/AI_RUNBOOK.md` come comandi canonici.
-  - What changed:
-    - Aggiunti script FE `dev` e `typecheck` in `file_editor_plus/frontend/package.json`.
-    - Aggiornato `AI/AI_RUNBOOK.md` con comandi canonici per dev/build/typecheck/test (con prerequisito `pip` per backend).
-    - Validato build FE; typecheck FE esegue ma segnala errori TS esistenti nel codice.
+  3. Nota add-on:
+     - Non cambiare ingress/paths `/config`.
+     - Non toccare l’immagine dell’add-on in questa fase: qui si standardizza solo il _modo_ di eseguire test.
 
 - Commands:
-  - `cd file_editor_plus/frontend && node -p "JSON.stringify(require('./package.json').scripts, null, 2)"`
-  - `cd file_editor_plus/frontend && npm ci`
-  - `cd file_editor_plus/frontend && npm run -s build`
   - `cd file_editor_plus/backend && ls -la`
-  - `cd file_editor_plus/backend && (test -f pyproject.toml && sed -n '1,200p' pyproject.toml || true)`
-  - `cd file_editor_plus/backend && (test -f requirements.txt && sed -n '1,120p' requirements.txt || true)`
-  - `cd file_editor_plus/backend && (python -m pytest -q || pytest -q)`
+  - `cd file_editor_plus/backend && (test -f requirements.txt && sed -n '1,160p' requirements.txt || true)`
+  - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
 
 - Acceptance criteria:
-  - `AI/AI_RUNBOOK.md` contiene:
-    - comando dev locale (se esiste) o motivazione `N/A`
-    - comando build FE
-    - comando lint/typecheck FE (o motivazione `N/A`)
-    - comando test BE (unico, ufficiale)
-
-  - I comandi documentati risultano eseguibili (o `N/A` motivato) e ripetibili.
+  - Esiste **un solo** comando canonico documentato in `AI/AI_RUNBOOK.md` per eseguire i test backend.
+  - Il comando funziona da repo root senza dipendenze sul python host.
 
 - Commit message:
-  - "chore(ai): document canonical dev/build/test commands"
-
-- Blockers/Notes:
-  - Vietato “aggiungere ruff/flake8/eslint” a caso: prima verificare cosa c’è già.
+  - `chore(runbook): standardize backend tests via docker`
 
 ---
 
-### STEP 003 — Hardening interoperabilità: rimuovere BOM dagli JSON schema
+## STEP 003 — Rimuovere BOM UTF-8 dai file `AI/*.md` e `AI/*.yaml`
 
-- Status: DONE
-- Goal: Evitare che tool esterni falliscano su `AI/SCHEMAS/*.json`.
+- Status: TODO
+- Problema:
+  - BOM (`EF BB BF`) diffuso nei file `AI/` → rischio tooling fragile (specie YAML).
+
 - Scope:
-  - `AI/SCHEMAS/*.json`
+  - `AI/**/*.md`
+  - `AI/**/*.yaml`
 
 - Changes:
-  - Rimuovere BOM UTF-8 da tutti i JSON schema.
-  - Verificare parsing JSON dopo modifica.
-  - What changed:
-    - Rimossi BOM UTF-8 da `AI/SCHEMAS/knowledge.schema.json` e `AI/SCHEMAS/tasks.schema.json`.
-    - Verificato parsing JSON via Node; build frontend OK.
+  - Strip BOM su tutti i file target.
+  - NON toccare i contenuti oltre al BOM (diff minimo).
 
 - Commands:
-  - `python - <<'PY'
+  - Scan/strip BOM (Python):
+
+```bash
+python - <<'PY'
 from pathlib import Path
-paths = sorted(Path('AI/SCHEMAS').glob('*.json'))
+root = Path('AI')
+paths = [p for p in root.rglob('*') if p.is_file() and p.suffix in {'.md', '.yaml', '.yml'}]
+changed = 0
+for p in sorted(paths):
+    b = p.read_bytes()
+    if b.startswith(b'ï»¿'):
+        p.write_bytes(b[3:])
+        print('stripped BOM:', p)
+        changed += 1
+print('done; files changed:', changed)
+PY
+```
+
+- Verifica (nessun BOM residuo):
+
+```bash
+python - <<'PY'
+from pathlib import Path
+root = Path('AI')
+paths = [p for p in root.rglob('*') if p.is_file() and p.suffix in {'.md', '.yaml', '.yml'}]
+left = []
 for p in paths:
-b = p.read_bytes()
-if b.startswith(b'\xef\xbb\xbf'):
-    p.write_bytes(b[3:])
-    print('stripped BOM:', p)
-else:
-    print('ok:', p)
-PY`
-  - `node -e "const fs=require('fs'); for (const f of fs.readdirSync('AI/SCHEMAS')) { if(!f.endsWith('.json')) continue; JSON.parse(fs.readFileSync('AI/SCHEMAS/'+f,'utf8')); } console.log('schemas: parse ok')"`
+    b = p.read_bytes()
+    if b.startswith(b'ï»¿'):
+        left.append(str(p))
+print('BOM remaining:', len(left))
+for x in sorted(left):
+    print(' -', x)
+PY
+```
 
 - Acceptance criteria:
-  - Nessun file in `AI/SCHEMAS` ha BOM.
-  - Parsing OK via Node (o strumento equivalente) su tutti gli schema.
+  - Nessun file `AI/*.md` o `AI/*.yaml` inizia con BOM.
+  - Diff pulito (solo rimozione BOM).
 
 - Commit message:
-  - "chore(ai): remove BOM from schema json"
-
-- Blockers/Notes:
-  - Se `AI/SCHEMAS` non esiste nel target, marcare `N/A` e registrare in `AI/KNOWLEDGE.yaml`.
+  - `chore(ai): remove utf-8 bom from md/yaml`
 
 ---
 
-### STEP 004 — Consolidare “source of truth” (chiudere conflitti legacy su doc)
+## STEP 004 — Knowledge: rimuovere TODO stale su `owner/created_at` (coerenza interna)
 
-- Status: DONE
-- Goal: Eliminare ambiguità “completed vs todo” tra fonti legacy.
+- Status: TODO
+- Problema:
+  - `AI/METADATA.yaml` ha `owner` e `created_at` compilati, ma `AI/KNOWLEDGE.yaml` (changes_log) li segnala ancora come mancanti/non determinabili.
+  - Risultato: audit interno incoerente.
+
 - Scope:
   - `AI/KNOWLEDGE.yaml`
-  - `AI/DECISIONS.md`
-  - (eventuali doc di progetto: README/docs)
+  - (verifica) `AI/METADATA.yaml`
 
 - Changes:
-  - Consolidare nello `changes_log` di `AI/KNOWLEDGE.yaml` cosa è:
-    - già fatto (documentazione/setup)
-    - ancora aperto (backlog reale)
+  1. Aprire `AI/KNOWLEDGE.yaml` e trovare la voce `changes_log` relativa alla migrazione (es. `migration_from_AI_old`).
+  2. Aggiornare `todos_remaining`:
+     - rimuovere riferimenti a `owner/created_at` come mancanti.
+     - lasciare solo TODO reali (es. `repo_url` se effettivamente desiderato).
 
-  - Se serve, aggiungere una nota in `AI/DECISIONS.md` su quale fonte è considerata vera (spoiler: `AI/KNOWLEDGE.yaml`).
-  - What changed:
-    - Aggiunta nota "source of truth" in `AI/DECISIONS.md` (stato progetto in `AI/KNOWLEDGE.yaml`).
-    - Registrata risoluzione conflitto doc in `AI/KNOWLEDGE.yaml` (docs presenti nel repo => considerato DONE).
+  3. Se si fa una scelta (es. “non compiliamo repo_url”), annotarla in `AI/DECISIONS.md`.
 
 - Commands:
-  - `rg -n "documentation" AI/KNOWLEDGE.yaml AI/DECISIONS.md -S`
+  - `rg -n "migration_from_AI_old|todos_remaining|owner|created_at" AI/KNOWLEDGE.yaml AI/METADATA.yaml -S`
+  - (optional) validazione YAML se disponibile nel repo/tooling.
 
 - Acceptance criteria:
-  - `AI/KNOWLEDGE.yaml` contiene una voce chiara che risolve il conflitto di stato.
-  - Nessuna ambiguità residua su “docs done” vs “docs todo”.
+  - `AI/KNOWLEDGE.yaml` non contiene TODO che contraddicono `AI/METADATA.yaml`.
+  - Il `changes_log` riflette la realtà: niente “fantasmi”.
 
 - Commit message:
-  - "chore(ai): reconcile legacy documentation status"
-
-- Blockers/Notes:
-  - Questo step non cambia prodotto: cambia solo la memoria/audit.
+  - `chore(ai): reconcile knowledge todos with metadata`
 
 ---
 
-## Backlog prodotto (ripartenza)
-
-### STEP 005 — Fix TS config naming (tsconfg.json vs tsconfig.json)
-
-- Status: DONE
-- Goal: Eliminare rischio toolchain TS che ignora config non standard.
-- Scope:
-  - `file_editor_plus/frontend/` (config TS, Vite/tsc)
-
-- Changes:
-  - Cercare riferimenti a `tsconfg.json` / `tsconfig.json`.
-  - Se presente naming errato, riallineare (rename o riferimenti) in modo compatibile.
-  - What changed:
-    - Verificato che `tsconfig.json` esiste e `tsconfg.json` non e' presente: nessuna modifica necessaria.
-    - Build frontend OK.
-
-- Commands:
-  - `rg -n "tsconfg\\.json|tsconfig\\.json" file_editor_plus/frontend -S`
-  - `cd file_editor_plus/frontend && npm ci && npm run -s build`
-
-- Acceptance criteria:
-  - La build FE usa la config TS prevista (niente fallback inatteso).
-  - Nessun warning/error nuovo relativo a TS config.
-
-- Commit message:
-  - "fix(frontend): align tsconfig naming"
-
-- Blockers/Notes:
-  - Tenere la modifica minimal: niente ristrutturazioni.
-
----
-
-### STEP 006 — Quality gate: lint/typecheck FE+BE (integrazione reale)
-
-- Status: DONE
-- Goal: Standardizzare controlli ripetibili (evitare regressioni silenziose).
-- Scope:
-  - Frontend: `file_editor_plus/frontend/package.json`
-  - Backend: config/tooling esistente (senza introdurre tool nuovi)
-  - (optional) `.github/workflows/` se già presente
-
-- Changes:
-  - FE: garantire script `lint` e `typecheck` se supportati dallo stack già presente.
-  - BE: definire almeno un controllo statico **già previsto** (es. format/lint/typecheck se esiste).
-  - Documentare i comandi in `AI/AI_RUNBOOK.md` (linkare a STEP 002 se già fatto).
-  - What changed:
-    - Confermato che FE ha `typecheck` (ma attualmente fallisce per errori TS esistenti) e non ha lint configurato (N/A).
-    - Confermato che BE non ha pytest/lint configurati in questo ambiente (pytest non presente; pip non disponibile).
-    - Build frontend rimane il gate principale.
-
-- Commands:
-  - `cd file_editor_plus/frontend && node -p "JSON.stringify(require('./package.json').scripts, null, 2)"`
-  - `cd file_editor_plus/frontend && (npm run -s lint || true)`
-  - `cd file_editor_plus/frontend && (npm run -s typecheck || true)`
-  - `cd file_editor_plus/backend && (python -m pytest -q || true)`
-
-- Acceptance criteria:
-  - Esiste un set di comandi “canonici” e documentati per:
-    - FE build + FE lint/typecheck (o `N/A` motivato)
-    - BE test + eventuale lint/typecheck se già previsto
-
-- Commit message:
-  - "chore(qg): wire up lint and typecheck commands"
-
-- Blockers/Notes:
-  - Se `|| true` è usato solo per esplorazione, rimuoverlo quando i comandi diventano ufficiali.
-
----
-
-### STEP 007 — Test: safe_path/make_backup/atomic_write
-
-- Status: DONE
-- Goal: Aumentare copertura regressioni su operazioni file critiche sotto `/config`.
-- Scope:
-  - `file_editor_plus/backend/app.py`
-  - `file_editor_plus/backend/test_*.py`
-
-- Changes:
-  - Aggiungere test mirati:
-    - traversal (`../`)
-    - null byte
-    - path assoluti
-    - backup path
-    - errori IO simulati (quando possibile)
-
-  - Commands:
-  - `cd file_editor_plus/backend && (python -m pytest -q || pytest -q)`
-
-- Acceptance criteria:
-  - Nuovi test presenti e passanti.
-  - Nessuna regressione sulla sicurezza (safe_path resta restrittivo).
-
-- Commit message:
-  - "test(backend): cover safe_path and atomic write"
-
-- Blockers/Notes:
-  - Se serve test fixture per `/config`, documentare chiaramente.
-  - What changed:
-    - Aggiunti test unitari per `safe_path`, `make_backup`, `atomic_write` in `file_editor_plus/backend/test_fs_primitives.py`.
-    - Corretto test esistente `test_traversal_blocked` per allinearlo al comportamento attuale (error entry invece di eccezione).
-    - Verifica eseguita via container `python:3.12-alpine` (pip install requirements + unittest).
-
----
-
-### STEP 008 — Stabilizzare failing test traversal (suite backend tutta verde)
-
-- Status: DONE
-- Goal: Portare la suite backend a 100% verde senza ridurre hardening.
-- Scope:
-  - `file_editor_plus/backend/test_search_replace.py`
-  - `file_editor_plus/backend/app.py` (solo se necessario)
-
-- Changes:
-  - Allineare aspettative test ↔ comportamento API.
-  - Garantire che traversal venga bloccato in modo consistente.
-  - What changed:
-    - Test `test_traversal_blocked` riallineato in STEP 007 (ora la suite backend risulta verde in esecuzione via Docker).
-
-- Commands:
-  - `cd file_editor_plus/backend && (python -m pytest -q || pytest -q)`
-
-- Acceptance criteria:
-  - Test backend passano 100%.
-
-- Commit message:
-  - "fix(backend): align traversal test expectations"
-
-- Blockers/Notes:
-  - Qualsiasi cambio semantico va documentato in `AI/DECISIONS.md`.
-
----
-
-### STEP 009 — Retention/cleanup backup (/config/.fep-backups)
-
-- Status: DONE
-- Goal: Evitare crescita incontrollata dei backup.
-- Scope:
-  - `file_editor_plus/backend/app.py` (backup)
-  - UI/setting (solo se già esistente)
-  - Documentazione policy
-
-- Changes:
-  - Definire policy retention (es. max N per file, max size totale, pruning manuale/automatico).
-  - Implementare pruning se richiesto dallo scope reale (altrimenti solo doc + issue).
-  - What changed:
-    - Implementata retention best-effort in backend: keep-last-N per file (default 50) via `FEP_BACKUP_KEEP_LAST` (0 disabilita).
-    - Aggiunti test unitari per retention e aggiornate docs `files.md` (tutte le lingue) con policy.
-
-- Commands:
-  - <<OPTIONAL>>
-
-- Acceptance criteria:
-  - Policy retention documentata.
-  - Se implementata: pruning verificabile e testabile.
-
-- Commit message:
-  - "feat(backup): document and enforce retention policy"
-
-- Blockers/Notes:
-  - Se non implementabile senza cambiare UX, proporre alternativa minimale.
-
----
-
-### STEP 010 — UX: messaggi errore coerenti per operazioni file
-
-- Status: DONE
-- Goal: Zero “successo finto”, errori sempre visibili e utili.
-- Scope:
-  - Frontend: upload/move/copy/delete/save
-
-- Changes:
-  - Uniformare toast/error handling.
-  - Mappare errori API a messaggi user-friendly.
-  - What changed:
-    - Aggiunto toast esplicito su errore di salvataggio file (prima era solo status) per evitare "successo finto".
-
-- Commands:
-  - `cd file_editor_plus/frontend && npm ci`
-  - `cd file_editor_plus/frontend && npm run -s build`
-
-- Acceptance criteria:
-  - Errori API mostrano messaggi chiari.
-  - Nessun caso in cui UI segnala successo quando API fallisce.
-
-- Commit message:
-  - "fix(ui): standardize file operation error messages"
-
-- Blockers/Notes:
-  - Preferire modifiche locali: niente redesign.
-
----
-
-### STEP 011 — Hardening log: rimuovere token_prefix dai log
-
-- Status: DONE
-- Goal: Ridurre rischio leakage credenziali nei log.
-- Scope:
-  - `file_editor_plus/backend/app.py` (logging)
-
-- Changes:
-  - Rimuovere/mascherare `token_prefix` e riferimenti a token nei log info/warn/error.
-  - What changed:
-    - Rimossi log `token_prefix` da HA proxy (ora logga solo `token_present=true/false`).
-
-- Commands:
-  - `rg -n "token_prefix|token" file_editor_plus/backend -S`
-  - `cd file_editor_plus/backend && (python -m pytest -q || pytest -q)`
-
-- Acceptance criteria:
-  - Log non contengono token o prefissi token.
-
-- Commit message:
-  - "fix(logging): redact token data from logs"
-
-- Blockers/Notes:
-  - Attenzione ai log in ingress/proxy.
-
----
-
-### STEP 012 — Security headers minimi (defense-in-depth)
-
-- Status: DONE
-- Goal: Hardening HTTP base senza rompere Ingress/assets.
-- Scope:
-  - `file_editor_plus/backend/app.py` (middleware/headers)
-
-- Changes:
-  - Aggiungere header minimi compatibili:
-    - `X-Content-Type-Options: nosniff`
-    - `Referrer-Policy: no-referrer` (o policy compatibile)
-    - CSP base se non rompe assets (altrimenti documentare limitazioni)
-  - What changed:
-    - Aggiunti header minimi `X-Content-Type-Options: nosniff` e `Referrer-Policy: no-referrer` via middleware FastAPI.
-    - CSP non impostata in questo step per ridurre rischio di rottura Ingress/assets (da valutare separatamente).
-
-- Commands:
-  - `curl -I http://localhost:PORT/ || true`
-  - `curl -I http://localhost:PORT/api/health || true`
-
-- Acceptance criteria:
-  - Header presenti su root e su API (dove applicabile).
-  - Nessun blocco di assets/JS/CSS (verifica manuale minima).
-
-- Commit message:
-  - "fix(security): add baseline http security headers"
-
-- Blockers/Notes:
-  - Porta/endpoint reali vanno presi dal runbook.
-
----
-
-### STEP 013 — Chiusura: audit finale + checklist release
-
-- Status: DONE
-- Goal: Chiudere il ciclo con repo pulita, conoscenza aggiornata e verifiche tracciate.
-- Scope:
-  - `AI/AI_TASKS.md`
-  - `AI/KNOWLEDGE.yaml`
-  - `AI/DECISIONS.md`
-  - `AI/CHECKLISTS/SMOKE.md`
-  - `AI/CHECKLISTS/RELEASE.md`
-
-- Changes:
-  - Aggiornare tutti gli status a `DONE`.
-  - Aggiornare `AI/KNOWLEDGE.yaml` (entities/relations/changes_log).
-  - Registrare decisioni/trade-off in `AI/DECISIONS.md`.
-  - Compilare le checklist smoke e release (o motivare `N/A`).
-  - What changed:
-    - Checklists aggiornate (SMOKE/RELEASE) con esito e note N/A dove non applicabile.
-    - Aggiunto ADR per decisione CSP (defer) e note su esecuzione test backend via Docker.
-    - Creato/aggiornato report `.temp/AUDIT_AI_TASKS.md`.
-
-- Commands:
-  - `git status --porcelain`
-  - `rg -n "Status: TODO|Status: DOING" AI/AI_TASKS.md -S`
-
-- Acceptance criteria:
-  - Nessuno step resta `TODO/DOING`.
-  - Checklists compilate.
-  - Worktree pulito.
-
-- Commit message:
-  - "chore(ai): finalize audit and close tasks"
-
-- Blockers/Notes:
-  - Se alcuni step sono `N/A`, devono essere motivati in `AI/KNOWLEDGE.yaml`.
+## Post-run (sempre)
+
+- `git status --porcelain`
+- Eseguire smoke dell’add-on (Ingress + operazioni file su `/config`) o `AI/CHECKLISTS/SMOKE.md`.
+- Aggiornare gli status a `DONE` quando i comandi passano.
