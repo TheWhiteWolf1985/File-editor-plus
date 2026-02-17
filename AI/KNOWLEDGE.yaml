@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   ai_kit_version: "1.0.0"
-  updated_at: "2026-02-17T11:48:01Z"
+  updated_at: "2026-02-17T11:50:10Z"
 
 commands:
   frontend_build:
@@ -144,14 +144,6 @@ changes_log:
           - "AI_old/knowledge-archive.yaml (storico log molto grande)"
         recommendation: "Non scegliere 'a sentimento': mantenere tracciate tutte le fonti; per nuove decisioni usare AI/KNOWLEDGE.yaml come unica memoria persistente e consolidare gradualmente."
     todos_remaining:
-      - file: "AI/METADATA.yaml"
-        field: "owner"
-        reason: "Non determinabile con certezza dalle fonti legacy."
-        source_hint: "N/A"
-      - file: "AI/METADATA.yaml"
-        field: "created_at"
-        reason: "Non determinabile con certezza dalle fonti legacy."
-        source_hint: "N/A"
       - file: "AI/AI_RUNBOOK.md"
         field: "Dev locale"
         reason: "Nel repo non esiste un comando dev server ufficiale unico; serve conferma."
@@ -398,3 +390,16 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "Modifica non funzionale: solo rimozione BOM (nessun contenuto alterato oltre ai primi 3 byte)."
+
+  - step_id: "AI_TASKS_POST_MIGRATION-004"
+    summary: "Knowledge: rimossi TODO stale (owner/created_at) e rimosso shim legacy `AI/Knowledge.yaml`."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "AI/METADATA.yaml"
+      - "AI/Knowledge.yaml"
+    commands:
+      - "rg -n \"migration_from_AI_old|todos_remaining|owner|created_at\" AI/KNOWLEDGE.yaml AI/METADATA.yaml -S"
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "La knowledge canonica e' `AI/KNOWLEDGE.yaml`. Lo shim `AI/Knowledge.yaml` e' stato rimosso per ridurre ambiguita' e residui."

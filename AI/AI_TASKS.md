@@ -161,7 +161,7 @@ left = []
 
 ## STEP 004 — Knowledge: rimuovere TODO stale su `owner/created_at` (coerenza interna)
 
-- Status: TODO
+- Status: DONE
 - Problema:
   - `AI/METADATA.yaml` ha `owner` e `created_at` compilati, ma `AI/KNOWLEDGE.yaml` (changes_log) li segnala ancora come mancanti/non determinabili.
   - Risultato: audit interno incoerente.
@@ -177,6 +177,9 @@ left = []
      - lasciare solo TODO reali (es. `repo_url` se effettivamente desiderato).
 
   3. Se si fa una scelta (es. “non compiliamo repo_url”), annotarla in `AI/DECISIONS.md`.
+
+- What changed:
+  - Rimossi i TODO stale su `AI/METADATA.yaml.owner` e `AI/METADATA.yaml.created_at` dalla entry `migration_from_AI_old` in `AI/KNOWLEDGE.yaml`.
 
 - Commands:
   - `rg -n "migration_from_AI_old|todos_remaining|owner|created_at" AI/KNOWLEDGE.yaml AI/METADATA.yaml -S`
