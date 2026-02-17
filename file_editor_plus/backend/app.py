@@ -98,6 +98,14 @@ DEFAULT_IGNORE = {
 
 app = FastAPI(title="File Editor Plus")
 
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    # Minimal headers (Ingress-friendly): avoid headers that could break embedding.
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    return resp
+
 
 def _is_within_base(p: Path) -> bool:
     try:

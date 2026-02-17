@@ -402,7 +402,7 @@ PY`
 
 ### STEP 012 — Security headers minimi (defense-in-depth)
 
-- Status: TODO
+- Status: DONE
 - Goal: Hardening HTTP base senza rompere Ingress/assets.
 - Scope:
   - `file_editor_plus/backend/app.py` (middleware/headers)
@@ -412,6 +412,9 @@ PY`
     - `X-Content-Type-Options: nosniff`
     - `Referrer-Policy: no-referrer` (o policy compatibile)
     - CSP base se non rompe assets (altrimenti documentare limitazioni)
+  - What changed:
+    - Aggiunti header minimi `X-Content-Type-Options: nosniff` e `Referrer-Policy: no-referrer` via middleware FastAPI.
+    - CSP non impostata in questo step per ridurre rischio di rottura Ingress/assets (da valutare separatamente).
 
 - Commands:
   - `curl -I http://localhost:PORT/ || true`

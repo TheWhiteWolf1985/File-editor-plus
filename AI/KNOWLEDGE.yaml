@@ -314,3 +314,18 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "Ora i log non includono piu' prefissi token; resta solo un flag booleano `token_present`."
+
+  - step_id: "STEP-012"
+    summary: "Aggiunti security headers minimi (nosniff + referrer-policy) via middleware FastAPI; verificati con curl su container uvicorn."
+    files:
+      - "file_editor_plus/backend/app.py"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker run -d -p 18099:8099 -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"pip install -r requirements.txt && uvicorn app:app\""
+      - "curl -sS -D - -o /dev/null http://localhost:18099/api/health"
+      - "docker stop <container>"
+      - "docker run --rm ... python -m unittest -q"
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "CSP non impostata in questo step per minimizzare rischio di incompatibilita' con Home Assistant Ingress; da valutare con test manuale dedicato."
