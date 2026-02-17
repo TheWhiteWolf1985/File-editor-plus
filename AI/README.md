@@ -115,3 +115,10 @@ Formato senza diff:
 ## Versioning kit
 - Versione in `AI/METADATA.yaml` (`ai_kit_version`).
 - Ogni cambio strutturale va tracciato in `AI/KNOWLEDGE.yaml` e, se decisionale, in `AI/DECISIONS.md`.
+
+## Avvio del docker
+
+$ sudo rm -f /var/run/docker.sock
+sudo dockerd --host=unix:///var/run/docker.sock --data-root=/var/lib/docker > /tmp/dockerd.log 2>&1 &
+sleep 2
+docker info || (tail -n 120 /tmp/dockerd.log; echo "DOCKERD_FAILED")

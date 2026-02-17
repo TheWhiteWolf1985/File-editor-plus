@@ -1,201 +1,235 @@
-# AI_TASKS — Fix residui post-migrazione (Home Assistant Add-on)
+# AI_TASKS — Audit & wiring: Topbar + Sidebar → servizi (Home Assistant Add-on)
 
 Data: 2026-02-17
-Contesto: **progetto add-on Home Assistant** (attenzione a Ingress, path `/config`, containerizzazione e permessi).
-Obiettivo: chiudere i **4 punti residui** emersi dagli audit e ripartire con lavoro “pulito”.
+Target: `ha-file-editor-plus` (add-on Home Assistant, UI via Ingress)
+Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e **Sidebar** e assicurare che **ognuno** sia collegato al proprio servizio/azione. Il report deve includere anche la lista di ciò che **NON è collegato**.
 
-## Regole operative
+## Vincoli add-on (da rispettare)
 
-- Status ammessi: `TODO` → `DOING` → `DONE`.
-- Ogni step deve essere **ripetibile** (comandi + acceptance criteria).
-- Non introdurre nuove dipendenze/tooling “a caso”. Se serve una scelta di progetto, scriverla in `AI/DECISIONS.md`.
-- Dopo ogni step: eseguire la smoke checklist dell’add-on (se esiste) o `AI/CHECKLISTS/SMOKE.md`.
+- Ingress HA può cambiare base path: evitare URL assoluti hardcoded; preferire path relativi o client API già presente. ([developers.home-assistant.io](https://developers.home-assistant.io/docs/apps/presentation/?utm_source=chatgpt.com))
+- Non rompere `/config` (montato) e non cambiare permessi/paths runtime.
+- Non introdurre nuove dipendenze FE/BE senza richiesta esplicita.
+- Ogni modifica UI deve essere verificabile con build/typecheck.
+
+## Output richiesti (deliverables)
+
+1. `AI/AUDITS/UI_NAV_AUDIT.md` con:
+   - tabella completa (Topbar + Sidebar) con: label, location, file:line, handler, service/endpoint, stato
+   - sezione **NOT CONNECTED** (anche se vuota) con elenco puntuale e motivo
+
+2. Se esistono voci non collegate: commit che le collega (stesso giro) e audit aggiornato.
+
+## Definizioni (per l’audit)
+
+- **Connected**: la voce/pulsante invoca direttamente un servizio (API client / backend endpoint / hass service) **oppure** naviga a una route/pagina che a sua volta invoca il servizio.
+- **Not connected**: handler mancante, handler vuoto, `TODO`, `console.log`, `disabled` senza feature flag/motivo, route che porta a pagina senza logica.
 
 ---
 
-## STEP 001 — Frontend: `npm run -s typecheck` deve essere GREEN
+## STEP 001 — Inventory: identificare Topbar/Sidebar e tutte le voci
 
-- Status: DONE
-- Problema:
-  - Typecheck TS fallisce (esempi audit: `Duplicate identifier 'treeDirty'`, `ImportMeta.env` non tipizzato, `implicit any`).
-
+- Status: TODO
+- Goal: elenco completo di voci/pulsanti (Topbar + Sidebar) con i riferimenti al codice.
 - Scope:
-  - `file_editor_plus/frontend/`
+  - `file_editor_plus/frontend/src/**`
 
-- Changes (minimali):
-  1. Eliminare il duplicato `treeDirty` (una sola dichiarazione, stessa semantica).
-  2. Sistemare typing Vite per `import.meta.env`:
-     - aggiungere/aggiornare un file declaration (tipicamente `src/vite-env.d.ts` o `vite-env.d.ts` in root FE) con:
-       - `/// <reference types="vite/client" />`
+- Procedure:
+  1. Trovare i componenti/strutture che definiscono la navigazione e i menu.
+  2. Estrarre tutte le voci:
+     - label/testo
+     - icona (se utile)
+     - tipo: link/route vs action button
+     - file + linea (o almeno file + snippet univoco)
 
-     - oppure adeguare l’uso se il progetto non è Vite (prima verificare).
+- Commands:
+  - Individuazione componenti:
+    - `rg -n -S "Topbar" file_editor_plus/frontend/src`
+    - `rg -n -S "TopBar" file_editor_plus/frontend/src`
+    - `rg -n -S "AppBar" file_editor_plus/frontend/src`
+    - `rg -n -S "Toolbar" file_editor_plus/frontend/src`
+    - `rg -n -S "Sidebar" file_editor_plus/frontend/src`
+    - `rg -n -S "Drawer" file_editor_plus/frontend/src`
 
-  3. Sistemare i punti con `implicit any` / overload su entities/tree/search con tipizzazioni esplicite **locali**.
+  - Individuazione definizioni items:
+    - `rg -n -S "menuItems" file_editor_plus/frontend/src`
+    - `rg -n -S "navItems" file_editor_plus/frontend/src`
+    - `rg -n -S "routes" file_editor_plus/frontend/src`
 
-- What changed:
-  - Rimosso `declare treeDirty` duplicato in `file_editor_plus/frontend/src/app-root.ts`.
-  - Aggiunto `file_editor_plus/frontend/src/vite-env.d.ts` per tipizzare `import.meta.env` (Vite).
-  - Tipizzazioni locali per chiudere errori strict TS in:
-    - `file_editor_plus/frontend/src/features/entities/entities.ts`
-    - `file_editor_plus/frontend/src/features/search/search.ts`
-    - `file_editor_plus/frontend/src/features/tree/tree.ts`
+  - Individuazione collegamenti/azioni:
+    - `rg -n -S "onClick" file_editor_plus/frontend/src`
+    - `rg -n -S "navigate(" file_editor_plus/frontend/src`
+    - `rg -n -S "to=" file_editor_plus/frontend/src`
+    - `rg -n -S "href=" file_editor_plus/frontend/src`
+
+- Acceptance criteria:
+  - Esiste una lista grezza completa (anche temporanea) con tutte le voci individuate.
+
+- Commit message:
+  - N/A (niente commit in questo step; è raccolta info)
+
+---
+
+## STEP 002 — Mappa servizi: trovare API client FE e endpoint BE
+
+- Status: TODO
+- Goal: costruire la mappa “UI → service → endpoint”.
+- Scope:
+  - FE: `file_editor_plus/frontend/src/**`
+  - BE: `file_editor_plus/backend/**`
+
+- Procedure:
+  1. Identificare il layer servizi FE (es. `src/api/*`, `src/services/*`, `client.ts`, ecc.).
+  2. Inventariare le chiamate lato FE (`fetch`, `axios`, `api.*`, websocket, ecc.).
+  3. Inventariare gli endpoint BE (route definitions).
+
+- Commands:
+  - FE service scan:
+    - `rg -n -S "fetch(" file_editor_plus/frontend/src`
+    - `rg -n -S "axios." file_editor_plus/frontend/src`
+    - `rg -n -S "api." file_editor_plus/frontend/src`
+    - `rg -n -S "client." file_editor_plus/frontend/src`
+    - `rg -n -S "callService(" file_editor_plus/frontend/src`
+    - `rg -n -S "hass." file_editor_plus/frontend/src`
+    - `rg -n -S "INGRESS" file_editor_plus/frontend/src`
+    - `rg -n -S "X-Ingress-Path" file_editor_plus/frontend/src`
+
+  - BE endpoint scan (Python/Flask style e simili):
+    - `rg -n -S "@app.route" file_editor_plus/backend`
+    - `rg -n -S "add_url_rule" file_editor_plus/backend`
+    - `rg -n -S "Blueprint(" file_editor_plus/backend`
+    - `rg -n -S "/api/" file_editor_plus/backend`
+
+- Acceptance criteria:
+  - Lista endpoint BE identificata.
+  - Individuato il punto canonico FE dove si fanno chiamate (o confermato che sono inline).
+
+---
+
+## STEP 003 — Audit report: compilare `AI/AUDITS/UI_NAV_AUDIT.md`
+
+- Status: TODO
+- Goal: produrre il report completo con stato Connected/Not connected.
+- Scope:
+  - `AI/AUDITS/UI_NAV_AUDIT.md` (nuovo)
+
+- Report format (obbligatorio):
+  - Tabella con colonne:
+    - Area (Topbar/Sidebar)
+    - Voce UI (label)
+    - Tipo (route/action)
+    - File:line
+    - Handler (nome funzione o inline)
+    - Service call (funzione client / chiamata)
+    - Endpoint/Servizio HA (se applicabile)
+    - Stato (✅ Connected / ❌ Not connected)
+    - Note
+
+  - Sezione **NOT CONNECTED** con elenco puntuale:
+    - voce
+    - file:line
+    - motivo
+    - cosa manca per collegarla
+
+- Acceptance criteria:
+  - `AI/AUDITS/UI_NAV_AUDIT.md` esiste e include:
+    - tutte le voci trovate allo Step 001
+    - mapping servizi/endpoints (Step 002) dove possibile
+    - lista NOT CONNECTED completa
+
+- Commit message:
+  - `docs(audit): add ui nav audit (topbar/sidebar)`
+
+---
+
+## STEP 004 — Wiring: collegare tutte le voci/pulsanti NON collegati
+
+- Status: TODO
+- Goal: nessuna voce rimane “dead button”.
+- Scope:
+  - FE: componenti Topbar/Sidebar e route collegate
+  - (eventuale) FE services layer, se serve solo “agganciare” chiamate già esistenti
+
+- Regole:
+  - Usare **pattern esistenti** (se c’è già `api.*`, usare quello).
+  - Per navigazione: usare router/navigate già in uso (niente `window.location` salvo necessità motivata).
+  - Per azioni: collegare a servizi reali; se il servizio non esiste ancora, creare un TODO esplicito e marcare la voce come `disabled` con spiegazione visibile (solo se accettabile).
+  - Non introdurre URL assoluti che ignorano Ingress.
 
 - Commands:
   - `cd file_editor_plus/frontend && npm ci`
   - `cd file_editor_plus/frontend && npm run -s typecheck`
-  - (optional) `cd file_editor_plus/frontend && npm run -s build`
+  - `cd file_editor_plus/frontend && npm run -s build`
 
 - Acceptance criteria:
-  - `npm run -s typecheck` ritorna exit code 0.
-  - Nessun nuovo warning/errore TS introdotto.
-  - La build FE continua a funzionare.
+  - Ogni item in sezione NOT CONNECTED viene risolto in uno dei modi:
+    - collegato a service/route funzionante
+    - disabilitato intenzionalmente con motivazione UX + feature flag/motivo documentato
+
+  - Nessun nuovo errore in `typecheck` e `build`.
 
 - Commit message:
-  - `fix(frontend): make typescript typecheck pass`
+  - `fix(ui): wire topbar/sidebar actions to services`
 
 ---
 
-## STEP 002 — Backend: standardizzare i test via Docker (comando canonico per add-on)
+## STEP 005 — Aggiornare audit (NOT CONNECTED deve essere vuoto o giustificato)
 
-- Status: DONE
-- Problema:
-  - Nel workspace python host manca `pip` → test BE non eseguibili “nativamente”.
-  - Essendo un add-on HA, la via sana è: **test via container** (ripetibile, indipendente dall’host).
-
+- Status: TODO
+- Goal: audit aggiornato post-fix.
 - Scope:
-  - `AI/AI_RUNBOOK.md`
-  - `file_editor_plus/backend/` (solo per capire runner e requirements)
+  - `AI/AUDITS/UI_NAV_AUDIT.md`
 
-- Changes:
-  1. Verificare il runner test backend reale:
-     - se esistono test `unittest` → usare `python -m unittest -q`
-     - se è configurato `pytest` → usare `pytest -q`
-
-  2. Stabilire **un comando ufficiale** di test BE via Docker e scriverlo nel runbook.
-     - Comando base (da audit) — adattare solo se il repo richiede altro:
-       - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
-
-  3. Nota add-on:
-     - Non cambiare ingress/paths `/config`.
-     - Non toccare l’immagine dell’add-on in questa fase: qui si standardizza solo il _modo_ di eseguire test.
-
-- What changed:
-  - Aggiornato `AI/AI_RUNBOOK.md` per rendere il comando test backend canonico via Docker (runner `unittest`).
-
-- Commands:
-  - `cd file_editor_plus/backend && ls -la`
-  - `cd file_editor_plus/backend && (test -f requirements.txt && sed -n '1,160p' requirements.txt || true)`
-  - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
+- Procedure:
+  - Aggiornare stato e mapping nella tabella.
+  - Se restano voci non collegate, devono essere:
+    - esplicitamente giustificate (perché non implementabili adesso)
+    - tracciate con TODO e spiegazione.
 
 - Acceptance criteria:
-  - Esiste **un solo** comando canonico documentato in `AI/AI_RUNBOOK.md` per eseguire i test backend.
-  - Il comando funziona da repo root senza dipendenze sul python host.
+  - Sezione NOT CONNECTED:
+    - vuota oppure contiene solo voci intenzionalmente non operative con motivazione.
 
 - Commit message:
-  - `chore(runbook): standardize backend tests via docker`
+  - `docs(audit): update ui nav audit after wiring`
 
 ---
 
-## STEP 003 — Rimuovere BOM UTF-8 dai file `AI/*.md` e `AI/*.yaml`
+## STEP 006 — Smoke add-on (Ingress + azioni principali)
 
-- Status: DONE
-- Problema:
-  - BOM (`EF BB BF`) diffuso nei file `AI/` → rischio tooling fragile (specie YAML).
-
+- Status: TODO
+- Goal: verificare che Ingress non sia stato rotto e che i click facciano cose vere.
 - Scope:
-  - `AI/**/*.md`
-  - `AI/**/*.yaml`
+  - runtime add-on (dev/test)
 
-- Changes:
-  - Strip BOM su tutti i file target.
-  - NON toccare i contenuti oltre al BOM (diff minimo).
-
-- Commands:
-  - Scan/strip BOM (Python):
-
-```bash
-python - <<'PY'
-from pathlib import Path
-root = Path('AI')
-paths = [p for p in root.rglob('*') if p.is_file() and p.suffix in {'.md', '.yaml', '.yml'}]
-changed = 0
-	for p in sorted(paths):
-	    b = p.read_bytes()
-	    if b.startswith(b'\\xef\\xbb\\xbf'):
-	        p.write_bytes(b[3:])
-	        print('stripped BOM:', p)
-	        changed += 1
-print('done; files changed:', changed)
-PY
-```
-
-- Verifica (nessun BOM residuo):
-
-```bash
-python - <<'PY'
-from pathlib import Path
-root = Path('AI')
-paths = [p for p in root.rglob('*') if p.is_file() and p.suffix in {'.md', '.yaml', '.yml'}]
-left = []
-	for p in paths:
-	    b = p.read_bytes()
-	    if b.startswith(b'\\xef\\xbb\\xbf'):
-	        left.append(str(p))
-	print('BOM remaining:', len(left))
-	for x in sorted(left):
-	    print(' -', x)
-	PY
-	```
-
-- What changed:
-  - Rimossi BOM UTF-8 da tutti i file `AI/**/*.md` e `AI/**/*.yaml` (15 file).
+- Checklist minima:
+  - UI si carica via Ingress.
+  - Navigazione sidebar funziona.
+  - Topbar: i pulsanti principali non sono dead.
+  - Azioni file non rompono `/config`.
 
 - Acceptance criteria:
-  - Nessun file `AI/*.md` o `AI/*.yaml` inizia con BOM.
-  - Diff pulito (solo rimozione BOM).
+  - Nessun errore console bloccante.
+  - Nessun 404/500 per assets/API a causa di base path.
 
 - Commit message:
-  - `chore(ai): remove utf-8 bom from md/yaml`
+  - N/A (solo verifica; se servono fix, commit dedicato)
 
 ---
 
-## STEP 004 — Knowledge: rimuovere TODO stale su `owner/created_at` (coerenza interna)
+## STEP 007 — Knowledge update (traccia audit e decisioni)
 
-- Status: DONE
-- Problema:
-  - `AI/METADATA.yaml` ha `owner` e `created_at` compilati, ma `AI/KNOWLEDGE.yaml` (changes_log) li segnala ancora come mancanti/non determinabili.
-  - Risultato: audit interno incoerente.
-
+- Status: TODO
+- Goal: aggiornare memoria del progetto.
 - Scope:
   - `AI/KNOWLEDGE.yaml`
-  - (verifica) `AI/METADATA.yaml`
+  - `AI/DECISIONS.md` (solo se scelta non ovvia)
 
 - Changes:
-  1. Aprire `AI/KNOWLEDGE.yaml` e trovare la voce `changes_log` rilevante.
-  2. Aggiornare `todos_remaining`:
-     - rimuovere riferimenti a `owner/created_at` come mancanti.
-     - lasciare solo TODO reali (es. `repo_url` se effettivamente desiderato).
-
-  3. Se si fa una scelta (es. “non compiliamo repo_url”), annotarla in `AI/DECISIONS.md`.
-
-- What changed:
-  - Rimossi i TODO stale su `AI/METADATA.yaml.owner` e `AI/METADATA.yaml.created_at` dalla knowledge (`AI/KNOWLEDGE.yaml`).
-
-- Commands:
-  - `rg -n "todos_remaining|owner|created_at" AI/KNOWLEDGE.yaml AI/METADATA.yaml -S`
-  - (optional) validazione YAML se disponibile nel repo/tooling.
+  - Registrare che esiste audit UI nav e dove si trova.
+  - Se sono state introdotte disabilitazioni/feature flags, registrare decisione e motivazione.
 
 - Acceptance criteria:
-  - `AI/KNOWLEDGE.yaml` non contiene TODO che contraddicono `AI/METADATA.yaml`.
-  - Il `changes_log` riflette la realtà: niente “fantasmi”.
+  - `AI/KNOWLEDGE.yaml` include riferimento a `AI/AUDITS/UI_NAV_AUDIT.md`.
 
 - Commit message:
-  - `chore(ai): reconcile knowledge todos with metadata`
-
----
-
-## Post-run (sempre)
-
-- `git status --porcelain`
-- Eseguire smoke dell’add-on (Ingress + operazioni file su `/config`) o `AI/CHECKLISTS/SMOKE.md`.
-- Aggiornare gli status a `DONE` quando i comandi passano.
+  - `chore(ai): record ui nav audit in knowledge`
