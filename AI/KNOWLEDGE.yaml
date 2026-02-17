@@ -219,3 +219,16 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "Conflitto osservato tra `AI_old/Knowledge.yaml` (epic docs: completed) e `AI_old/knowledge.yaml` (TODO-006: docs todo). Source-of-truth per stato corrente: `AI/KNOWLEDGE.yaml` + presenza effettiva dei file `file_editor_plus/docs/*` nel repo."
+
+  - step_id: "STEP-005"
+    summary: "Verificato naming TS config nel frontend: tsconfig.json presente, nessun tsconfg.json."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "test -f file_editor_plus/frontend/tsconfig.json"
+      - "test -f file_editor_plus/frontend/tsconfg.json"
+      - "rg -n \"tsconfg\" file_editor_plus/frontend -S"
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Nessuna modifica applicativa necessaria; controllo eseguito per prevenire regressioni."

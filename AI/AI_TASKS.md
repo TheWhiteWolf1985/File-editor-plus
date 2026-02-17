@@ -185,7 +185,7 @@ PY`
 
 ### STEP 005 — Fix TS config naming (tsconfg.json vs tsconfig.json)
 
-- Status: TODO
+- Status: DONE
 - Goal: Eliminare rischio toolchain TS che ignora config non standard.
 - Scope:
   - `file_editor_plus/frontend/` (config TS, Vite/tsc)
@@ -193,6 +193,9 @@ PY`
 - Changes:
   - Cercare riferimenti a `tsconfg.json` / `tsconfig.json`.
   - Se presente naming errato, riallineare (rename o riferimenti) in modo compatibile.
+  - What changed:
+    - Verificato che `tsconfig.json` esiste e `tsconfg.json` non e' presente: nessuna modifica necessaria.
+    - Build frontend OK.
 
 - Commands:
   - `rg -n "tsconfg\\.json|tsconfig\\.json" file_editor_plus/frontend -S`
