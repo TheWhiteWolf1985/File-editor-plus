@@ -1,4 +1,4 @@
-﻿# AI_TASKS — Fix residui post-migrazione (Home Assistant Add-on)
+# AI_TASKS — Fix residui post-migrazione (Home Assistant Add-on)
 
 Data: 2026-02-17
 Contesto: **progetto add-on Home Assistant** (attenzione a Ingress, path `/config`, containerizzazione e permessi).
@@ -98,7 +98,7 @@ Obiettivo: chiudere i **4 punti residui** emersi dagli audit e ripartire con lav
 
 ## STEP 003 — Rimuovere BOM UTF-8 dai file `AI/*.md` e `AI/*.yaml`
 
-- Status: TODO
+- Status: DONE
 - Problema:
   - BOM (`EF BB BF`) diffuso nei file `AI/` → rischio tooling fragile (specie YAML).
 
@@ -119,12 +119,12 @@ from pathlib import Path
 root = Path('AI')
 paths = [p for p in root.rglob('*') if p.is_file() and p.suffix in {'.md', '.yaml', '.yml'}]
 changed = 0
-for p in sorted(paths):
-    b = p.read_bytes()
-    if b.startswith(b'ï»¿'):
-        p.write_bytes(b[3:])
-        print('stripped BOM:', p)
-        changed += 1
+	for p in sorted(paths):
+	    b = p.read_bytes()
+	    if b.startswith(b'\\xef\\xbb\\xbf'):
+	        p.write_bytes(b[3:])
+	        print('stripped BOM:', p)
+	        changed += 1
 print('done; files changed:', changed)
 PY
 ```
@@ -137,15 +137,18 @@ from pathlib import Path
 root = Path('AI')
 paths = [p for p in root.rglob('*') if p.is_file() and p.suffix in {'.md', '.yaml', '.yml'}]
 left = []
-for p in paths:
-    b = p.read_bytes()
-    if b.startswith(b'ï»¿'):
-        left.append(str(p))
-print('BOM remaining:', len(left))
-for x in sorted(left):
-    print(' -', x)
-PY
-```
+	for p in paths:
+	    b = p.read_bytes()
+	    if b.startswith(b'\\xef\\xbb\\xbf'):
+	        left.append(str(p))
+	print('BOM remaining:', len(left))
+	for x in sorted(left):
+	    print(' -', x)
+	PY
+	```
+
+- What changed:
+  - Rimossi BOM UTF-8 da tutti i file `AI/**/*.md` e `AI/**/*.yaml` (15 file).
 
 - Acceptance criteria:
   - Nessun file `AI/*.md` o `AI/*.yaml` inizia con BOM.

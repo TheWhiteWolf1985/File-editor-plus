@@ -1,4 +1,4 @@
-﻿# DECISIONS (mini-ADR) — Migrazione da AI_old
+# DECISIONS (mini-ADR) — Migrazione da AI_old
 
 Nota: le fonti legacy non riportano sempre date esplicite per le decisioni; quando non deducibile con certezza, usare `Date: N/A (...)`.
 

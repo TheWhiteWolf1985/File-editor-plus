@@ -1,4 +1,4 @@
-﻿# EXAMPLE_AI_TASKS
+# EXAMPLE_AI_TASKS
 
 ### STEP 001 - Setup contesto operativo
 - Status: TODO

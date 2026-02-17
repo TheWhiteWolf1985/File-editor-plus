@@ -1,4 +1,4 @@
-﻿# EXAMPLE_PRD_from_workflow
+# EXAMPLE_PRD_from_workflow
 
 Scopo: mostrare come mappare un documento operativo generico in `AI_PRD`.
 

@@ -1,7 +1,7 @@
-﻿meta:
+meta:
   project: "ha-file-editor-plus"
   ai_kit_version: "1.0.0"
-  updated_at: "2026-02-17T11:46:37Z"
+  updated_at: "2026-02-17T11:48:01Z"
 
 commands:
   frontend_build:
@@ -373,3 +373,28 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "I test backend sono `unittest` (`file_editor_plus/backend/test_*.py`). Il runner locale resta opzionale, ma quello documentato e' ripetibile via container."
+
+  - step_id: "AI_TASKS_POST_MIGRATION-003"
+    summary: "AI kit: rimossi BOM UTF-8 da tutti i file Markdown/YAML sotto `AI/` per robustezza tooling."
+    files:
+      - "AI/AI_CONVENTIONS.md"
+      - "AI/AI_INVENTORY.md"
+      - "AI/AI_PRD.md"
+      - "AI/AI_PROJECT.md"
+      - "AI/AI_RUNBOOK.md"
+      - "AI/AI_TASKS.md"
+      - "AI/CHECKLISTS/RELEASE.md"
+      - "AI/CHECKLISTS/SMOKE.md"
+      - "AI/DECISIONS.md"
+      - "AI/EXAMPLES/EXAMPLE_AI_TASKS.md"
+      - "AI/EXAMPLES/EXAMPLE_PRD_from_workflow.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "AI/Knowledge.yaml"
+      - "AI/METADATA.yaml"
+      - "AI/README.md"
+    commands:
+      - "python3 script: strip BOM on AI/**/*.md + AI/**/*.yaml"
+      - "python3 script: verify 0 BOM remaining"
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Modifica non funzionale: solo rimozione BOM (nessun contenuto alterato oltre ai primi 3 byte)."

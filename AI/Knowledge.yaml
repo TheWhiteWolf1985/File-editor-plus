@@ -1,4 +1,4 @@
-﻿# Compatibility shim
+# Compatibility shim
 #
 # Canonical project knowledge file: `AI/KNOWLEDGE.yaml`
 # This file exists only to support older prompts that refer to `AI/Knowledge.yaml`.

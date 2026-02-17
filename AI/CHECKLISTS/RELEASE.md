@@ -1,4 +1,4 @@
-﻿# RELEASE.md
+# RELEASE.md
 
 Checklist pre-release:
 - [ ] Scope di release confermato con PRD e tasks. (N/A: non e' un rilascio formale, solo chiusura tasks)

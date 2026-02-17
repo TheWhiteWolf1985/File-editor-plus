@@ -1,4 +1,4 @@
-﻿# SMOKE.md
+# SMOKE.md
 
 Checklist smoke post-change:
 - [ ] Workspace apre senza errori bloccanti. (N/A: non eseguita verifica UI manuale in questo giro)

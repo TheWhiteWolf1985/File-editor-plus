@@ -1,4 +1,4 @@
-﻿# AI_RUNBOOK
+# AI_RUNBOOK
 
 Runbook operativo (solo comandi verificabili nel repo o in AI_old).
 

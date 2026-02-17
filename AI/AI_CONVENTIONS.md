@@ -1,4 +1,4 @@
-﻿# AI_CONVENTIONS
+# AI_CONVENTIONS
 
 ## Commit style
 - Formato consigliato: Conventional Commits.

@@ -1,4 +1,4 @@
-﻿# AI_PROJECT — ha-file-editor-plus
+# AI_PROJECT — ha-file-editor-plus
 
 ## Scope
 - Obiettivo principale: fornire un add-on Home Assistant per editare file sotto `/config` via Ingress, con backend FastAPI e frontend Lit.

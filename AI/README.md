@@ -1,4 +1,4 @@
-﻿# AI Kit Repository
+# AI Kit Repository
 
 Questo repository contiene una cartella `AI/` pronta da copiare in qualunque progetto.
 Flusso ufficiale: si copia `AI/` dentro la repo target e si compila/modifica tutto direttamente li'.

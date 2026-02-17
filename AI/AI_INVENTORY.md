@@ -1,4 +1,4 @@
-﻿# AI_INVENTORY — Componenti del repo
+# AI_INVENTORY — Componenti del repo
 
 Perimetro compilabile a mano.
 Non inserire elenchi auto-rilevati della repository.

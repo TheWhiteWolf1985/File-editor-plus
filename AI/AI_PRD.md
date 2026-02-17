@@ -1,4 +1,4 @@
-﻿# AI_PRD — File Editor Plus (Home Assistant add-on)
+# AI_PRD — File Editor Plus (Home Assistant add-on)
 
 ## Overview
 - Problema: serve un editor avanzato per gestire file YAML e testo sotto `/config` direttamente da Home Assistant via Ingress.
