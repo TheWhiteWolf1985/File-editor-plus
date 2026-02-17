@@ -287,7 +287,7 @@ PY`
 
 ### STEP 008 — Stabilizzare failing test traversal (suite backend tutta verde)
 
-- Status: TODO
+- Status: DONE
 - Goal: Portare la suite backend a 100% verde senza ridurre hardening.
 - Scope:
   - `file_editor_plus/backend/test_search_replace.py`
@@ -296,6 +296,8 @@ PY`
 - Changes:
   - Allineare aspettative test ↔ comportamento API.
   - Garantire che traversal venga bloccato in modo consistente.
+  - What changed:
+    - Test `test_traversal_blocked` riallineato in STEP 007 (ora la suite backend risulta verde in esecuzione via Docker).
 
 - Commands:
   - `cd file_editor_plus/backend && (python -m pytest -q || pytest -q)`

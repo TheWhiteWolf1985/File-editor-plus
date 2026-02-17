@@ -261,3 +261,14 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "In questo workspace `python3` non include `pip`, quindi i test backend sono stati eseguiti in un container (immagine python gia' presente localmente)."
+
+  - step_id: "STEP-008"
+    summary: "Suite backend resa verde: test traversal riallineato al comportamento API (errore per-file); verificata esecuzione via Docker."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "La modifica funzionale era gia' inclusa nello STEP 007; qui e' stata solo verificata e registrata come suite verde."
