@@ -2651,6 +2651,9 @@ export class AppRoot extends LitElement {
       setTimeout(() => (this.status = t("status.ready")), 800);
     } catch (e) {
       this.status = t("toast.file.save_error");
+      this.showToast(this.status, "error");
+      if (import.meta.env.DEV) console.warn("save failed", e);
+      setTimeout(() => (this.status = t("status.ready")), 1200);
     }
   }
 

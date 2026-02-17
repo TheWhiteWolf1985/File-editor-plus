@@ -346,7 +346,7 @@ PY`
 
 ### STEP 010 — UX: messaggi errore coerenti per operazioni file
 
-- Status: TODO
+- Status: DONE
 - Goal: Zero “successo finto”, errori sempre visibili e utili.
 - Scope:
   - Frontend: upload/move/copy/delete/save
@@ -354,6 +354,8 @@ PY`
 - Changes:
   - Uniformare toast/error handling.
   - Mappare errori API a messaggi user-friendly.
+  - What changed:
+    - Aggiunto toast esplicito su errore di salvataggio file (prima era solo status) per evitare "successo finto".
 
 - Commands:
   - `cd file_editor_plus/frontend && npm ci`
