@@ -207,3 +207,15 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "Prima della modifica alcuni parser fallivano su BOM iniziale; ora gli schema sono parseabili direttamente."
+
+  - step_id: "STEP-004"
+    summary: "Risolto conflitto legacy sullo stato documentazione: la repo contiene docs multilingua sotto file_editor_plus/docs, quindi lo stato e' considerato DONE."
+    files:
+      - "AI/KNOWLEDGE.yaml"
+      - "AI/DECISIONS.md"
+      - "AI/AI_TASKS.md"
+    commands:
+      - "rg -n \"documentation\" AI/KNOWLEDGE.yaml AI/DECISIONS.md -S"
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Conflitto osservato tra `AI_old/Knowledge.yaml` (epic docs: completed) e `AI_old/knowledge.yaml` (TODO-006: docs todo). Source-of-truth per stato corrente: `AI/KNOWLEDGE.yaml` + presenza effettiva dei file `file_editor_plus/docs/*` nel repo."

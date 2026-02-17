@@ -2,6 +2,10 @@
 
 Nota: le fonti legacy non riportano sempre date esplicite per le decisioni; quando non deducibile con certezza, usare `Date: N/A (...)`.
 
+Source of truth:
+- Lo stato corrente del progetto (cosa e' fatto vs aperto) e' tracciato in `AI/KNOWLEDGE.yaml`.
+- I file in `AI_old/` restano archivio (possono contenere stato storico o non allineato).
+
 ## ADR 001 — Runtime senza risorse esterne (no CDN / no fetch internet)
 - Date: N/A (non tracciata nelle fonti legacy)
 - Context:

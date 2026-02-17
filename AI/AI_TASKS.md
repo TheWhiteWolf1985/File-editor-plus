@@ -149,7 +149,7 @@ PY`
 
 ### STEP 004 — Consolidare “source of truth” (chiudere conflitti legacy su doc)
 
-- Status: TODO
+- Status: DONE
 - Goal: Eliminare ambiguità “completed vs todo” tra fonti legacy.
 - Scope:
   - `AI/KNOWLEDGE.yaml`
@@ -162,6 +162,9 @@ PY`
     - ancora aperto (backlog reale)
 
   - Se serve, aggiungere una nota in `AI/DECISIONS.md` su quale fonte è considerata vera (spoiler: `AI/KNOWLEDGE.yaml`).
+  - What changed:
+    - Aggiunta nota "source of truth" in `AI/DECISIONS.md` (stato progetto in `AI/KNOWLEDGE.yaml`).
+    - Registrata risoluzione conflitto doc in `AI/KNOWLEDGE.yaml` (docs presenti nel repo => considerato DONE).
 
 - Commands:
   - `rg -n "documentation" AI/KNOWLEDGE.yaml AI/DECISIONS.md -S`
