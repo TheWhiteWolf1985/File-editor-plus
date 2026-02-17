@@ -109,7 +109,7 @@ Questo `AI_TASKS.md` **sostituisce** il backlog “migrato da AI_old” che cont
 
 ### STEP 003 — Hardening interoperabilità: rimuovere BOM dagli JSON schema
 
-- Status: TODO
+- Status: DONE
 - Goal: Evitare che tool esterni falliscano su `AI/SCHEMAS/*.json`.
 - Scope:
   - `AI/SCHEMAS/*.json`
@@ -117,6 +117,9 @@ Questo `AI_TASKS.md` **sostituisce** il backlog “migrato da AI_old” che cont
 - Changes:
   - Rimuovere BOM UTF-8 da tutti i JSON schema.
   - Verificare parsing JSON dopo modifica.
+  - What changed:
+    - Rimossi BOM UTF-8 da `AI/SCHEMAS/knowledge.schema.json` e `AI/SCHEMAS/tasks.schema.json`.
+    - Verificato parsing JSON via Node; build frontend OK.
 
 - Commands:
   - `python - <<'PY'

@@ -193,3 +193,17 @@ changes_log:
       - "cd file_editor_plus/backend && python3 -m unittest -q (fails: deps non installate)"
       - "python3 -m pip (not available in this environment)"
     notes: "Backend: i test richiedono dipendenze (requirements.txt) ma in questo ambiente `python3` non include `pip`, quindi non e' stato possibile installarle e far girare la suite localmente."
+
+  - step_id: "STEP-003"
+    summary: "Rimosso BOM UTF-8 dagli JSON schema per migliorare interoperabilita' con tooling esterno."
+    files:
+      - "AI/SCHEMAS/knowledge.schema.json"
+      - "AI/SCHEMAS/tasks.schema.json"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "node script: strip BOM in AI/SCHEMAS/*.json"
+      - "node: JSON.parse su AI/SCHEMAS/*.json"
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Prima della modifica alcuni parser fallivano su BOM iniziale; ora gli schema sono parseabili direttamente."
