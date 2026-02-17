@@ -74,7 +74,7 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 ## STEP 002 — Mappa servizi: trovare API client FE e endpoint BE
 
-- Status: TODO
+- Status: DONE
 - Goal: costruire la mappa “UI → service → endpoint”.
 - Scope:
   - FE: `file_editor_plus/frontend/src/**`
@@ -105,6 +105,13 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 - Acceptance criteria:
   - Lista endpoint BE identificata.
   - Individuato il punto canonico FE dove si fanno chiamate (o confermato che sono inline).
+
+- What changed:
+  - Identificato layer servizi FE: `file_editor_plus/frontend/src/services/api.ts` (fetch wrapper).
+  - Identificati endpoint BE: `file_editor_plus/backend/app.py` (`/api/*` FastAPI).
+
+- Commit message:
+  - `docs(audit): map ui services and endpoints`
 
 ---
 

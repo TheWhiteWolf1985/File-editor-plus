@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-17T20:09:42Z"
+  updated_at: "2026-02-17T20:10:36Z"
 
 commands:
   frontend_build:
@@ -102,6 +102,19 @@ changes_log:
       - "rg -n -S \"menuItems|navItems|routes\" file_editor_plus/frontend/src"
       - "rg -n -S \"navigate\\(|href=|@click=|onClick\" file_editor_plus/frontend/src/app-root.ts"
     notes: "Inventario grezzo usato per compilare `AI/AUDITS/UI_NAV_AUDIT.md` nello STEP 003."
+
+  - step_id: "UI_NAV_AUDIT-STEP-002"
+    summary: "Mappati servizi FE ed endpoint BE per collegare le voci UI (Topbar/Sidebar) alle azioni reali."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/frontend/src/services/api.ts"
+      - "file_editor_plus/frontend/src/features/system/system.ts"
+      - "file_editor_plus/backend/app.py"
+    commands:
+      - "rg -n \"export const api|export type .*Payload\" file_editor_plus/frontend/src/services/api.ts"
+      - "rg -n \"@app\\.(get|post|put|delete)\\(\\\"/api\" file_editor_plus/backend/app.py"
+    notes: "Base per il report STEP 003 e per wiring STEP 004 (evitare URL assoluti; usare apiBase + /api/*)."
 
   - step_id: "AI_TASKS_POST_MIGRATION-001"
     summary: "Frontend: reso `npm run -s typecheck` green (typing Vite env + fix tipizzazioni locali)."
