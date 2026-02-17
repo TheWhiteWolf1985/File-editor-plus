@@ -765,6 +765,17 @@ export class AppRoot extends LitElement {
     this.showUploadModal = true;
   }
 
+  private triggerPathDownload(path: string) {
+    const url = `${this.apiBase}api/fs/download?path=${encodeURIComponent(path)}`;
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "";
+    link.rel = "noopener";
+    document.documentElement.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
   private closeUploadModal() {
     if (this.uploadInProgress) return;
     this.showUploadModal = false;
@@ -1901,10 +1912,21 @@ export class AppRoot extends LitElement {
       } else if (action === "Save" && this.activePath) {
         this.save();
       } else if (action === "Save as…") {
-        this.status = "Save as non implementato";
-        this.showToast(t("toast.file.save_as_not_implemented"), "info");
+        if (!this.activePath) {
+          this.showToast(t("toast.editor.open_file_first"), "info");
+          return;
+        }
+        this.triggerPathDownload(this.activePath);
       } else if (action === "Settings") {
         this.openSettingsModal();
+      } else if (action === "Import…") {
+        this.openUploadModal();
+      } else if (action === "Export…") {
+        if (!this.activePath) {
+          this.showToast(t("toast.editor.open_file_first"), "info");
+          return;
+        }
+        this.triggerPathDownload(this.activePath);
       }
     } else if (menu === "edit") {
       if (action === "Undo") {

@@ -156,7 +156,7 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 ## STEP 004 — Wiring: collegare tutte le voci/pulsanti NON collegati
 
-- Status: TODO
+- Status: DONE
 - Goal: nessuna voce rimane “dead button”.
 - Scope:
   - FE: componenti Topbar/Sidebar e route collegate
@@ -182,6 +182,9 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 - Commit message:
   - `fix(ui): wire topbar/sidebar actions to services`
+
+- What changed:
+  - Collegati i menu item `File -> Import…` (apre upload) e `File -> Export…`/`Save as…` (download via `/api/fs/download?path=...`).
 
 ---
 

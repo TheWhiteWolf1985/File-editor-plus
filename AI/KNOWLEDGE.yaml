@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-17T20:14:09Z"
+  updated_at: "2026-02-17T20:18:13Z"
 
 commands:
   frontend_build:
@@ -91,6 +91,18 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "UI_NAV_AUDIT-STEP-004"
+    summary: "Wiring Topbar File: `Import…` ora apre upload; `Export…` e `Save as…` scaricano il file attivo via backend."
+    files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s typecheck"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Download usa endpoint esistente `/api/fs/download?path=...` (Ingress-safe via `apiBase`)."
+
   - step_id: "UI_NAV_AUDIT-STEP-003"
     summary: "Creato audit completo UI Nav (Topbar/Sidebar) con mapping a servizi/endpoints e sezione NOT CONNECTED."
     files:
