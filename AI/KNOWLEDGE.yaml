@@ -329,3 +329,20 @@ changes_log:
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "CSP non impostata in questo step per minimizzare rischio di incompatibilita' con Home Assistant Ingress; da valutare con test manuale dedicato."
+
+  - step_id: "STEP-013"
+    summary: "Chiusura ciclo tasks: checklists aggiornate, decisioni registrate, audit finale generato."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "AI/DECISIONS.md"
+      - "AI/CHECKLISTS/SMOKE.md"
+      - "AI/CHECKLISTS/RELEASE.md"
+      - ".temp/AUDIT_AI_TASKS.md"
+    commands:
+      - "git status --porcelain"
+      - "rg -n \"Status: TODO|Status: DOING\" AI/AI_TASKS.md -S"
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+      - "docker run --rm ... python -m unittest -q"
+    notes: "Audit in `.temp/AUDIT_AI_TASKS.md` (file ignorato da git)."

@@ -48,3 +48,27 @@ Source of truth:
   - Minor complessita' nel bootstrap ma evita clash e 404 sotto Ingress.
 - Evidence:
   - `AI_old/application_audit/FILE_EDITOR_PLUS_AUDIT.md` (Ingress + Vite base "./" + apiBase da `window.location.href`).
+
+## ADR 004 — Security headers minimi, CSP deferita
+- Date: 2026-02-17
+- Context:
+  - L'add-on gira via Home Assistant Ingress; alcune policy (es. CSP restrittiva, X-Frame-Options) possono rompere embedding/assets se non validate in ambiente reale.
+- Decision:
+  - Applicare solo header minimi e "safe" (`X-Content-Type-Options`, `Referrer-Policy`) via middleware.
+  - Non impostare CSP in questo step (da validare con test manuale dedicato in Ingress).
+- Alternatives:
+  - Impostare CSP permissiva subito (rischio di regressioni non visibili senza test Ingress).
+- Consequences:
+  - Miglioramento hardening senza impatti UX.
+  - CSP resta un follow-up da verificare in HA Ingress.
+
+## ADR 005 — Test backend via Docker (pip non disponibile nel workspace)
+- Date: 2026-02-17
+- Context:
+  - Nel workspace corrente `python3` non include `pip`, quindi non e' possibile installare `requirements.txt` ed eseguire unit test direttamente.
+- Decision:
+  - Eseguire i test backend in un container Python (`python:3.12-alpine`) montando `file_editor_plus/backend`.
+- Alternatives:
+  - Installare pip a livello OS (non desiderato in questo contesto).
+- Consequences:
+  - Test ripetibili senza modificare l'ambiente host.

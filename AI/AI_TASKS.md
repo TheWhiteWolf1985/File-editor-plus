@@ -434,7 +434,7 @@ PY`
 
 ### STEP 013 — Chiusura: audit finale + checklist release
 
-- Status: TODO
+- Status: DONE
 - Goal: Chiudere il ciclo con repo pulita, conoscenza aggiornata e verifiche tracciate.
 - Scope:
   - `AI/AI_TASKS.md`
@@ -448,6 +448,10 @@ PY`
   - Aggiornare `AI/KNOWLEDGE.yaml` (entities/relations/changes_log).
   - Registrare decisioni/trade-off in `AI/DECISIONS.md`.
   - Compilare le checklist smoke e release (o motivare `N/A`).
+  - What changed:
+    - Checklists aggiornate (SMOKE/RELEASE) con esito e note N/A dove non applicabile.
+    - Aggiunto ADR per decisione CSP (defer) e note su esecuzione test backend via Docker.
+    - Creato/aggiornato report `.temp/AUDIT_AI_TASKS.md`.
 
 - Commands:
   - `git status --porcelain`
