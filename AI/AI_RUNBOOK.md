@@ -40,8 +40,10 @@ Vincoli:
 ## Test (unit/integration/e2e)
 - Backend unit tests:
   - Test files esistenti: `file_editor_plus/backend/test_diff.py`, `file_editor_plus/backend/test_format_yaml.py`, `file_editor_plus/backend/test_search_replace.py`.
-  - Comando runner ufficiale:
-    - Prerequisito: ambiente Python con `pip` disponibile e dipendenze installate.
+  - Comando runner ufficiale (Docker, indipendente dal python host):
+    - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
+  - (Opzionale) Runner locale:
+    - Prerequisito: ambiente Python con `pip` disponibile e dipendenze installabili.
     - `cd file_editor_plus/backend && python3 -m pip install -r requirements.txt && python3 -m unittest -q`
 - Frontend build e' un gate minimo (Vite/TS).
 

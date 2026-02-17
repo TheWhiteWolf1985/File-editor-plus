@@ -57,7 +57,7 @@ Obiettivo: chiudere i **4 punti residui** emersi dagli audit e ripartire con lav
 
 ## STEP 002 — Backend: standardizzare i test via Docker (comando canonico per add-on)
 
-- Status: TODO
+- Status: DONE
 - Problema:
   - Nel workspace python host manca `pip` → test BE non eseguibili “nativamente”.
   - Essendo un add-on HA, la via sana è: **test via container** (ripetibile, indipendente dall’host).
@@ -78,6 +78,9 @@ Obiettivo: chiudere i **4 punti residui** emersi dagli audit e ripartire con lav
   3. Nota add-on:
      - Non cambiare ingress/paths `/config`.
      - Non toccare l’immagine dell’add-on in questa fase: qui si standardizza solo il _modo_ di eseguire test.
+
+- What changed:
+  - Aggiornato `AI/AI_RUNBOOK.md` per rendere il comando test backend canonico via Docker (runner `unittest`).
 
 - Commands:
   - `cd file_editor_plus/backend && ls -la`

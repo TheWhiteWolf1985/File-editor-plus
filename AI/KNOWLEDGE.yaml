@@ -1,7 +1,7 @@
 ﻿meta:
   project: "ha-file-editor-plus"
   ai_kit_version: "1.0.0"
-  updated_at: "2026-02-17T11:44:34Z"
+  updated_at: "2026-02-17T11:46:37Z"
 
 commands:
   frontend_build:
@@ -361,3 +361,15 @@ changes_log:
       - "cd file_editor_plus/frontend && npm run -s typecheck"
       - "cd file_editor_plus/frontend && npm run -s build"
     notes: "Nessun cambio di behavior: solo correzioni tipizzazione/strict TS per abilitare quality gate typecheck."
+
+  - step_id: "AI_TASKS_POST_MIGRATION-002"
+    summary: "Runbook: comando canonico per test backend via Docker (unittest) per evitare dipendenze dal python host."
+    files:
+      - "AI/AI_RUNBOOK.md"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "I test backend sono `unittest` (`file_editor_plus/backend/test_*.py`). Il runner locale resta opzionale, ma quello documentato e' ripetibile via container."
