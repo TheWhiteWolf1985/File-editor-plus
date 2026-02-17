@@ -240,7 +240,7 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 ## STEP 007 — Knowledge update (traccia audit e decisioni)
 
-- Status: TODO
+- Status: DONE
 - Goal: aggiornare memoria del progetto.
 - Scope:
   - `AI/KNOWLEDGE.yaml`
@@ -255,3 +255,6 @@ Obiettivo: fare un **audit completo** di tutte le voci/pulsanti in **Topbar** e 
 
 - Commit message:
   - `chore(ai): record ui nav audit in knowledge`
+
+- What changed:
+  - `AI/KNOWLEDGE.yaml`: aggiunta entita' per `AI/AUDITS/UI_NAV_AUDIT.md` e aggiornato changes_log per tracciare il completamento dell'epic.

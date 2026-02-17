@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-17T20:21:14Z"
+  updated_at: "2026-02-17T20:21:58Z"
 
 commands:
   frontend_build:
@@ -63,6 +63,12 @@ entities:
     path: "file_editor_plus/docs"
     notes: "Layout multilingua `docs/<lang>/*.md` (it/en/de/fr/es)."
 
+  - id: "docs:audit_ui_nav"
+    type: "audit"
+    name: "UI nav audit (Topbar + Sidebar)"
+    path: "AI/AUDITS/UI_NAV_AUDIT.md"
+    notes: "Mappa voci UI -> handler -> servizi/endpoints; include sezione NOT CONNECTED."
+
   - id: "frontend:i18n"
     type: "module"
     name: "UI i18n module"
@@ -91,6 +97,17 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "UI_NAV_AUDIT-STEP-007"
+    summary: "Knowledge: registrato audit UI nav come entita' e tracciato completamento epic audit/wiring."
+    files:
+      - "AI/KNOWLEDGE.yaml"
+      - "AI/AI_TASKS.md"
+      - "AI/AUDITS/UI_NAV_AUDIT.md"
+    commands:
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Source of truth per audit: `AI/AUDITS/UI_NAV_AUDIT.md`."
+
   - step_id: "UI_NAV_AUDIT-STEP-006"
     summary: "Smoke add-on: eseguito update + restart di `local_file_editor_plus` e verificato esito OK da supervisor logs."
     files:
