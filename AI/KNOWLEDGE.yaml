@@ -1,13 +1,19 @@
 meta:
   project: "ha-file-editor-plus"
-  ai_kit_version: "1.0.0"
-  updated_at: "2026-02-17T11:50:10Z"
+  source_of_truth: "AI/KNOWLEDGE.yaml"
+  updated_at: "2026-02-17T12:04:04Z"
 
 commands:
   frontend_build:
     - "cd file_editor_plus/frontend"
     - "npm ci"
     - "npm run build"
+  frontend_typecheck:
+    - "cd file_editor_plus/frontend"
+    - "npm ci"
+    - "npm run -s typecheck"
+  backend_tests_docker:
+    - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
   addon_lifecycle:
     update: "docker exec hassio_cli ha apps update local_file_editor_plus"
     rebuild: "docker exec hassio_cli ha apps rebuild local_file_editor_plus"
@@ -85,260 +91,6 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
-  - step_id: "migration_from_AI_old"
-    summary: "Migrazione controllata da AI_old/ (legacy) a AI/ (New AI Kit): compilati i documenti standard, normalizzata knowledge e tracciati conflitti/placeholder."
-    files:
-      - "AI/AI_PROJECT.md"
-      - "AI/AI_PRD.md"
-      - "AI/AI_RUNBOOK.md"
-      - "AI/AI_CONVENTIONS.md"
-      - "AI/AI_INVENTORY.md"
-      - "AI/AI_TASKS.md"
-      - "AI/DECISIONS.md"
-      - "AI/METADATA.yaml"
-      - "AI/KNOWLEDGE.yaml"
-      - "AI/README.md"
-    commands:
-      - "ls -la AI AI_old"
-      - "find AI -maxdepth 2 -type f -print"
-      - "find AI_old -maxdepth 3 -type f -print"
-      - "sed/cat/rg/nl per lettura mirata delle fonti"
-      - "python/node (solo parse JSON/YAML) (se disponibili)"
-    sources_used:
-      - "AI_old/AGENTS.md"
-      - "AI_old/AI_PROJECT.md"
-      - "AI_old/Knowledge.yaml"
-      - "AI_old/knowledge.yaml"
-      - "AI_old/knowledge-archive.yaml"
-      - "AI_old/config.toml"
-      - "AI_old/startup.md"
-      - "AI_old/application_audit/FILE_EDITOR_PLUS_AUDIT.md"
-      - "file_editor_plus/frontend/package.json"
-      - "file_editor_plus/rootfs/etc/services.d/web/run"
-      - "file_editor_plus/README.md"
-    mapping:
-      - from: "AI_old/AI_PROJECT.md"
-        to: "AI/AI_PROJECT.md#Scope, Vincoli, DoD"
-        type: "summarized"
-      - from: "AI_old/AGENTS.md"
-        to: "AI/AI_CONVENTIONS.md#Release / Version bump"
-        type: "copied"
-      - from: "AI_old/knowledge.yaml"
-        to: "AI/AI_TASKS.md#Backlog e follow-ups"
-        type: "summarized"
-      - from: "AI_old/Knowledge.yaml"
-        to: "AI/DECISIONS.md#ADR (docs viewer + multilang)"
-        type: "summarized"
-      - from: "AI_old/application_audit/FILE_EDITOR_PLUS_AUDIT.md"
-        to: "AI/AI_TASKS.md#Hardening e quality gates"
-        type: "summarized"
-      - from: "file_editor_plus/* (repo evidence)"
-        to: "AI/AI_RUNBOOK.md + AI/AI_INVENTORY.md"
-        type: "copied"
-    conflicts:
-      - id: "CONFLICT-001"
-        topic: "Knowledge legacy duplicata"
-        details:
-          - "AI_old/Knowledge.yaml (snapshot epic/documentazione)"
-          - "AI_old/knowledge.yaml (backlog/risks/open_questions/log recente)"
-          - "AI_old/knowledge-archive.yaml (storico log molto grande)"
-        recommendation: "Non scegliere 'a sentimento': mantenere tracciate tutte le fonti; per nuove decisioni usare AI/KNOWLEDGE.yaml come unica memoria persistente e consolidare gradualmente."
-    todos_remaining:
-      - file: "AI/AI_RUNBOOK.md"
-        field: "Dev locale"
-        reason: "Nel repo non esiste un comando dev server ufficiale unico; serve conferma."
-        source_hint: "AI_old/AI_RUNBOOK non presente; AI_old/AI_PROJECT.md contiene solo build."
-
-  - step_id: "STEP-001"
-    summary: "Finalizzato bump AI kit: metadata compilata, placeholder bloccanti rimossi dai documenti operativi, build frontend verificata."
-    files:
-      - "AI/METADATA.yaml"
-      - "AI/AI_PROJECT.md"
-      - "AI/AI_RUNBOOK.md"
-      - "AI/DECISIONS.md"
-      - "AI/AI_CONVENTIONS.md"
-      - "AI/AI_TASKS.md"
-      - "AI/Knowledge.yaml"
-      - "AI/KNOWLEDGE.yaml"
-    commands:
-      - "git status --porcelain"
-      - "git diff --name-only"
-      - "rg -n \"<{2}REQUIRED>{2}\" AI -S --glob '!AI/AI_TASKS.md' --glob '!AI/README.md' --glob '!AI/EXAMPLES/**'"
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "Placeholder `<<REQUIRED>>` rimangono solo in template/esempi (`AI/README.md`, `AI/EXAMPLES/*`) come previsto dal kit."
-
-  - step_id: "STEP-002"
-    summary: "Definiti comandi canonici per dev/build/typecheck/test e aggiornato runbook; aggiunti script FE `dev` e `typecheck`."
-    files:
-      - "AI/AI_RUNBOOK.md"
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-      - "file_editor_plus/frontend/package.json"
-    commands:
-      - "cd file_editor_plus/frontend && node -p \"JSON.stringify(require('./package.json').scripts, null, 2)\""
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-      - "cd file_editor_plus/frontend && npm run -s typecheck"
-      - "cd file_editor_plus/backend && ls -la"
-      - "cd file_editor_plus/backend && sed -n '1,160p' requirements.txt"
-      - "cd file_editor_plus/backend && python3 -m unittest -q (fails: deps non installate)"
-      - "python3 -m pip (not available in this environment)"
-    notes: "Backend: i test richiedono dipendenze (requirements.txt) ma in questo ambiente `python3` non include `pip`, quindi non e' stato possibile installarle e far girare la suite localmente."
-
-  - step_id: "STEP-003"
-    summary: "Rimosso BOM UTF-8 dagli JSON schema per migliorare interoperabilita' con tooling esterno."
-    files:
-      - "AI/SCHEMAS/knowledge.schema.json"
-      - "AI/SCHEMAS/tasks.schema.json"
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-    commands:
-      - "node script: strip BOM in AI/SCHEMAS/*.json"
-      - "node: JSON.parse su AI/SCHEMAS/*.json"
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "Prima della modifica alcuni parser fallivano su BOM iniziale; ora gli schema sono parseabili direttamente."
-
-  - step_id: "STEP-004"
-    summary: "Risolto conflitto legacy sullo stato documentazione: la repo contiene docs multilingua sotto file_editor_plus/docs, quindi lo stato e' considerato DONE."
-    files:
-      - "AI/KNOWLEDGE.yaml"
-      - "AI/DECISIONS.md"
-      - "AI/AI_TASKS.md"
-    commands:
-      - "rg -n \"documentation\" AI/KNOWLEDGE.yaml AI/DECISIONS.md -S"
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "Conflitto osservato tra `AI_old/Knowledge.yaml` (epic docs: completed) e `AI_old/knowledge.yaml` (TODO-006: docs todo). Source-of-truth per stato corrente: `AI/KNOWLEDGE.yaml` + presenza effettiva dei file `file_editor_plus/docs/*` nel repo."
-
-  - step_id: "STEP-005"
-    summary: "Verificato naming TS config nel frontend: tsconfig.json presente, nessun tsconfg.json."
-    files:
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-    commands:
-      - "test -f file_editor_plus/frontend/tsconfig.json"
-      - "test -f file_editor_plus/frontend/tsconfg.json"
-      - "rg -n \"tsconfg\" file_editor_plus/frontend -S"
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "Nessuna modifica applicativa necessaria; controllo eseguito per prevenire regressioni."
-
-  - step_id: "STEP-006"
-    summary: "Quality gate: confermati comandi typecheck FE (non ancora green) e N/A per lint FE e tooling BE in questo ambiente."
-    files:
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-    commands:
-      - "cd file_editor_plus/frontend && node -p \"JSON.stringify(require('./package.json').scripts, null, 2)\""
-      - "cd file_editor_plus/frontend && (npm run -s lint || true)"
-      - "cd file_editor_plus/frontend && (npm run -s typecheck || true)"
-      - "cd file_editor_plus/backend && (python3 -m pytest -q || true)"
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    risks:
-      - "Typecheck FE attualmente fallisce: non usare come gate finche' non vengono risolti gli errori TS."
-      - "Backend test/lint non eseguibili in questo ambiente senza pip o container dedicato."
-
-  - step_id: "STEP-007"
-    summary: "Aggiunti test backend per safe_path/make_backup/atomic_write e allineato test traversal esistente; suite eseguita via Docker."
-    files:
-      - "file_editor_plus/backend/test_fs_primitives.py"
-      - "file_editor_plus/backend/test_search_replace.py"
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-    commands:
-      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt && python -m unittest -q\""
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "In questo workspace `python3` non include `pip`, quindi i test backend sono stati eseguiti in un container (immagine python gia' presente localmente)."
-
-  - step_id: "STEP-008"
-    summary: "Suite backend resa verde: test traversal riallineato al comportamento API (errore per-file); verificata esecuzione via Docker."
-    files:
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-    commands:
-      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt && python -m unittest -q\""
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "La modifica funzionale era gia' inclusa nello STEP 007; qui e' stata solo verificata e registrata come suite verde."
-
-  - step_id: "STEP-009"
-    summary: "Retention backup: keep-last-N per file in `.fep-backups` (default 50) + documentazione multilingua."
-    files:
-      - "file_editor_plus/backend/app.py"
-      - "file_editor_plus/backend/test_fs_primitives.py"
-      - "file_editor_plus/docs/it/files.md"
-      - "file_editor_plus/docs/en/files.md"
-      - "file_editor_plus/docs/fr/files.md"
-      - "file_editor_plus/docs/es/files.md"
-      - "file_editor_plus/docs/de/files.md"
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-    commands:
-      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt && python -m unittest -q\""
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "Retention controllata via env `FEP_BACKUP_KEEP_LAST` (0 disabilita). Implementazione best-effort: la retention non deve rompere la creazione del backup."
-
-  - step_id: "STEP-010"
-    summary: "UX file ops: errore salvataggio ora produce toast esplicito (oltre allo status), evitando feedback ambiguo."
-    files:
-      - "file_editor_plus/frontend/src/app-root.ts"
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-    commands:
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "Change minimale: non altera semantica save, aggiunge solo rendering errori (toast + status reset)."
-
-  - step_id: "STEP-011"
-    summary: "Hardening log: rimossi riferimenti a token_prefix dai log del proxy HA."
-    files:
-      - "file_editor_plus/backend/app.py"
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-    commands:
-      - "rg -n \"token_prefix\" file_editor_plus/backend -S"
-      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt && python -m unittest -q\""
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "Ora i log non includono piu' prefissi token; resta solo un flag booleano `token_present`."
-
-  - step_id: "STEP-012"
-    summary: "Aggiunti security headers minimi (nosniff + referrer-policy) via middleware FastAPI; verificati con curl su container uvicorn."
-    files:
-      - "file_editor_plus/backend/app.py"
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-    commands:
-      - "docker run -d -p 18099:8099 -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"pip install -r requirements.txt && uvicorn app:app\""
-      - "curl -sS -D - -o /dev/null http://localhost:18099/api/health"
-      - "docker stop <container>"
-      - "docker run --rm ... python -m unittest -q"
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "CSP non impostata in questo step per minimizzare rischio di incompatibilita' con Home Assistant Ingress; da valutare con test manuale dedicato."
-
-  - step_id: "STEP-013"
-    summary: "Chiusura ciclo tasks: checklists aggiornate, decisioni registrate, audit finale generato."
-    files:
-      - "AI/AI_TASKS.md"
-      - "AI/KNOWLEDGE.yaml"
-      - "AI/DECISIONS.md"
-      - "AI/CHECKLISTS/SMOKE.md"
-      - "AI/CHECKLISTS/RELEASE.md"
-      - ".temp/AUDIT_AI_TASKS.md"
-    commands:
-      - "git status --porcelain"
-      - "rg -n \"Status: TODO|Status: DOING\" AI/AI_TASKS.md -S"
-      - "cd file_editor_plus/frontend && npm ci"
-      - "cd file_editor_plus/frontend && npm run -s build"
-      - "docker run --rm ... python -m unittest -q"
-    notes: "Audit in `.temp/AUDIT_AI_TASKS.md` (file ignorato da git)."
-
   - step_id: "AI_TASKS_POST_MIGRATION-001"
     summary: "Frontend: reso `npm run -s typecheck` green (typing Vite env + fix tipizzazioni locali)."
     files:
@@ -369,21 +121,9 @@ changes_log:
   - step_id: "AI_TASKS_POST_MIGRATION-003"
     summary: "AI kit: rimossi BOM UTF-8 da tutti i file Markdown/YAML sotto `AI/` per robustezza tooling."
     files:
-      - "AI/AI_CONVENTIONS.md"
-      - "AI/AI_INVENTORY.md"
-      - "AI/AI_PRD.md"
-      - "AI/AI_PROJECT.md"
-      - "AI/AI_RUNBOOK.md"
-      - "AI/AI_TASKS.md"
-      - "AI/CHECKLISTS/RELEASE.md"
-      - "AI/CHECKLISTS/SMOKE.md"
-      - "AI/DECISIONS.md"
-      - "AI/EXAMPLES/EXAMPLE_AI_TASKS.md"
-      - "AI/EXAMPLES/EXAMPLE_PRD_from_workflow.md"
+      - "AI/**/*.md"
+      - "AI/**/*.yaml"
       - "AI/KNOWLEDGE.yaml"
-      - "AI/Knowledge.yaml"
-      - "AI/METADATA.yaml"
-      - "AI/README.md"
     commands:
       - "python3 script: strip BOM on AI/**/*.md + AI/**/*.yaml"
       - "python3 script: verify 0 BOM remaining"
@@ -392,14 +132,13 @@ changes_log:
     notes: "Modifica non funzionale: solo rimozione BOM (nessun contenuto alterato oltre ai primi 3 byte)."
 
   - step_id: "AI_TASKS_POST_MIGRATION-004"
-    summary: "Knowledge: rimossi TODO stale (owner/created_at) e rimosso shim legacy `AI/Knowledge.yaml`."
+    summary: "Knowledge: rimossi TODO stale (owner/created_at) dalla knowledge."
     files:
       - "AI/AI_TASKS.md"
       - "AI/KNOWLEDGE.yaml"
       - "AI/METADATA.yaml"
-      - "AI/Knowledge.yaml"
     commands:
-      - "rg -n \"migration_from_AI_old|todos_remaining|owner|created_at\" AI/KNOWLEDGE.yaml AI/METADATA.yaml -S"
+      - "rg -n \"todos_remaining|owner|created_at\" AI/KNOWLEDGE.yaml AI/METADATA.yaml -S"
       - "cd file_editor_plus/frontend && npm ci"
       - "cd file_editor_plus/frontend && npm run -s build"
-    notes: "La knowledge canonica e' `AI/KNOWLEDGE.yaml`. Lo shim `AI/Knowledge.yaml` e' stato rimosso per ridurre ambiguita' e residui."
+    notes: "La source of truth e' `AI/KNOWLEDGE.yaml`."

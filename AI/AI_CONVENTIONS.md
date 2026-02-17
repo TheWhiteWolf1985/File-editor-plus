@@ -33,7 +33,3 @@ Esempio:
 - No refactor non richiesto.
 - No feature reintrodotte se rimosse dal progetto.
 - No segreti reali.
-
-## Bump Legacy -> New AI Kit (regole)
-- Non modificare o cancellare contenuti in `AI_old/`.
-- Non inserire fatti non verificati: se non certo usare i placeholder previsti dal kit (vedi `AI/README.md`).

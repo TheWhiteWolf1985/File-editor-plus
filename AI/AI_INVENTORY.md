@@ -15,13 +15,13 @@ Non inserire elenchi auto-rilevati della repository.
 ## Cosa NON assumere
 - Non assumere auth applicativa oltre a Ingress (nel repo non e' definita in modo certo).
 - Non assumere policy CSP/security headers: dipende da runtime Ingress e non e' deducibile solo dal repo.
-- Non assumere comandi lint/typecheck/test ufficiali oltre a quelli esplicitati nei file del repo/AI_old.
+- Non assumere comandi lint/typecheck/test ufficiali oltre a quelli esplicitati nei file del repo.
 
 ## Integrazioni consentite/vietate
 - Consentite (presenti nel codice):
   - Supervisor/Core API (via `SUPERVISOR_TOKEN`) per states/websocket/actions allowlisted.
 - Vietate:
-  - risorse runtime esterne (CDN, fetch internet) (vincolo di progetto, documentato in AI_old/AI_PROJECT.md).
+  - risorse runtime esterne (CDN, fetch internet) (vincolo di progetto).
 
 ## Confini (in/out scope)
 - <<OPTIONAL>>

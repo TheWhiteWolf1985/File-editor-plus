@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0 - First official release
+
+- First official release.
+
 ## 0.2.82
 
 - Chore release: bump versione add-on e ricostruzione completa (build frontend + update/rebuild/restart addon).

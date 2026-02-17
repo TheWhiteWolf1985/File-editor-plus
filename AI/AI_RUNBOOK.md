@@ -1,6 +1,6 @@
 # AI_RUNBOOK
 
-Runbook operativo (solo comandi verificabili nel repo o in AI_old).
+Runbook operativo (solo comandi verificabili nel repo).
 
 Vincoli:
 - Niente CDN o fetch runtime esterni.
@@ -25,14 +25,14 @@ Vincoli:
   - `cd file_editor_plus/frontend`
   - `npm ci`
   - `npm run build`
-- Add-on lifecycle (certi da AI_old):
+- Add-on lifecycle:
   - `docker exec hassio_cli ha apps update local_file_editor_plus`
   - `docker exec hassio_cli ha apps rebuild local_file_editor_plus`
   - `docker exec hassio_cli ha apps restart local_file_editor_plus`
 
 ## Lint/Format/Typecheck
 - Frontend:
-  - Typecheck: `cd file_editor_plus/frontend && npm run -s typecheck` (nota: al momento puo' fallire per errori TS gia' presenti)
+  - Typecheck: `cd file_editor_plus/frontend && npm run -s typecheck`
   - Lint: N/A (nessun tooling lint configurato nel repo)
 - Backend:
   - Lint/typecheck: N/A (nessun tooling esplicito nel repo)

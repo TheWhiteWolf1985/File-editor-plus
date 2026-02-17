@@ -171,7 +171,7 @@ left = []
   - (verifica) `AI/METADATA.yaml`
 
 - Changes:
-  1. Aprire `AI/KNOWLEDGE.yaml` e trovare la voce `changes_log` relativa alla migrazione (es. `migration_from_AI_old`).
+  1. Aprire `AI/KNOWLEDGE.yaml` e trovare la voce `changes_log` rilevante.
   2. Aggiornare `todos_remaining`:
      - rimuovere riferimenti a `owner/created_at` come mancanti.
      - lasciare solo TODO reali (es. `repo_url` se effettivamente desiderato).
@@ -179,10 +179,10 @@ left = []
   3. Se si fa una scelta (es. “non compiliamo repo_url”), annotarla in `AI/DECISIONS.md`.
 
 - What changed:
-  - Rimossi i TODO stale su `AI/METADATA.yaml.owner` e `AI/METADATA.yaml.created_at` dalla entry `migration_from_AI_old` in `AI/KNOWLEDGE.yaml`.
+  - Rimossi i TODO stale su `AI/METADATA.yaml.owner` e `AI/METADATA.yaml.created_at` dalla knowledge (`AI/KNOWLEDGE.yaml`).
 
 - Commands:
-  - `rg -n "migration_from_AI_old|todos_remaining|owner|created_at" AI/KNOWLEDGE.yaml AI/METADATA.yaml -S`
+  - `rg -n "todos_remaining|owner|created_at" AI/KNOWLEDGE.yaml AI/METADATA.yaml -S`
   - (optional) validazione YAML se disponibile nel repo/tooling.
 
 - Acceptance criteria:

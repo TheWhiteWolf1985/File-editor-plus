@@ -115,9 +115,3 @@ Formato senza diff:
 ## Versioning kit
 - Versione in `AI/METADATA.yaml` (`ai_kit_version`).
 - Ogni cambio strutturale va tracciato in `AI/KNOWLEDGE.yaml` e, se decisionale, in `AI/DECISIONS.md`.
-
-## Bump da AI_old (legacy -> kit)
-Regole operative per questa repo:
-- Non modificare/cancellare contenuti in `AI_old/` (solo lettura).
-- Inserire in `AI/` solo informazioni verificabili dal repo o presenti in `AI_old/`; in caso contrario usare `<<REQUIRED>>` / `<<OPTIONAL>>`.
-- Note di migrazione/conflitti e TODO residui vanno tracciati in `AI/KNOWLEDGE.yaml` (changes_log).
