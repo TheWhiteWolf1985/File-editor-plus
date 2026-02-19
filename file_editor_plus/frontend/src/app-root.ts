@@ -76,6 +76,7 @@ import {
   apiGetSession,
   apiPostDiff,
   apiSaveFile,
+  apiCreateFile,
   apiGenerateDebugLog,
   apiUpload,
   apiMovePath,
@@ -97,6 +98,8 @@ export class AppRoot extends LitElement {
     const base = new URL("./", window.location.href).pathname;
     return base.endsWith("/") ? base : `${base}/`;
   })();
+
+  private saveAsConflictResolver: ((choice: "overwrite" | "suffix" | "cancel") => void) | null = null;
 
   static properties = {
     expanded: { state: true },
@@ -184,6 +187,12 @@ export class AppRoot extends LitElement {
     showUnsavedModal: { state: true },
     utilityGenerating: { state: true },
     showUploadModal: { state: true },
+    showSaveAsModal: { state: true },
+    saveAsTargetDir: { state: true },
+    saveAsFilename: { state: true },
+    saveAsInProgress: { state: true },
+    saveAsConflictOpen: { state: true },
+    saveAsConflictPath: { state: true },
     uploadTargetDir: { state: true },
     uploadInProgress: { state: true },
     uploadFiles: { state: true },
@@ -220,6 +229,12 @@ export class AppRoot extends LitElement {
   declare showUnsavedModal: boolean;
   declare utilityGenerating: boolean;
   declare showUploadModal: boolean;
+  declare showSaveAsModal: boolean;
+  declare saveAsTargetDir: string;
+  declare saveAsFilename: string;
+  declare saveAsInProgress: boolean;
+  declare saveAsConflictOpen: boolean;
+  declare saveAsConflictPath: string | null;
   declare uploadTargetDir: string;
   declare uploadFile: File | null;
   declare uploadFiles: File[];
@@ -553,6 +568,12 @@ export class AppRoot extends LitElement {
     this.showUnsavedModal = false;
     this.utilityGenerating = false;
     this.showUploadModal = false;
+    this.showSaveAsModal = false;
+    this.saveAsTargetDir = "/";
+    this.saveAsFilename = "";
+    this.saveAsInProgress = false;
+    this.saveAsConflictOpen = false;
+    this.saveAsConflictPath = null;
     this.uploadTargetDir = "/";
     this.uploadFile = null;
     this.uploadFiles = [];
@@ -763,6 +784,167 @@ export class AppRoot extends LitElement {
     this.uploadFiles = [];
     this.uploadProgress = null;
     this.showUploadModal = true;
+  }
+
+  private openSaveAsModal() {
+    if (!this.activePath) {
+      this.showToast(t("toast.editor.open_file_first"), "info");
+      return;
+    }
+    const parts = this.activePath.split("/");
+    const name = parts.pop() || this.activePath;
+    const dir = parts.length ? parts.join("/") : "/";
+    this.saveAsTargetDir = this.normalizeDir(dir || "/");
+    this.saveAsFilename = name;
+    this.saveAsInProgress = false;
+    this.saveAsConflictOpen = false;
+    this.saveAsConflictPath = null;
+    this.showSaveAsModal = true;
+  }
+
+  private closeSaveAsModal() {
+    if (this.saveAsInProgress) return;
+    this.showSaveAsModal = false;
+    this.saveAsConflictOpen = false;
+    this.saveAsConflictPath = null;
+    this.saveAsConflictResolver = null;
+  }
+
+  private buildSaveAsDestPath(dir: string, filename: string): string {
+    const cleanName = filename.trim();
+    if (!cleanName) return "";
+    const cleanDir = this.normalizeDir(dir);
+    return cleanDir === "/" ? cleanName : `${cleanDir}/${cleanName}`;
+  }
+
+  private isCreateConflict(res: Response, payload: any): boolean {
+    if (res.status === 409) return true;
+    if (res.status !== 400) return false;
+    const msg = String(payload?.detail || payload?.error || "").toLowerCase();
+    return msg.includes("already exists") || msg.includes("exists");
+  }
+
+  private nextAvailableFilename(filename: string, i: number): string {
+    const base = filename.trim();
+    const dot = base.lastIndexOf(".");
+    const hasExt = dot > 0 && dot < base.length - 1;
+    const stem = hasExt ? base.slice(0, dot) : base;
+    const ext = hasExt ? base.slice(dot) : "";
+    return `${stem} (${i})${ext}`;
+  }
+
+  private promptSaveAsConflict(destPath: string) {
+    this.saveAsConflictPath = destPath;
+    this.saveAsConflictOpen = true;
+    return new Promise<"overwrite" | "suffix" | "cancel">((resolve) => {
+      this.saveAsConflictResolver = resolve;
+    });
+  }
+
+  private resolveSaveAsConflict(choice: "overwrite" | "suffix" | "cancel") {
+    const resolver = this.saveAsConflictResolver;
+    this.saveAsConflictResolver = null;
+    this.saveAsConflictOpen = false;
+    this.saveAsConflictPath = null;
+    if (resolver) resolver(choice);
+  }
+
+  private async submitSaveAs() {
+    if (this.saveAsInProgress) return;
+    if (!this.activePath) {
+      this.showToast(t("toast.editor.open_file_first"), "info");
+      return;
+    }
+    const content = this.content ?? "";
+    const initialDest = this.buildSaveAsDestPath(this.saveAsTargetDir, this.saveAsFilename);
+    if (!initialDest) {
+      this.showToast("Nome file non valido", "error");
+      return;
+    }
+    if (initialDest.startsWith("/")) {
+      this.showToast("Il percorso deve essere relativo a /config", "error");
+      return;
+    }
+
+    this.saveAsInProgress = true;
+    try {
+      const tryCreate = async (destPath: string) => {
+        const res = await apiCreateFile(this.apiBase, destPath, content);
+        let payload: any = null;
+        try {
+          payload = await res.json();
+        } catch {
+          payload = null;
+        }
+        return { res, payload };
+      };
+
+      let destPath = initialDest;
+      while (true) {
+        const { res, payload } = await tryCreate(destPath);
+        if (res.ok && payload?.ok === true) {
+          this.showSaveAsModal = false;
+          this.openFile(destPath);
+          this.showToast("File salvato", "info");
+          return;
+        }
+
+        if (this.isCreateConflict(res, payload)) {
+          const choice = await this.promptSaveAsConflict(destPath);
+          if (choice === "cancel") {
+            this.showToast("Operazione annullata", "info");
+            return;
+          }
+          if (choice === "overwrite") {
+            const overwrite = await apiSaveFile(this.apiBase, destPath, content);
+            let overPayload: any = null;
+            try {
+              overPayload = await overwrite.json();
+            } catch {
+              overPayload = null;
+            }
+            if (overwrite.ok && overPayload?.ok === true) {
+              this.showSaveAsModal = false;
+              this.openFile(destPath);
+              this.showToast("File sovrascritto", "info");
+              return;
+            }
+            const msg = overPayload?.detail || overPayload?.error || `HTTP ${overwrite.status}`;
+            this.showToast(String(msg), "error");
+            return;
+          }
+
+          // suffix
+          for (let i = 1; i < 200; i++) {
+            const tryName = this.nextAvailableFilename(this.saveAsFilename, i);
+            const tryPath = this.buildSaveAsDestPath(this.saveAsTargetDir, tryName);
+            const { res: retryRes, payload: retryPayload } = await tryCreate(tryPath);
+            if (retryRes.ok && retryPayload?.ok === true) {
+              this.showSaveAsModal = false;
+              this.openFile(tryPath);
+              this.showToast("File salvato", "info");
+              return;
+            }
+            if (!this.isCreateConflict(retryRes, retryPayload)) {
+              const msg = retryPayload?.detail || retryPayload?.error || `HTTP ${retryRes.status}`;
+              this.showToast(String(msg), "error");
+              return;
+            }
+          }
+          this.showToast("Impossibile trovare un nome disponibile", "error");
+          return;
+        }
+
+        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
+        this.showToast(String(msg), "error");
+        return;
+      }
+    } catch (e) {
+      if (import.meta.env.DEV) console.warn("save-as failed", e);
+      this.showToast("Errore Save As", "error");
+    } finally {
+      this.saveAsInProgress = false;
+    }
   }
 
   private triggerPathDownload(path: string) {
@@ -1912,11 +2094,7 @@ export class AppRoot extends LitElement {
       } else if (action === "Save" && this.activePath) {
         this.save();
       } else if (action === "Save as…") {
-        if (!this.activePath) {
-          this.showToast(t("toast.editor.open_file_first"), "info");
-          return;
-        }
-        this.triggerPathDownload(this.activePath);
+        this.openSaveAsModal();
       } else if (action === "Settings") {
         this.openSettingsModal();
       } else if (action === "Import…") {
@@ -3306,6 +3484,59 @@ export class AppRoot extends LitElement {
                         : t("modal.upload.uploading")
                       : t("explorer.action.upload")}
                   </button>
+                </div>
+              </div>
+            </div>`
+          : nothing}
+
+        ${this.showSaveAsModal
+          ? html`<div class="modalBackdrop" @click=${() => this.closeSaveAsModal()}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:520px;">
+                <h3>Save as…</h3>
+                <div class="formRow" style="margin-top:12px; display:grid; gap:6px;">
+                  <label style="font-size:var(--font-size-sm); color:var(--muted-color);">Cartella</label>
+                  <select
+                    .value=${this.saveAsTargetDir}
+                    @change=${(e: Event) => (this.saveAsTargetDir = this.normalizeDir((e.target as HTMLSelectElement).value))}
+                    ?disabled=${this.saveAsInProgress}
+                  >
+                    ${this.getDirectoryOptions().map(
+                      (dir) =>
+                        html`<option value=${dir.path} ?disabled=${!dir.writable}>
+                          ${dir.path === "/" ? "/config" : `/config/${dir.path}`} ${dir.writable ? "" : " (readonly)"}
+                        </option>`
+                    )}
+                  </select>
+                </div>
+                <div class="formRow" style="margin-top:12px; display:grid; gap:6px;">
+                  <label style="font-size:var(--font-size-sm); color:var(--muted-color);">Nome file</label>
+                  <input
+                    type="text"
+                    .value=${this.saveAsFilename}
+                    @input=${(e: Event) => (this.saveAsFilename = (e.target as HTMLInputElement).value)}
+                    ?disabled=${this.saveAsInProgress}
+                  />
+                </div>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.closeSaveAsModal()} ?disabled=${this.saveAsInProgress}>${t("btn.cancel")}</button>
+                  <button class="btn primary" @click=${() => this.submitSaveAs()} ?disabled=${this.saveAsInProgress}>
+                    ${this.saveAsInProgress ? t("status.saving") : t("btn.save")}
+                  </button>
+                </div>
+              </div>
+            </div>`
+          : nothing}
+
+        ${this.saveAsConflictOpen && this.saveAsConflictPath
+          ? html`<div class="modalBackdrop" @click=${() => this.resolveSaveAsConflict("cancel")}>
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:480px;">
+                <h3>Conflitto</h3>
+                <p style="margin-top:8px; color:var(--muted-color);">File già esistente, vuoi sovrascrivere?</p>
+                <p style="margin-top:6px; color:var(--muted-color); font-size:var(--font-size-sm);">${this.saveAsConflictPath}</p>
+                <div class="actions">
+                  <button class="btn" @click=${() => this.resolveSaveAsConflict("cancel")}>Cancel</button>
+                  <button class="btn" @click=${() => this.resolveSaveAsConflict("suffix")}>No</button>
+                  <button class="btn primary" @click=${() => this.resolveSaveAsConflict("overwrite")}>Sì</button>
                 </div>
               </div>
             </div>`

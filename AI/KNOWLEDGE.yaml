@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-17T20:21:58Z"
+  updated_at: "2026-02-19T08:48:56Z"
 
 commands:
   frontend_build:
@@ -97,6 +97,33 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "SAVEAS_CLOUD-STEP-002"
+    summary: "Frontend: implementato Save As reale con dialog (cartella+nome) e gestione conflitto a 3 scelte; switch automatico al nuovo file."
+    files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s typecheck"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Usa `PUT /api/file?create_only=1` per tentativo create; conflitto rilevato via HTTP 400/409 (dettaglio completato in STEP 003)."
+
+  - step_id: "SAVEAS_CLOUD-STEP-001"
+    summary: "Discovery Save As + Cloud Backup: mappati servizi FE ed endpoint/helper BE rilevanti per implementare save-as reale e backup cloud."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/frontend/src/services/api.ts"
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/backend/app.py"
+    commands:
+      - "rg -n -S \"Save as|Save As|Export|Download\" file_editor_plus/frontend/src"
+      - "rg -n -S \"src/services|api.ts\" file_editor_plus/frontend/src"
+      - "rg -n -S \"\\\"/api\" file_editor_plus/backend"
+      - "rg -n -S \"def safe_path|def atomic_write|def make_backup\" file_editor_plus/backend"
+    notes: "Backend: `PUT /api/file` supporta `create_only=1` (oggi conflitto = HTTP 400 'File already exists'); helpers `safe_path/atomic_write` disponibili."
+
   - step_id: "UI_NAV_AUDIT-STEP-007"
     summary: "Knowledge: registrato audit UI nav come entita' e tracciato completamento epic audit/wiring."
     files:
