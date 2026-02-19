@@ -406,7 +406,7 @@ Obiettivo: sistemare 2 voci menu:
 
 ## STEP 008 — Smoke add-on (Ingress + Save As + Cloud)
 
-- Status: TODO
+- Status: DONE
 - Goal: verificare che tutto funzioni nel contesto HA.
 - Checklist minima:
   - UI via Ingress carica senza 404 assets.
@@ -427,11 +427,22 @@ Obiettivo: sistemare 2 voci menu:
 - Commit message:
   - N/A (solo verifica; eventuali fix in commit dedicato)
 
+- What changed:
+  - Eseguito restart add-on. Update non disponibile (nessun bump versione in questo epic), quindi smoke limitato a restart + log supervisor.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+
+- Commands run:
+  - `docker exec hassio_cli ha apps update local_file_editor_plus` (esito: "No update available")
+  - `docker exec hassio_cli ha apps restart local_file_editor_plus` (OK)
+  - `docker exec hassio_cli ha supervisor logs -n 120` (OK; errore Ingress transitorio durante restart, poi recovery)
+
 ---
 
 ## STEP 009 — Aggiornare audit e knowledge
 
-- Status: TODO
+- Status: DONE
 - Goal: chiudere il cerchio.
 - Changes:
   - Aggiornare `AI/AUDITS/UI_NAV_AUDIT.md`:
@@ -447,3 +458,15 @@ Obiettivo: sistemare 2 voci menu:
 
 - Commit message:
   - `docs(audit): update nav audit for save-as and cloud backup`
+
+- What changed:
+  - Audit UI nav aggiornato: `Save as…` non e' piu' download; `Backup -> Cloud` ora connesso a UI+API gdrive.
+  - Knowledge aggiornata con note cloud backup e riferimenti audit.
+
+- Files touched:
+  - `AI/AUDITS/UI_NAV_AUDIT.md`
+  - `AI/AI_TASKS.md`
+  - `AI/KNOWLEDGE.yaml`
+
+- Commands run:
+  - `cd file_editor_plus/frontend && npm ci && npm run -s build`

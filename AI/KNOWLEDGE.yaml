@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-19T09:07:10Z"
+  updated_at: "2026-02-19T09:09:40Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,27 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "SAVEAS_CLOUD-STEP-009"
+    summary: "Aggiornati audit e knowledge: Save As ora crea file (non download) e Backup Cloud e' wired a UI+API gdrive."
+    files:
+      - "AI/AUDITS/UI_NAV_AUDIT.md"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm ci && npm run -s build"
+    notes: "Audit: sezione NOT CONNECTED ora vuota; righe aggiornate per Save As e Cloud Backup."
+
+  - step_id: "SAVEAS_CLOUD-STEP-008"
+    summary: "Smoke add-on: restart eseguito; update non disponibile (nessun bump versione in questo epic)."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker exec hassio_cli ha apps update local_file_editor_plus"
+      - "docker exec hassio_cli ha apps restart local_file_editor_plus"
+      - "docker exec hassio_cli ha supervisor logs -n 120"
+    notes: "Supervisor logs mostrano errore Ingress transitorio durante restart (connect failed), poi recupero."
+
   - step_id: "SAVEAS_CLOUD-STEP-007"
     summary: "Frontend: aggiunta UI Google Drive Backup (device auth + manual backup + schedule settings) e wiring `Backup -> Cloud`."
     files:

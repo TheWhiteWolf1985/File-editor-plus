@@ -21,7 +21,7 @@ Legenda stato:
 | Topbar > File | New file | action | `file_editor_plus/frontend/src/app-root.ts:1894` | `handleMenuAction("file","New file")` | (state) `newItemKind="file"` -> create | `/api/file (PUT create_only=1)` | ✅ | Creazione effettiva avviene in flow "new item" |
 | Topbar > File | New folder | action | `file_editor_plus/frontend/src/app-root.ts:1898` | `handleMenuAction("file","New folder")` | (state) `newItemKind="folder"` -> create | `/api/folder (POST)` | ✅ |  |
 | Topbar > File | Save | action | `file_editor_plus/frontend/src/app-root.ts:1901` | `save()` | `apiSaveFile()` | `/api/file (PUT)` | ✅ |  |
-| Topbar > File | Save as… | action | `file_editor_plus/frontend/src/app-root.ts:1903` | `triggerPathDownload(activePath)` | link download | `/api/fs/download (GET)` | ✅ | Download del file attivo |
+| Topbar > File | Save as… | action | `file_editor_plus/frontend/src/app-root.ts:2258` | `openSaveAsModal()` | `apiCreateFile()` (+ `apiSaveFile()` su overwrite) | `/api/file (PUT create_only=1)` | ✅ | Crea un nuovo file (dialog cartella+nome), poi switch al nuovo file |
 | Topbar > File | Settings | route/modal | `file_editor_plus/frontend/src/app-root.ts:1906` | `openSettingsModal()` | `apiPutUserConfig()` (on apply) | `/api/user-config (PUT)` | ✅ | Impostazioni UI |
 | Topbar > File | Import… | action | `file_editor_plus/frontend/src/app-root.ts:2684` | `openUploadModal()` | `apiUpload()` (nel modal) | `/api/upload (POST)` | ✅ | Apre modal upload |
 | Topbar > File | Export… | action | `file_editor_plus/frontend/src/app-root.ts:2685` | `triggerPathDownload(activePath)` | link download | `/api/fs/download (GET)` | ✅ | Download del file attivo |
@@ -55,14 +55,11 @@ Legenda stato:
 | Sidebar > Snippets | Add / Modify / Delete | action | `file_editor_plus/frontend/src/app-root.ts:2504` | `openSnippetModal()` + CRUD | `apiCreate/Update/DeleteSnippet()` | `/api/snippets*` | ✅ |  |
 | Sidebar > Backup | Local download | action | `file_editor_plus/frontend/src/app-root.ts:2462` | `runBackup("download")` | link download | `/api/backup (GET)` | ✅ | Download via `<a>` |
 | Sidebar > Backup | Save as… | action | `file_editor_plus/frontend/src/app-root.ts:2474` | `runBackup("saveas")` | `apiGetBackup()` | `/api/backup (GET)` | ✅ | File System Access API se disponibile |
-| Sidebar > Backup | Cloud | action | `file_editor_plus/frontend/src/app-root.ts:2486` | disabled | N/A | N/A | ❌ | Coming soon (disabilitato) |
+| Sidebar > Backup | Cloud | action | `file_editor_plus/frontend/src/app-root.ts:2848` | `openGdriveModal()` | `apiGdrive*()` | `/api/cloud/gdrive/*` | ✅ | Device Flow + backup manuale + schedule |
 | Sidebar > Utility | Generate debug log | action | `file_editor_plus/frontend/src/app-root.ts:2554` | `generateDebugLog()` | `apiGenerateDebugLog()` | `/api/utils/debug-log (POST)` | ✅ |  |
 | Sidebar > Utility | Reset session | action | `file_editor_plus/frontend/src/app-root.ts:2565` | `apiResetSession()` | `apiResetSession()` | `/api/session/reset (POST)` | ✅ |  |
 | Sidebar > System | Reload YAML / Restart / Reboot / Shutdown | action | `file_editor_plus/frontend/src/app-root.ts:2576` | `runSystemAction()` | `apiPostHaAction()` | `/api/ha/action (POST)` | ✅ | Backend inoltra a HA |
 
 ## NOT CONNECTED
 
-1. Backup -> **Cloud**
-   - `file_editor_plus/frontend/src/app-root.ts:2486`
-   - Stato: disabilitato (coming soon)
-   - Gap: OK se intenzionale; mantenere spiegazione in UI.
+*(vuoto)*
