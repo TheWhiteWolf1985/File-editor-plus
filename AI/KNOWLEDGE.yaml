@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-19T08:58:24Z"
+  updated_at: "2026-02-19T09:03:04Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,17 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "SAVEAS_CLOUD-STEP-006"
+    summary: "Cloud scheduler: schedule (GET/PUT) + worker thread + retention solo per backup automatici."
+    files:
+      - "file_editor_plus/backend/app.py"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm ci && npm run -s build"
+    notes: "Auto backup: filename `config-auto-*.zip`; retention applicata list+delete oltre N (best-effort)."
+
   - step_id: "SAVEAS_CLOUD-STEP-005"
     summary: "Backend Google Drive: Device Authorization Flow + backup manuale ZIP di /config con upload in cartella fissa."
     files:

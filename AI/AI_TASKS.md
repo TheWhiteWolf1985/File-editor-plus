@@ -316,7 +316,7 @@ Obiettivo: sistemare 2 voci menu:
 
 ## STEP 006 — Cloud Backup: schedulazione + retention (solo auto)
 
-- Status: TODO
+- Status: DONE
 - Goal: backup automatico configurabile.
 - Scheduling UX richiesto:
   - Toggle enable
@@ -336,6 +336,18 @@ Obiettivo: sistemare 2 voci menu:
 
 - Commit message:
   - `feat(cloud): scheduled drive backups with retention for auto only`
+
+- What changed:
+  - Backend: aggiunti endpoint schedule `GET/PUT /api/cloud/gdrive/schedule` con `next_run` calcolato.
+  - Scheduler thread: esegue backup automatici con filename `config-auto-*` e retention best-effort (solo auto).
+
+- Files touched:
+  - `file_editor_plus/backend/app.py`
+  - `AI/AI_TASKS.md`
+
+- Commands run:
+  - `docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\"`
+  - `cd file_editor_plus/frontend && npm ci && npm run -s build`
 
 ---
 

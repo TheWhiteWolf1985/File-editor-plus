@@ -17,7 +17,7 @@ import threading
 from logging.handlers import RotatingFileHandler
 import tempfile
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
@@ -243,10 +243,14 @@ def next_available_name(path: Path) -> Path:
 GDRIVE_DIR = Path("/data/gdrive")
 GDRIVE_TOKENS_FILE = GDRIVE_DIR / "tokens.json"
 GDRIVE_CONFIG_FILE = GDRIVE_DIR / "config.json"
+GDRIVE_SCHEDULE_FILE = GDRIVE_DIR / "schedule.json"
 
 _gdrive_lock = threading.Lock()
 _gdrive_device_state: Optional[dict] = None
 _gdrive_device_stop: Optional[threading.Event] = None
+_gdrive_schedule_stop = threading.Event()
+_gdrive_schedule_wake = threading.Event()
+_gdrive_last_auto_run: Optional[int] = None
 
 
 def _load_addon_options() -> dict:
@@ -299,6 +303,44 @@ def _load_gdrive_config() -> dict:
 def _save_gdrive_config(cfg: dict) -> None:
     GDRIVE_DIR.mkdir(parents=True, exist_ok=True)
     atomic_write(GDRIVE_CONFIG_FILE, json.dumps(cfg, ensure_ascii=False, indent=2))
+
+
+def _load_gdrive_schedule() -> dict:
+    if not GDRIVE_SCHEDULE_FILE.exists():
+        return {"enabled": False, "time": "03:00", "retention": 10}
+    try:
+        d = json.loads(GDRIVE_SCHEDULE_FILE.read_text(encoding="utf-8"))
+        if not isinstance(d, dict):
+            return {"enabled": False, "time": "03:00", "retention": 10}
+        enabled = bool(d.get("enabled"))
+        hhmm = str(d.get("time") or "03:00")
+        retention = int(d.get("retention") or 0)
+        retention = max(0, min(200, retention))
+        return {"enabled": enabled, "time": hhmm, "retention": retention}
+    except Exception:
+        return {"enabled": False, "time": "03:00", "retention": 10}
+
+
+def _save_gdrive_schedule(cfg: dict) -> None:
+    GDRIVE_DIR.mkdir(parents=True, exist_ok=True)
+    atomic_write(GDRIVE_SCHEDULE_FILE, json.dumps(cfg, ensure_ascii=False, indent=2))
+
+
+def _parse_hhmm(value: str) -> tuple[int, int]:
+    m = re.fullmatch(r"([0-1]\\d|2[0-3]):([0-5]\\d)", (value or "").strip())
+    if not m:
+        raise HTTPException(400, "Invalid time format (expected HH:MM)")
+    return int(m.group(1)), int(m.group(2))
+
+
+def _compute_next_run_iso(hhmm: str) -> str:
+    # Use container timezone (system) and return ISO with offset.
+    h, m = _parse_hhmm(hhmm)
+    now = datetime.now().astimezone()
+    candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    if candidate <= now:
+        candidate = candidate + timedelta(days=1)
+    return candidate.isoformat()
 
 
 def _is_gdrive_connected(tokens: Optional[dict]) -> bool:
@@ -497,6 +539,150 @@ def _upload_zip_to_drive(access_token: str, folder_id: str, zip_path: Path, file
         content=gen(),
         headers={"Content-Type": f"multipart/related; boundary={boundary}"},
     )
+
+
+def _list_drive_files(access_token: str, folder_id: str, name_contains: Optional[str] = None, limit: int = 200) -> list[dict]:
+    q = f"'{folder_id}' in parents and trashed=false"
+    if name_contains:
+        # Use contains to keep query simple.
+        q += f" and name contains '{name_contains}'"
+    res = _drive_request(
+        "GET",
+        "https://www.googleapis.com/drive/v3/files",
+        access_token,
+        params={
+            "q": q,
+            "fields": "files(id,name,createdTime,size)",
+            "orderBy": "createdTime desc",
+            "pageSize": min(max(1, int(limit)), 1000),
+        },
+    )
+    files = res.get("files") if isinstance(res, dict) else None
+    return files if isinstance(files, list) else []
+
+
+def _delete_drive_file(access_token: str, file_id: str) -> None:
+    if not file_id:
+        return
+    _drive_request(
+        "DELETE",
+        f"https://www.googleapis.com/drive/v3/files/{file_id}",
+        access_token,
+    )
+
+
+def _apply_auto_retention(access_token: str, folder_id: str, keep_last: int) -> dict:
+    keep = max(0, min(200, int(keep_last)))
+    if keep <= 0:
+        return {"kept": 0, "deleted": 0}
+    items = _list_drive_files(access_token, folder_id, name_contains="config-auto-")
+    to_delete = items[keep:]
+    deleted = 0
+    for it in to_delete:
+        try:
+            _delete_drive_file(access_token, str(it.get("id") or ""))
+            deleted += 1
+        except Exception:
+            # best-effort: retention should not break backup
+            continue
+    return {"kept": min(keep, len(items)), "deleted": deleted, "total": len(items)}
+
+
+def _zip_config_dir_named(filename: str) -> Path:
+    tmp = tempfile.NamedTemporaryFile(prefix="fep-gdrive-backup-", suffix=".zip", delete=False)
+    tmp_path = Path(tmp.name)
+    tmp.close()
+    try:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(BASE_DIR):
+                dirs[:] = [d for d in dirs if not Path(root, d).is_symlink()]
+                for name in files:
+                    full = Path(root) / name
+                    if full.is_symlink():
+                        continue
+                    try:
+                        rel = full.resolve().relative_to(BASE_DIR).as_posix()
+                    except Exception:
+                        continue
+                    zf.write(full, rel)
+    except Exception as e:
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(500, f"Backup failed: {e}")
+    return tmp_path
+
+
+def _run_auto_backup_once() -> dict:
+    access = _get_access_token_or_503()
+    folder_id = _ensure_backup_folder(access)
+    filename = datetime.now().strftime("config-auto-%Y%m%d-%H%M%S.zip")
+    zip_path = _zip_config_dir_named(filename)
+    retention_cfg = _load_gdrive_schedule()
+    try:
+        uploaded = _upload_zip_to_drive(access, folder_id, zip_path, filename)
+        retention = _apply_auto_retention(access, folder_id, int(retention_cfg.get("retention") or 0))
+    finally:
+        zip_path.unlink(missing_ok=True)
+    return {"ok": True, "file": uploaded, "folder_id": folder_id, "retention": retention}
+
+
+def _gdrive_schedule_loop():
+    global _gdrive_last_auto_run
+    while not _gdrive_schedule_stop.is_set():
+        cfg = _load_gdrive_schedule()
+        enabled = bool(cfg.get("enabled"))
+        hhmm = str(cfg.get("time") or "03:00")
+
+        if not enabled:
+            _gdrive_schedule_wake.wait(timeout=30)
+            _gdrive_schedule_wake.clear()
+            continue
+
+        try:
+            h, m = _parse_hhmm(hhmm)
+        except HTTPException:
+            _gdrive_schedule_wake.wait(timeout=30)
+            _gdrive_schedule_wake.clear()
+            continue
+
+        now = datetime.now().astimezone()
+        target = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        if target <= now:
+            target = target + timedelta(days=1)
+        wait_s = max(1.0, (target - now).total_seconds())
+        # Wake up early if config changes.
+        _gdrive_schedule_wake.wait(timeout=min(wait_s, 60 * 60))
+        if _gdrive_schedule_stop.is_set():
+            return
+        if _gdrive_schedule_wake.is_set():
+            _gdrive_schedule_wake.clear()
+            continue
+
+        # If we're within a small window, run the job once.
+        now2 = datetime.now().astimezone()
+        if now2 < target - timedelta(seconds=2):
+            continue
+
+        last = int(_gdrive_last_auto_run or 0)
+        if int(time.time()) - last < 45:
+            continue
+        _gdrive_last_auto_run = int(time.time())
+        try:
+            _run_auto_backup_once()
+        except Exception:
+            # best-effort: do not crash the loop; errors are surfaced to UI via status/manual runs.
+            continue
+
+
+_gdrive_schedule_thread_started = False
+
+
+def _ensure_gdrive_scheduler_started():
+    global _gdrive_schedule_thread_started
+    if _gdrive_schedule_thread_started:
+        return
+    _gdrive_schedule_thread_started = True
+    t = threading.Thread(target=_gdrive_schedule_loop, daemon=True, name="gdrive-scheduler")
+    t.start()
 
 
 def _stop_device_flow_locked():
@@ -2563,6 +2749,7 @@ def gdrive_status():
 
 @app.post("/api/cloud/gdrive/device/start")
 def gdrive_device_start():
+    global _gdrive_device_state, _gdrive_device_stop
     cid = _get_gdrive_client_id()
     if not cid:
         raise HTTPException(503, "Manca gdrive_client_id nelle opzioni add-on")
@@ -2600,7 +2787,6 @@ def gdrive_device_start():
         name="gdrive-device-flow",
     )
     with _gdrive_lock:
-        global _gdrive_device_state, _gdrive_device_stop
         _gdrive_device_state = state
         _gdrive_device_stop = stop_event
     thread.start()
@@ -2638,6 +2824,33 @@ def gdrive_backup_manual():
     finally:
         zip_path.unlink(missing_ok=True)
     return {"ok": True, "file": uploaded, "folder_id": folder_id}
+
+
+@app.get("/api/cloud/gdrive/schedule")
+def gdrive_get_schedule():
+    cfg = _load_gdrive_schedule()
+    enabled = bool(cfg.get("enabled"))
+    hhmm = str(cfg.get("time") or "03:00")
+    next_run = _compute_next_run_iso(hhmm) if enabled else None
+    return {"ok": True, **cfg, "next_run": next_run}
+
+
+@app.put("/api/cloud/gdrive/schedule")
+def gdrive_put_schedule(body: dict):
+    if not isinstance(body, dict):
+        raise HTTPException(400, "Invalid JSON body")
+    enabled = bool(body.get("enabled"))
+    hhmm = str(body.get("time") or "03:00")
+    _parse_hhmm(hhmm)  # validate
+    retention = int(body.get("retention") or 0)
+    retention = max(0, min(200, retention))
+    cfg = {"enabled": enabled, "time": hhmm, "retention": retention}
+    _save_gdrive_schedule(cfg)
+    if enabled:
+        _ensure_gdrive_scheduler_started()
+    _gdrive_schedule_wake.set()
+    next_run = _compute_next_run_iso(hhmm) if enabled else None
+    return {"ok": True, **cfg, "next_run": next_run}
 
 
 # ---- Frontend (Ingress friendly): serve static + SPA fallback
