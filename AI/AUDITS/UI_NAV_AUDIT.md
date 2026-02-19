@@ -55,7 +55,7 @@ Legenda stato:
 | Sidebar > Snippets | Add / Modify / Delete | action | `file_editor_plus/frontend/src/app-root.ts:2504` | `openSnippetModal()` + CRUD | `apiCreate/Update/DeleteSnippet()` | `/api/snippets*` | ✅ |  |
 | Sidebar > Backup | Local download | action | `file_editor_plus/frontend/src/app-root.ts:2462` | `runBackup("download")` | link download | `/api/backup (GET)` | ✅ | Download via `<a>` |
 | Sidebar > Backup | Save as… | action | `file_editor_plus/frontend/src/app-root.ts:2474` | `runBackup("saveas")` | `apiGetBackup()` | `/api/backup (GET)` | ✅ | File System Access API se disponibile |
-| Sidebar > Backup | Cloud | action | `file_editor_plus/frontend/src/app-root.ts:2848` | `openGdriveModal()` | `apiGdrive*()` | `/api/cloud/gdrive/*` | ✅ | Device Flow + backup manuale + schedule |
+| Sidebar > Backup | Cloud | action | `file_editor_plus/frontend/src/app-root.ts:2848` | `openGdriveModal()` | `apiGdrive*()` | `/api/cloud/gdrive/*` | ✅ | Device Flow + backup manuale + schedule (hourly/daily/weekly/monthly) |
 | Sidebar > Utility | Generate debug log | action | `file_editor_plus/frontend/src/app-root.ts:2554` | `generateDebugLog()` | `apiGenerateDebugLog()` | `/api/utils/debug-log (POST)` | ✅ |  |
 | Sidebar > Utility | Reset session | action | `file_editor_plus/frontend/src/app-root.ts:2565` | `apiResetSession()` | `apiResetSession()` | `/api/session/reset (POST)` | ✅ |  |
 | Sidebar > System | Reload YAML / Restart / Reboot / Shutdown | action | `file_editor_plus/frontend/src/app-root.ts:2576` | `runSystemAction()` | `apiPostHaAction()` | `/api/ha/action (POST)` | ✅ | Backend inoltra a HA |

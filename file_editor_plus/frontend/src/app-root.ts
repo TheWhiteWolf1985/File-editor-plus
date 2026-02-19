@@ -1091,18 +1091,42 @@ export class AppRoot extends LitElement {
     const cfg = this.gdriveSchedule;
     if (!cfg || typeof cfg !== "object") return;
     const enabled = !!cfg.enabled;
-    const time = String(cfg.time || "03:00");
-    const retention = Number(cfg.retention || 0);
+    const modeRaw = String(cfg.mode || "daily");
+    const mode = (modeRaw === "hourly" || modeRaw === "daily" || modeRaw === "weekly" || modeRaw === "monthly" ? modeRaw : "daily") as
+      | "hourly"
+      | "daily"
+      | "weekly"
+      | "monthly";
+
+    const reqPayload: any = { enabled, mode };
+
+    const retentionCount = Number(cfg.retention_count ?? cfg.retention ?? 0);
+    reqPayload.retention_count = Number.isFinite(retentionCount) ? Math.max(0, Math.min(200, retentionCount)) : 0;
+
+    if (mode === "hourly") {
+      const interval = Number(cfg.hour_interval ?? 1);
+      reqPayload.hour_interval = Number.isFinite(interval) ? Math.max(1, Math.min(24, interval)) : 1;
+    } else {
+      const atTime = String(cfg.at_time || cfg.time || "03:00");
+      reqPayload.at_time = atTime;
+      if (mode === "weekly") {
+        reqPayload.weekday = String(cfg.weekday || "mon");
+      }
+      if (mode === "monthly") {
+        const md = Number(cfg.monthday ?? 1);
+        reqPayload.monthday = Number.isFinite(md) ? Math.max(1, Math.min(28, md)) : 1;
+      }
+    }
     this.gdriveSavingSchedule = true;
     try {
-      const res = await apiGdrivePutSchedule(this.apiBase, { enabled, time, retention });
-      const payload = await res.json().catch(() => null);
-      if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
+      const res = await apiGdrivePutSchedule(this.apiBase, reqPayload);
+      const respPayload = await res.json().catch(() => null);
+      if (!res.ok || respPayload?.ok !== true) {
+        const msg = respPayload?.detail || respPayload?.error || `HTTP ${res.status}`;
         this.showToast(String(msg), "error");
         return;
       }
-      this.gdriveSchedule = payload;
+      this.gdriveSchedule = respPayload;
       this.showToast("Schedulazione aggiornata");
     } finally {
       this.gdriveSavingSchedule = false;
@@ -3653,7 +3677,7 @@ export class AppRoot extends LitElement {
 
         ${this.showGdriveModal
           ? html`<div class="modalBackdrop" @click=${() => this.closeGdriveModal()}>
-              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:560px;">
+              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:720px;">
                 <h3>Google Drive Backup</h3>
                 ${this.gdriveLoading
                   ? html`<div style="margin-top:10px; color:var(--muted-color);">${t("status.loading")}</div>`
@@ -3664,6 +3688,12 @@ export class AppRoot extends LitElement {
                   const connected = !!st.connected;
                   const flow = st.device_flow || null;
                   const sched = this.gdriveSchedule || {};
+                  const mode = String(sched.mode || "daily");
+                  const atTime = String(sched.at_time || sched.time || "03:00");
+                  const hourInterval = Number(sched.hour_interval ?? 1);
+                  const weekday = String(sched.weekday || "mon");
+                  const monthday = Number(sched.monthday ?? 1);
+                  const retentionCount = Number(sched.retention_count ?? sched.retention ?? 0);
                   return html`
                     <div style="margin-top:10px; display:grid; gap:10px;">
                       <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
@@ -3740,28 +3770,108 @@ export class AppRoot extends LitElement {
                         </label>
                         <div style="display:flex; gap:10px; flex-wrap:wrap;">
                           <label style="display:grid; gap:6px;">
-                            <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Orario</span>
-                            <input
-                              type="time"
-                              .value=${String(sched.time || "03:00")}
+                            <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Modalita'</span>
+                            <select
+                              .value=${mode}
                               ?disabled=${this.gdriveSavingSchedule}
-                              @input=${(e: Event) => {
-                                const v = (e.target as HTMLInputElement).value;
-                                this.gdriveSchedule = { ...(sched || {}), time: v };
+                              @change=${(e: Event) => {
+                                const v = String((e.target as HTMLSelectElement).value || "daily");
+                                const next: any = { ...(sched || {}), mode: v };
+                                if (v === "hourly") {
+                                  if (next.hour_interval == null) next.hour_interval = 1;
+                                } else {
+                                  if (!next.at_time && next.time) next.at_time = next.time;
+                                  if (!next.at_time) next.at_time = atTime;
+                                  if (v === "weekly" && !next.weekday) next.weekday = "mon";
+                                  if (v === "monthly" && !next.monthday) next.monthday = 1;
+                                }
+                                this.gdriveSchedule = next;
                               }}
-                            />
+                            >
+                              <option value="hourly">Oraria</option>
+                              <option value="daily">Giornaliera</option>
+                              <option value="weekly">Settimanale</option>
+                              <option value="monthly">Mensile</option>
+                            </select>
                           </label>
+
+                          ${mode === "hourly"
+                            ? html`<label style="display:grid; gap:6px;">
+                                <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Intervallo ore</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="24"
+                                  .value=${String(Number.isFinite(hourInterval) ? hourInterval : 1)}
+                                  ?disabled=${this.gdriveSavingSchedule}
+                                  @input=${(e: Event) => {
+                                    const v = Number((e.target as HTMLInputElement).value || 1);
+                                    this.gdriveSchedule = { ...(sched || {}), mode: "hourly", hour_interval: v };
+                                  }}
+                                />
+                              </label>`
+                            : html`
+                                ${mode === "weekly"
+                                  ? html`<label style="display:grid; gap:6px;">
+                                      <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Giorno</span>
+                                      <select
+                                        .value=${weekday}
+                                        ?disabled=${this.gdriveSavingSchedule}
+                                        @change=${(e: Event) => {
+                                          const v = String((e.target as HTMLSelectElement).value || "mon");
+                                          this.gdriveSchedule = { ...(sched || {}), mode: "weekly", weekday: v };
+                                        }}
+                                      >
+                                        <option value="mon">Lun</option>
+                                        <option value="tue">Mar</option>
+                                        <option value="wed">Mer</option>
+                                        <option value="thu">Gio</option>
+                                        <option value="fri">Ven</option>
+                                        <option value="sat">Sab</option>
+                                        <option value="sun">Dom</option>
+                                      </select>
+                                    </label>`
+                                  : nothing}
+                                ${mode === "monthly"
+                                  ? html`<label style="display:grid; gap:6px;">
+                                      <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Giorno mese</span>
+                                      <input
+                                        type="number"
+                                        min="1"
+                                        max="28"
+                                        .value=${String(Number.isFinite(monthday) ? monthday : 1)}
+                                        ?disabled=${this.gdriveSavingSchedule}
+                                        @input=${(e: Event) => {
+                                          const v = Number((e.target as HTMLInputElement).value || 1);
+                                          this.gdriveSchedule = { ...(sched || {}), mode: "monthly", monthday: v };
+                                        }}
+                                      />
+                                    </label>`
+                                  : nothing}
+                                <label style="display:grid; gap:6px;">
+                                  <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Orario</span>
+                                  <input
+                                    type="time"
+                                    .value=${atTime}
+                                    ?disabled=${this.gdriveSavingSchedule}
+                                    @input=${(e: Event) => {
+                                      const v = (e.target as HTMLInputElement).value;
+                                      this.gdriveSchedule = { ...(sched || {}), at_time: v };
+                                    }}
+                                  />
+                                </label>
+                              `}
                           <label style="display:grid; gap:6px;">
                             <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Retention (auto)</span>
                             <input
                               type="number"
                               min="0"
                               max="200"
-                              .value=${String(sched.retention ?? 0)}
+                              .value=${String(Number.isFinite(retentionCount) ? retentionCount : 0)}
                               ?disabled=${this.gdriveSavingSchedule}
                               @input=${(e: Event) => {
                                 const v = Number((e.target as HTMLInputElement).value || 0);
-                                this.gdriveSchedule = { ...(sched || {}), retention: v };
+                                this.gdriveSchedule = { ...(sched || {}), retention_count: v };
                               }}
                             />
                           </label>

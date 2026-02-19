@@ -303,10 +303,21 @@ export const apiGdriveGetSchedule = (apiBase: string) => {
   return fetch(url);
 };
 
-export const apiGdrivePutSchedule = (
-  apiBase: string,
-  payload: { enabled: boolean; time: string; retention: number }
-) => {
+export type GdriveScheduleMode = "hourly" | "daily" | "weekly" | "monthly";
+export type ApiGdriveSchedulePutPayload = {
+  enabled: boolean;
+  mode: GdriveScheduleMode;
+  hour_interval?: number;
+  at_time?: string;
+  weekday?: "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+  monthday?: number;
+  retention_count?: number;
+  // Legacy keys (accepted by backend for back-compat).
+  time?: string;
+  retention?: number;
+};
+
+export const apiGdrivePutSchedule = (apiBase: string, payload: ApiGdriveSchedulePutPayload) => {
   const url = `${apiBase}api/cloud/gdrive/schedule`;
   return fetch(url, {
     method: "PUT",

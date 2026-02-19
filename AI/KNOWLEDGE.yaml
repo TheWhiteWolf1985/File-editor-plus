@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-19T09:09:40Z"
+  updated_at: "2026-02-19T10:04:04Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,110 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "AI_TASKS-STEP-009"
+    summary: "Allineato audit UI nav e chiuso epic Save As + Cloud Backup (scheduler avanzato + UI)."
+    files:
+      - "AI/AUDITS/UI_NAV_AUDIT.md"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Audit aggiornato: Backup -> Cloud wired e schedule 4 modalita'."
+
+  - step_id: "AI_TASKS-STEP-008"
+    summary: "Smoke add-on: rebuild + restart eseguiti per `local_file_editor_plus` dopo i fix Cloud scheduler/UI."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker exec hassio_cli ha apps rebuild local_file_editor_plus"
+      - "docker exec hassio_cli ha apps restart local_file_editor_plus"
+      - "docker exec hassio_cli ha supervisor logs -n 120"
+    notes: "Supervisor logs: rebuild OK; warning non bloccante su opzione map deprecata `config`."
+
+  - step_id: "AI_TASKS-STEP-007"
+    summary: "UI Cloud Backup: schedule editor con 4 modalita' (hourly/daily/weekly/monthly) e salvataggio payload nuovo."
+    files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/services/api.ts"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm ci && npm run -s typecheck"
+      - "cd file_editor_plus/frontend && npm run -s typecheck && npm run -s build"
+    notes: "Schedule PUT usa campi `mode/hour_interval/at_time/weekday/monthday/retention_count`; backend accetta anche legacy `time/retention`."
+
+  - step_id: "AI_TASKS-STEP-006"
+    summary: "Cloud scheduler BE: aggiunte modalita' hourly/daily/weekly/monthly con `next_run` e retention_count (solo auto)."
+    files:
+      - "file_editor_plus/backend/app.py"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Compatibilita' retro: GET/PUT schedule accettano ancora `time`/`retention` (mappati a daily + retention_count)."
+
+  - step_id: "AI_TASKS-STEP-005"
+    summary: "Backend Google Drive: confermati endpoint Device Flow + upload ZIP; manual backup ora usa filename `config-manual-*`."
+    files:
+      - "file_editor_plus/backend/app.py"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Retention rimane applicata solo ai backup automatici (`config-auto-*`)."
+
+  - step_id: "AI_TASKS-STEP-004"
+    summary: "Rivalidate opzioni add-on per Google Drive (`gdrive_client_id`) e documentato prerequisito nel runbook."
+    files:
+      - "AI/AI_RUNBOOK.md"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "rg -n -S \"gdrive_client_id\" ."
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Opzioni add-on: `file_editor_plus/config.yaml` contiene `options/schema` per `gdrive_client_id`. Backend legge da `/data/options.json`."
+
+  - step_id: "AI_TASKS-STEP-003"
+    summary: "Verificato supporto backend per Save As: create_only=1 con conflitto 409, scrittura atomica con backup."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/backend && (python -m pytest -q || true)"
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+    notes: "Runner locale python non presente nell'ambiente; test backend eseguiti via docker (OK). Endpoint: `PUT /api/file?create_only=1` -> 409 su esistente."
+
+  - step_id: "AI_TASKS-STEP-002"
+    summary: "Verificata (staticamente) la feature Save As: dialog, conflitto overwrite/suffix/cancel, switch al nuovo path."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm run -s typecheck"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "Save As usa `PUT /api/file?create_only=1` via `apiCreateFile()`; in conflitto mostra prompt e in overwrite usa `apiSaveFile()`."
+
+  - step_id: "AI_TASKS-STEP-001"
+    summary: "Rivalidato wiring FE/BE per Save As ed Export e le primitive backend di scrittura sicura."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "rg -n -S \"Save as\" file_editor_plus/frontend/src"
+      - "rg -n -S \"Export\" file_editor_plus/frontend/src"
+      - "rg -n -S \"Download\" file_editor_plus/frontend/src"
+      - "rg -n -S \"saveAs\" file_editor_plus/frontend/src"
+      - "rg -n -S \"src/services\" file_editor_plus/frontend/src"
+      - "rg -n -S \"fetch\\(\" file_editor_plus/frontend/src"
+      - "rg -n -S \"\\/api\" file_editor_plus/backend"
+      - "rg -n -S \"safe_path\" file_editor_plus/backend"
+      - "rg -n -S \"atomic_write\" file_editor_plus/backend"
+      - "cd file_editor_plus/frontend && npm ci && npm run build"
+    notes: "FE: `apiCreateFile` usa `PUT /api/file?create_only=1`; Export usa `/api/fs/download?path=...`. BE: `PUT /api/file` fa backup + `atomic_write` e blocca assoluti/traversal via `safe_path`."
+
   - step_id: "SAVEAS_CLOUD-STEP-009"
     summary: "Aggiornati audit e knowledge: Save As ora crea file (non download) e Backup Cloud e' wired a UI+API gdrive."
     files:

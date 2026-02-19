@@ -306,19 +306,75 @@ def _save_gdrive_config(cfg: dict) -> None:
 
 
 def _load_gdrive_schedule() -> dict:
+    """
+    Google Drive schedule config (persisted in `/data/gdrive/schedule.json`).
+
+    Supported schema (normalized):
+      - enabled: bool
+      - mode: hourly|daily|weekly|monthly
+      - hour_interval: int (1..24) (hourly)
+      - at_time: HH:MM (daily/weekly/monthly)
+      - weekday: mon..sun (weekly)
+      - monthday: 1..28 (monthly)
+      - retention_count: int (0..200)
+
+    Back-compat: if old keys `time` / `retention` exist, they are mapped to
+    daily mode (`at_time=time`) and `retention_count=retention`.
+    """
+    default = {
+        "enabled": False,
+        "mode": "daily",
+        "hour_interval": 1,
+        "at_time": "03:00",
+        "weekday": "mon",
+        "monthday": 1,
+        "retention_count": 10,
+    }
     if not GDRIVE_SCHEDULE_FILE.exists():
-        return {"enabled": False, "time": "03:00", "retention": 10}
+        return dict(default)
     try:
         d = json.loads(GDRIVE_SCHEDULE_FILE.read_text(encoding="utf-8"))
-        if not isinstance(d, dict):
-            return {"enabled": False, "time": "03:00", "retention": 10}
-        enabled = bool(d.get("enabled"))
-        hhmm = str(d.get("time") or "03:00")
-        retention = int(d.get("retention") or 0)
-        retention = max(0, min(200, retention))
-        return {"enabled": enabled, "time": hhmm, "retention": retention}
     except Exception:
-        return {"enabled": False, "time": "03:00", "retention": 10}
+        return dict(default)
+    if not isinstance(d, dict):
+        return dict(default)
+
+    enabled = bool(d.get("enabled"))
+    mode = str(d.get("mode") or "").strip().lower() or "daily"
+    if mode not in ("hourly", "daily", "weekly", "monthly"):
+        mode = "daily"
+
+    # Back-compat keys.
+    at_time = str(d.get("at_time") or d.get("time") or default["at_time"])
+    hour_interval = int(d.get("hour_interval") or 0) if mode == "hourly" else default["hour_interval"]
+    weekday = str(d.get("weekday") or default["weekday"]).strip().lower()
+    monthday = int(d.get("monthday") or default["monthday"])
+    retention_count = int(d.get("retention_count") or d.get("retention") or 0)
+
+    # Validate/clamp.
+    if mode == "hourly":
+        hour_interval = max(1, min(24, int(hour_interval or 1)))
+    else:
+        hour_interval = default["hour_interval"]
+
+    try:
+        _parse_hhmm(at_time)
+    except HTTPException:
+        at_time = default["at_time"]
+
+    weekday = weekday if weekday in ("mon", "tue", "wed", "thu", "fri", "sat", "sun") else default["weekday"]
+    monthday = max(1, min(28, int(monthday or 1)))
+    retention_count = max(0, min(200, int(retention_count or 0)))
+
+    return {
+        "enabled": enabled,
+        "mode": mode,
+        "hour_interval": hour_interval,
+        "at_time": at_time,
+        "weekday": weekday,
+        "monthday": monthday,
+        "retention_count": retention_count,
+    }
 
 
 def _save_gdrive_schedule(cfg: dict) -> None:
@@ -333,14 +389,62 @@ def _parse_hhmm(value: str) -> tuple[int, int]:
     return int(m.group(1)), int(m.group(2))
 
 
-def _compute_next_run_iso(hhmm: str) -> str:
-    # Use container timezone (system) and return ISO with offset.
-    h, m = _parse_hhmm(hhmm)
-    now = datetime.now().astimezone()
-    candidate = now.replace(hour=h, minute=m, second=0, microsecond=0)
-    if candidate <= now:
-        candidate = candidate + timedelta(days=1)
-    return candidate.isoformat()
+def _compute_next_run_dt(cfg: dict, now: Optional[datetime] = None, last_run_epoch: Optional[int] = None) -> datetime:
+    """
+    Compute the next run datetime for the given normalized schedule config.
+    Uses container timezone (system).
+    """
+    now = now or datetime.now().astimezone()
+    mode = str(cfg.get("mode") or "daily").lower()
+
+    if mode == "hourly":
+        interval = max(1, min(24, int(cfg.get("hour_interval") or 1)))
+        if last_run_epoch:
+            try:
+                last_dt = datetime.fromtimestamp(int(last_run_epoch)).astimezone()
+                last_dt = last_dt.replace(minute=0, second=0, microsecond=0)
+                cand = last_dt + timedelta(hours=interval)
+                if cand > now:
+                    return cand
+            except Exception:
+                pass
+        next_hour = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        return next_hour
+
+    at_time = str(cfg.get("at_time") or "03:00")
+    h, m = _parse_hhmm(at_time)
+
+    if mode == "daily":
+        cand = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        if cand <= now:
+            cand = cand + timedelta(days=1)
+        return cand
+
+    if mode == "weekly":
+        weekday = str(cfg.get("weekday") or "mon").lower()
+        idx = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}.get(weekday, 0)
+        base = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        days_ahead = (idx - base.weekday()) % 7
+        cand = base + timedelta(days=days_ahead)
+        if cand <= now:
+            cand = cand + timedelta(days=7)
+        return cand
+
+    # monthly
+    monthday = max(1, min(28, int(cfg.get("monthday") or 1)))
+    cand = now.replace(day=monthday, hour=h, minute=m, second=0, microsecond=0)
+    if cand <= now:
+        y = cand.year
+        mo = cand.month + 1
+        if mo > 12:
+            y += 1
+            mo = 1
+        cand = cand.replace(year=y, month=mo, day=monthday)
+    return cand
+
+
+def _compute_next_run_iso_for_cfg(cfg: dict, last_run_epoch: Optional[int] = None) -> str:
+    return _compute_next_run_dt(cfg, last_run_epoch=last_run_epoch).isoformat()
 
 
 def _is_gdrive_connected(tokens: Optional[dict]) -> bool:
@@ -486,7 +590,8 @@ def _ensure_backup_folder(access_token: str) -> str:
 
 
 def _zip_config_dir() -> tuple[Path, str]:
-    filename = datetime.now().strftime("config-backup-%Y%m%d-%H%M%S.zip")
+    # Manual backup filename (auto backups use `config-auto-*`).
+    filename = datetime.now().strftime("config-manual-%Y%m%d-%H%M%S.zip")
     tmp = tempfile.NamedTemporaryFile(prefix="fep-gdrive-backup-", suffix=".zip", delete=False)
     tmp_path = Path(tmp.name)
     tmp.close()
@@ -619,7 +724,7 @@ def _run_auto_backup_once() -> dict:
     retention_cfg = _load_gdrive_schedule()
     try:
         uploaded = _upload_zip_to_drive(access, folder_id, zip_path, filename)
-        retention = _apply_auto_retention(access, folder_id, int(retention_cfg.get("retention") or 0))
+        retention = _apply_auto_retention(access, folder_id, int(retention_cfg.get("retention_count") or 0))
     finally:
         zip_path.unlink(missing_ok=True)
     return {"ok": True, "file": uploaded, "folder_id": folder_id, "retention": retention}
@@ -630,24 +735,19 @@ def _gdrive_schedule_loop():
     while not _gdrive_schedule_stop.is_set():
         cfg = _load_gdrive_schedule()
         enabled = bool(cfg.get("enabled"))
-        hhmm = str(cfg.get("time") or "03:00")
 
         if not enabled:
             _gdrive_schedule_wake.wait(timeout=30)
             _gdrive_schedule_wake.clear()
             continue
 
+        now = datetime.now().astimezone()
         try:
-            h, m = _parse_hhmm(hhmm)
+            target = _compute_next_run_dt(cfg, now=now, last_run_epoch=_gdrive_last_auto_run)
         except HTTPException:
             _gdrive_schedule_wake.wait(timeout=30)
             _gdrive_schedule_wake.clear()
             continue
-
-        now = datetime.now().astimezone()
-        target = now.replace(hour=h, minute=m, second=0, microsecond=0)
-        if target <= now:
-            target = target + timedelta(days=1)
         wait_s = max(1.0, (target - now).total_seconds())
         # Wake up early if config changes.
         _gdrive_schedule_wake.wait(timeout=min(wait_s, 60 * 60))
@@ -2830,8 +2930,7 @@ def gdrive_backup_manual():
 def gdrive_get_schedule():
     cfg = _load_gdrive_schedule()
     enabled = bool(cfg.get("enabled"))
-    hhmm = str(cfg.get("time") or "03:00")
-    next_run = _compute_next_run_iso(hhmm) if enabled else None
+    next_run = _compute_next_run_iso_for_cfg(cfg, last_run_epoch=_gdrive_last_auto_run) if enabled else None
     return {"ok": True, **cfg, "next_run": next_run}
 
 
@@ -2840,16 +2939,50 @@ def gdrive_put_schedule(body: dict):
     if not isinstance(body, dict):
         raise HTTPException(400, "Invalid JSON body")
     enabled = bool(body.get("enabled"))
-    hhmm = str(body.get("time") or "03:00")
-    _parse_hhmm(hhmm)  # validate
-    retention = int(body.get("retention") or 0)
-    retention = max(0, min(200, retention))
-    cfg = {"enabled": enabled, "time": hhmm, "retention": retention}
+    mode = str(body.get("mode") or "daily").strip().lower() or "daily"
+    if mode not in ("hourly", "daily", "weekly", "monthly"):
+        raise HTTPException(400, "Invalid schedule mode")
+
+    # Back-compat: accept legacy keys `time` and `retention`.
+    at_time = str(body.get("at_time") or body.get("time") or "03:00")
+    if mode != "hourly":
+        _parse_hhmm(at_time)  # validate
+
+    hour_interval = int(body.get("hour_interval") or 1)
+    if mode == "hourly":
+        hour_interval = max(1, min(24, hour_interval))
+    else:
+        hour_interval = 1
+
+    weekday = str(body.get("weekday") or "mon").strip().lower()
+    if mode == "weekly" and weekday not in ("mon", "tue", "wed", "thu", "fri", "sat", "sun"):
+        raise HTTPException(400, "Invalid weekday")
+    if mode != "weekly":
+        weekday = "mon"
+
+    monthday = int(body.get("monthday") or 1)
+    if mode == "monthly":
+        monthday = max(1, min(28, monthday))
+    else:
+        monthday = 1
+
+    retention_count = int(body.get("retention_count") or body.get("retention") or 0)
+    retention_count = max(0, min(200, retention_count))
+
+    cfg = {
+        "enabled": enabled,
+        "mode": mode,
+        "hour_interval": hour_interval,
+        "at_time": at_time,
+        "weekday": weekday,
+        "monthday": monthday,
+        "retention_count": retention_count,
+    }
     _save_gdrive_schedule(cfg)
     if enabled:
         _ensure_gdrive_scheduler_started()
     _gdrive_schedule_wake.set()
-    next_run = _compute_next_run_iso(hhmm) if enabled else None
+    next_run = _compute_next_run_iso_for_cfg(cfg, last_run_epoch=_gdrive_last_auto_run) if enabled else None
     return {"ok": True, **cfg, "next_run": next_run}
 
 
