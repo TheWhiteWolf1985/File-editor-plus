@@ -166,7 +166,7 @@ Obiettivo: sistemare 2 voci menu:
 
 ## STEP 003 — Save As: backend support (se manca) per write con overwrite controllato
 
-- Status: TODO
+- Status: DONE
 - Goal: garantire una primitive BE per “write file atomico” con:
   - safe_path
   - overwrite controllato
@@ -194,6 +194,16 @@ Obiettivo: sistemare 2 voci menu:
 
 - Commit message:
   - `fix(backend): support save-as via atomic write with overwrite control`
+
+- What changed:
+  - Backend: `PUT /api/file?create_only=1` ora ritorna `409` quando il file esiste (conflitto distinguibile dal FE).
+
+- Files touched:
+  - `file_editor_plus/backend/app.py`
+  - `AI/AI_TASKS.md`
+
+- Commands run:
+  - `cd file_editor_plus/backend && (python -m pytest -q || true)` (nota: `python` non presente nell'ambiente host; comando ha fallback `|| true`)
 
 ---
 

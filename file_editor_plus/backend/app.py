@@ -1824,7 +1824,7 @@ async def write_file(request: Request, path: str, create_only: bool = False):
         text = ""
 
     if create_only and f.exists():
-        raise HTTPException(400, "File already exists")
+        raise HTTPException(409, "File already exists")
 
     # backup prima di scrivere (solo se esiste)
     bak = make_backup(f)
