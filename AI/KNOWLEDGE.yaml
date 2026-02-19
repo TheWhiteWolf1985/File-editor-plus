@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-19T08:49:59Z"
+  updated_at: "2026-02-19T08:51:30Z"
 
 commands:
   frontend_build:
@@ -97,6 +97,18 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "SAVEAS_CLOUD-STEP-004"
+    summary: "Decisione credenziali Google Drive: usare add-on options (`gdrive_client_id`) invece di Application Credentials."
+    files:
+      - "file_editor_plus/config.yaml"
+      - "AI/DECISIONS.md"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "find . -maxdepth 3 -type d -name \"custom_components\" -o -name \"homeassistant\""
+      - "rg -n -S \"application_credentials\" ."
+    notes: "ADR 006: il repo non contiene `custom_components/`, quindi nessun wiring nativo ad Application Credentials."
+
   - step_id: "SAVEAS_CLOUD-STEP-003"
     summary: "Backend: reso distinguibile il conflitto create-only per Save As (HTTP 409 su file gia' esistente)."
     files:

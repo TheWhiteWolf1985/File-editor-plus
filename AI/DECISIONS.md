@@ -62,3 +62,15 @@ Source of truth:
 - Consequences:
   - Test ripetibili senza modificare l'ambiente host.
 
+## ADR 006 — Credenziali Google Drive via add-on options (no Application Credentials)
+- Date: 2026-02-19
+- Context:
+  - Nel repository non esiste una integrazione Home Assistant (`custom_components/`) collegata all'add-on.
+  - La feature Cloud Backup richiede un `client_id` OAuth per Device Authorization Flow.
+- Decision:
+  - Usare **add-on options** per configurare `gdrive_client_id` (in `file_editor_plus/config.yaml`), senza dipendere da `application_credentials`.
+- Alternatives:
+  - Implementare un custom component HA e usare `application_credentials`.
+- Consequences:
+  - Setup piu' manuale per l'utente (inserimento client id nelle opzioni add-on).
+  - Nessuna dipendenza da componenti HA esterni; implementazione confinata all'add-on.

@@ -25,5 +25,8 @@ panel_icon: "mdi:file-document-edit-outline"
 map:
   - config:rw
 
-options: {}
-schema: {}
+options:
+  gdrive_client_id: ""
+
+schema:
+  gdrive_client_id: str

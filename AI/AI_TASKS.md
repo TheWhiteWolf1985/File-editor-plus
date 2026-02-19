@@ -209,7 +209,7 @@ Obiettivo: sistemare 2 voci menu:
 
 ## STEP 004 — Cloud Backup: decisione su Application Credentials (HA) e fallback add-on options
 
-- Status: TODO
+- Status: DONE
 - Goal: rispettare la preferenza “Application Credentials”, ma senza inventarsi magia.
 - Procedure:
   1. Verificare se nel repo esiste già una **integrazione HA** (custom_component) collegata all’add-on.
@@ -235,6 +235,22 @@ Obiettivo: sistemare 2 voci menu:
 
 - Commit message:
   - `chore(cloud): decide oauth credential source (ha vs addon options)`
+
+- What changed:
+  - Decisione: nessuna integrazione HA presente -> credenziali via add-on options (vedi `ADR 006`).
+  - Implementato placeholder opzione `gdrive_client_id` in `file_editor_plus/config.yaml` (options+schema).
+
+- Files touched:
+  - `file_editor_plus/config.yaml`
+  - `AI/DECISIONS.md`
+  - `AI/AI_TASKS.md`
+
+- Commands run:
+  - `ls -la`
+  - `find . -maxdepth 3 -type d -name "custom_components" -o -name "homeassistant"`
+  - `rg -n -S "application_credentials" .`
+  - `rg -n -S "options" file_editor_plus -S`
+  - `rg -n -S "config.yaml|schema.yaml|options.yaml" .`
 
 ---
 
