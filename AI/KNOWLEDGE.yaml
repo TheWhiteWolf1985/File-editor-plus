@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-19T09:03:04Z"
+  updated_at: "2026-02-19T09:07:10Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,24 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "SAVEAS_CLOUD-STEP-007"
+    summary: "Frontend: aggiunta UI Google Drive Backup (device auth + manual backup + schedule settings) e wiring `Backup -> Cloud`."
+    files:
+      - "file_editor_plus/frontend/src/app-root.ts"
+      - "file_editor_plus/frontend/src/services/api.ts"
+      - "file_editor_plus/frontend/src/i18n/it.json"
+      - "file_editor_plus/frontend/src/i18n/en.json"
+      - "file_editor_plus/frontend/src/i18n/fr.json"
+      - "file_editor_plus/frontend/src/i18n/es.json"
+      - "file_editor_plus/frontend/src/i18n/de.json"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm ci"
+      - "cd file_editor_plus/frontend && npm run -s typecheck"
+      - "cd file_editor_plus/frontend && npm run -s build"
+    notes: "La voce `Backup -> Cloud` non e' piu' disabled; il modal gestisce connect/polling (backend thread) e schedule via `/api/cloud/gdrive/schedule`."
+
   - step_id: "SAVEAS_CLOUD-STEP-006"
     summary: "Cloud scheduler: schedule (GET/PUT) + worker thread + retention solo per backup automatici."
     files:

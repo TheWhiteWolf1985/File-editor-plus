@@ -272,3 +272,45 @@ export const apiMovePath = (apiBase: string, src: string, dstDir: string, mode: 
     body: JSON.stringify({ src, dst_dir: dstDir, mode }),
   });
 };
+
+export const apiGdriveStatus = (apiBase: string) => {
+  const url = `${apiBase}api/cloud/gdrive/status`;
+  return fetch(url);
+};
+
+export const apiGdriveDeviceStart = (apiBase: string) => {
+  const url = `${apiBase}api/cloud/gdrive/device/start`;
+  return fetch(url, { method: "POST", headers: jsonHeaders });
+};
+
+export const apiGdriveDeviceCancel = (apiBase: string) => {
+  const url = `${apiBase}api/cloud/gdrive/device/cancel`;
+  return fetch(url, { method: "POST", headers: jsonHeaders });
+};
+
+export const apiGdriveDisconnect = (apiBase: string) => {
+  const url = `${apiBase}api/cloud/gdrive/disconnect`;
+  return fetch(url, { method: "POST", headers: jsonHeaders });
+};
+
+export const apiGdriveBackup = (apiBase: string) => {
+  const url = `${apiBase}api/cloud/gdrive/backup`;
+  return fetch(url, { method: "POST", headers: jsonHeaders });
+};
+
+export const apiGdriveGetSchedule = (apiBase: string) => {
+  const url = `${apiBase}api/cloud/gdrive/schedule`;
+  return fetch(url);
+};
+
+export const apiGdrivePutSchedule = (
+  apiBase: string,
+  payload: { enabled: boolean; time: string; retention: number }
+) => {
+  const url = `${apiBase}api/cloud/gdrive/schedule`;
+  return fetch(url, {
+    method: "PUT",
+    headers: jsonHeaders,
+    body: JSON.stringify(payload),
+  });
+};

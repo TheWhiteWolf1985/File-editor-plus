@@ -353,7 +353,7 @@ Obiettivo: sistemare 2 voci menu:
 
 ## STEP 007 — Cloud Backup: UI (connect, manual backup, schedule settings)
 
-- Status: TODO
+- Status: DONE
 - Goal: rendere operativa la voce menu `Backup → Cloud`.
 - UI richieste:
   - Schermata/modale "Google Drive Backup":
@@ -382,6 +382,25 @@ Obiettivo: sistemare 2 voci menu:
 
 - Commit message:
   - `feat(ui): google drive backup screen (device auth + schedule)`
+
+- What changed:
+  - UI: abilitato `Backup -> Cloud` e aggiunto modal "Google Drive Backup" (connect device flow, backup ora, schedule enable/time/retention, disconnect).
+  - FE: aggiunti wrapper API per `/api/cloud/gdrive/*` e wiring lato `app-root.ts`.
+
+- Files touched:
+  - `file_editor_plus/frontend/src/app-root.ts`
+  - `file_editor_plus/frontend/src/services/api.ts`
+  - `file_editor_plus/frontend/src/i18n/it.json`
+  - `file_editor_plus/frontend/src/i18n/en.json`
+  - `file_editor_plus/frontend/src/i18n/fr.json`
+  - `file_editor_plus/frontend/src/i18n/es.json`
+  - `file_editor_plus/frontend/src/i18n/de.json`
+  - `AI/AI_TASKS.md`
+
+- Commands run:
+  - `cd file_editor_plus/frontend && npm ci`
+  - `cd file_editor_plus/frontend && npm run -s typecheck`
+  - `cd file_editor_plus/frontend && npm run -s build`
 
 ---
 

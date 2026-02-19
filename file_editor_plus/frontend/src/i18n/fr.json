@@ -355,7 +355,7 @@
     "network_loading": "Sauvegarde réseau...",
     "network_desc": "Enregistrez le zip avec la fenêtre système (si pris en charge).",
     "cloud": "Sauvegarde dans le cloud",
-    "cloud_coming_soon_desc": "Bientôt disponible."
+    "cloud_coming_soon_desc": "Sauvegarde ZIP de /config sur Google Drive (Device Flow)."
   },
   "utility": {
     "generating": "Génération...",

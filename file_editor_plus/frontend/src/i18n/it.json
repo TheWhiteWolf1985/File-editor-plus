@@ -355,7 +355,7 @@
     "network_loading": "Backup in rete...",
     "network_desc": "Salva lo zip con la finestra di sistema (se supportata).",
     "cloud": "Backup su cloud",
-    "cloud_coming_soon_desc": "Disponibile a breve."
+    "cloud_coming_soon_desc": "Backup ZIP di /config su Google Drive (Device Flow)."
   },
   "utility": {
     "generating": "Generazione...",
