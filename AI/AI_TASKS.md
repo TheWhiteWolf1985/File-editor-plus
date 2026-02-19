@@ -256,7 +256,7 @@ Obiettivo: sistemare 2 voci menu:
 
 ## STEP 005 — Cloud Backup: backend Google Drive (Device Flow + upload zip)
 
-- Status: TODO
+- Status: DONE
 - Goal: BE espone API per auth/status/backup/schedule e carica ZIP su Drive.
 - Storage (proposta standard):
   - tokens + config in `/data/gdrive/` (es. `tokens.json`, `config.json`)
@@ -298,6 +298,19 @@ Obiettivo: sistemare 2 voci menu:
 
 - Commit message:
   - `feat(cloud): google drive device auth and zip backup upload`
+
+- What changed:
+  - Backend: aggiunti endpoint Google Drive (Device Flow + backup manuale ZIP) sotto `/api/cloud/gdrive/*`.
+  - Token/metadata persistiti sotto `/data/gdrive/` (tokens + folder id).
+
+- Files touched:
+  - `file_editor_plus/backend/app.py`
+  - `AI/AI_TASKS.md`
+
+- Commands run:
+  - `cd file_editor_plus/backend && (test -f requirements.txt && sed -n '1,200p' requirements.txt || true)`
+  - `cd file_editor_plus/backend && (python -m pytest -q || true)` (nota: `python` non presente nell'ambiente host; comando ha fallback `|| true`)
+  - `cd file_editor_plus/frontend && npm ci && npm run -s build`
 
 ---
 

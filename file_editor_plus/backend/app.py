@@ -13,6 +13,7 @@ import socket
 import platform
 import hashlib
 import mimetypes
+import threading
 from logging.handlers import RotatingFileHandler
 import tempfile
 import zipfile
@@ -235,6 +236,366 @@ def next_available_name(path: Path) -> Path:
             return candidate
         i += 1
 
+
+#
+# Google Drive Cloud Backup (Device Flow + zip upload)
+#
+GDRIVE_DIR = Path("/data/gdrive")
+GDRIVE_TOKENS_FILE = GDRIVE_DIR / "tokens.json"
+GDRIVE_CONFIG_FILE = GDRIVE_DIR / "config.json"
+
+_gdrive_lock = threading.Lock()
+_gdrive_device_state: Optional[dict] = None
+_gdrive_device_stop: Optional[threading.Event] = None
+
+
+def _load_addon_options() -> dict:
+    # Home Assistant add-on options are typically available at /data/options.json.
+    p = Path("/data/options.json")
+    if not p.exists():
+        return {}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _get_gdrive_client_id() -> Optional[str]:
+    opts = _load_addon_options()
+    cid = (opts.get("gdrive_client_id") or "").strip() if isinstance(opts, dict) else ""
+    return cid or None
+
+
+def _load_gdrive_tokens() -> Optional[dict]:
+    if not GDRIVE_TOKENS_FILE.exists():
+        return None
+    try:
+        return json.loads(GDRIVE_TOKENS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _save_gdrive_tokens(tokens: dict) -> None:
+    GDRIVE_DIR.mkdir(parents=True, exist_ok=True)
+    atomic_write(GDRIVE_TOKENS_FILE, json.dumps(tokens, ensure_ascii=False, indent=2))
+
+
+def _clear_gdrive_tokens() -> None:
+    try:
+        GDRIVE_TOKENS_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _load_gdrive_config() -> dict:
+    if not GDRIVE_CONFIG_FILE.exists():
+        return {}
+    try:
+        return json.loads(GDRIVE_CONFIG_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _save_gdrive_config(cfg: dict) -> None:
+    GDRIVE_DIR.mkdir(parents=True, exist_ok=True)
+    atomic_write(GDRIVE_CONFIG_FILE, json.dumps(cfg, ensure_ascii=False, indent=2))
+
+
+def _is_gdrive_connected(tokens: Optional[dict]) -> bool:
+    if not tokens or not isinstance(tokens, dict):
+        return False
+    return bool(tokens.get("refresh_token"))
+
+
+def _oauth_post_form(url: str, data: dict, timeout: float = 20.0) -> dict:
+    # Uses httpx (already in requirements). Never logs tokens/secrets.
+    try:
+        resp = httpx.post(url, data=data, timeout=timeout)
+    except Exception as e:
+        raise HTTPException(503, f"Google OAuth request failed: {e}")
+    text = resp.text or ""
+    try:
+        payload = resp.json()
+    except Exception:
+        payload = {"raw": text}
+    if resp.status_code >= 400:
+        err = payload.get("error") if isinstance(payload, dict) else None
+        desc = payload.get("error_description") if isinstance(payload, dict) else None
+        msg = desc or err or f"HTTP {resp.status_code}"
+        raise HTTPException(502, f"Google OAuth error: {msg}")
+    if not isinstance(payload, dict):
+        raise HTTPException(502, "Google OAuth invalid response")
+    return payload
+
+
+def _refresh_access_token(client_id: str, refresh_token: str) -> dict:
+    payload = _oauth_post_form(
+        "https://oauth2.googleapis.com/token",
+        {
+            "client_id": client_id,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+        },
+    )
+    access = payload.get("access_token")
+    expires_in = payload.get("expires_in") or 3600
+    if not access:
+        raise HTTPException(502, "Google token refresh failed")
+    now = int(time.time())
+    return {"access_token": access, "expires_at": now + int(expires_in)}
+
+
+def _get_access_token_or_503() -> str:
+    cid = _get_gdrive_client_id()
+    if not cid:
+        raise HTTPException(503, "Google Drive non configurato: manca gdrive_client_id nelle opzioni add-on")
+    tokens = _load_gdrive_tokens()
+    if not _is_gdrive_connected(tokens):
+        raise HTTPException(401, "Google Drive non connesso")
+
+    now = int(time.time())
+    access = (tokens or {}).get("access_token")
+    expires_at = int((tokens or {}).get("expires_at") or 0)
+    if access and expires_at > now + 30:
+        return str(access)
+
+    refreshed = _refresh_access_token(cid, str(tokens["refresh_token"]))
+    tokens = dict(tokens or {})
+    tokens.update(refreshed)
+    _save_gdrive_tokens(tokens)
+    return str(tokens["access_token"])
+
+
+def _drive_request(
+    method: str,
+    url: str,
+    access_token: str,
+    *,
+    params: Optional[dict] = None,
+    json_body: Optional[dict] = None,
+    content=None,
+    headers: Optional[dict] = None,
+) -> dict:
+    req_headers = {"Authorization": f"Bearer {access_token}"}
+    if headers:
+        req_headers.update(headers)
+    try:
+        resp = httpx.request(
+            method,
+            url,
+            params=params,
+            json=json_body,
+            content=content,
+            headers=req_headers,
+            timeout=60.0,
+        )
+    except Exception as e:
+        raise HTTPException(503, f"Google Drive request failed: {e}")
+    text = resp.text or ""
+    try:
+        payload = resp.json() if text else {}
+    except Exception:
+        payload = {"raw": text}
+    if resp.status_code >= 400:
+        msg = None
+        if isinstance(payload, dict):
+            err = payload.get("error")
+            if isinstance(err, dict):
+                msg = err.get("message")
+            elif isinstance(err, str):
+                msg = err
+        raise HTTPException(502, f"Google Drive error: {msg or 'HTTP ' + str(resp.status_code)}")
+    if not isinstance(payload, dict):
+        raise HTTPException(502, "Google Drive invalid response")
+    return payload
+
+
+def _ensure_backup_folder(access_token: str) -> str:
+    cfg = _load_gdrive_config()
+    folder_id = (cfg.get("folder_id") or "").strip() if isinstance(cfg, dict) else ""
+    if folder_id:
+        return folder_id
+
+    name = "File Editor Plus Backups"
+    q = f"mimeType='application/vnd.google-apps.folder' and name='{name}' and trashed=false"
+    res = _drive_request(
+        "GET",
+        "https://www.googleapis.com/drive/v3/files",
+        access_token,
+        params={"q": q, "fields": "files(id,name)"},
+    )
+    files = res.get("files") if isinstance(res, dict) else None
+    if isinstance(files, list) and files:
+        folder_id = str(files[0].get("id") or "")
+    if not folder_id:
+        created = _drive_request(
+            "POST",
+            "https://www.googleapis.com/drive/v3/files",
+            access_token,
+            json_body={"name": name, "mimeType": "application/vnd.google-apps.folder"},
+        )
+        folder_id = str(created.get("id") or "")
+    if not folder_id:
+        raise HTTPException(502, "Impossibile creare/riusare cartella Google Drive")
+    cfg = dict(cfg or {})
+    cfg["folder_id"] = folder_id
+    _save_gdrive_config(cfg)
+    return folder_id
+
+
+def _zip_config_dir() -> tuple[Path, str]:
+    filename = datetime.now().strftime("config-backup-%Y%m%d-%H%M%S.zip")
+    tmp = tempfile.NamedTemporaryFile(prefix="fep-gdrive-backup-", suffix=".zip", delete=False)
+    tmp_path = Path(tmp.name)
+    tmp.close()
+    try:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, dirs, files in os.walk(BASE_DIR):
+                dirs[:] = [d for d in dirs if not Path(root, d).is_symlink()]
+                for name in files:
+                    full = Path(root) / name
+                    if full.is_symlink():
+                        continue
+                    try:
+                        rel = full.resolve().relative_to(BASE_DIR).as_posix()
+                    except Exception:
+                        continue
+                    zf.write(full, rel)
+    except Exception as e:
+        tmp_path.unlink(missing_ok=True)
+        raise HTTPException(500, f"Backup failed: {e}")
+    return tmp_path, filename
+
+
+def _upload_zip_to_drive(access_token: str, folder_id: str, zip_path: Path, filename: str) -> dict:
+    boundary = f"fepboundary{uuid.uuid4().hex}"
+    meta = json.dumps({"name": filename, "parents": [folder_id]}, ensure_ascii=False)
+    pre = (
+        f"--{boundary}\r\n"
+        "Content-Type: application/json; charset=UTF-8\r\n\r\n"
+        f"{meta}\r\n"
+        f"--{boundary}\r\n"
+        "Content-Type: application/zip\r\n\r\n"
+    ).encode("utf-8")
+    post = f"\r\n--{boundary}--\r\n".encode("utf-8")
+
+    def gen():
+        yield pre
+        with open(zip_path, "rb") as f:
+            while True:
+                chunk = f.read(1024 * 1024)
+                if not chunk:
+                    break
+                yield chunk
+        yield post
+
+    return _drive_request(
+        "POST",
+        "https://www.googleapis.com/upload/drive/v3/files",
+        access_token,
+        params={"uploadType": "multipart", "fields": "id,name,size,createdTime"},
+        content=gen(),
+        headers={"Content-Type": f"multipart/related; boundary={boundary}"},
+    )
+
+
+def _stop_device_flow_locked():
+    global _gdrive_device_state, _gdrive_device_stop
+    if _gdrive_device_stop:
+        _gdrive_device_stop.set()
+    _gdrive_device_state = None
+    _gdrive_device_stop = None
+
+
+def _device_flow_poll_loop(client_id: str, device_code: str, interval: int, expires_at: int, stop_event: threading.Event):
+    global _gdrive_device_state
+    next_sleep = max(1, int(interval))
+    while True:
+        if stop_event.is_set():
+            return
+        if int(time.time()) >= int(expires_at):
+            with _gdrive_lock:
+                if _gdrive_device_state:
+                    _gdrive_device_state["status"] = "expired"
+            return
+        time.sleep(next_sleep)
+        if stop_event.is_set():
+            return
+
+        try:
+            resp = httpx.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "client_id": client_id,
+                    "device_code": device_code,
+                    "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                },
+                timeout=20.0,
+            )
+        except Exception as e:
+            with _gdrive_lock:
+                if _gdrive_device_state:
+                    _gdrive_device_state["status"] = "error"
+                    _gdrive_device_state["error"] = f"network: {e}"
+            return
+
+        try:
+            payload = resp.json()
+        except Exception:
+            payload = {}
+
+        if resp.status_code == 200 and isinstance(payload, dict) and payload.get("access_token"):
+            refresh_token = payload.get("refresh_token")
+            if not refresh_token:
+                with _gdrive_lock:
+                    if _gdrive_device_state:
+                        _gdrive_device_state["status"] = "error"
+                        _gdrive_device_state["error"] = "missing refresh_token"
+                return
+            now = int(time.time())
+            expires_in = int(payload.get("expires_in") or 3600)
+            tokens = {
+                "refresh_token": refresh_token,
+                "access_token": payload.get("access_token"),
+                "expires_at": now + expires_in,
+                "token_type": payload.get("token_type") or "Bearer",
+                "scope": payload.get("scope") or "drive.file",
+            }
+            try:
+                _save_gdrive_tokens(tokens)
+            except Exception:
+                with _gdrive_lock:
+                    if _gdrive_device_state:
+                        _gdrive_device_state["status"] = "error"
+                        _gdrive_device_state["error"] = "cannot persist tokens"
+                return
+            with _gdrive_lock:
+                if _gdrive_device_state:
+                    _gdrive_device_state["status"] = "connected"
+            return
+
+        if isinstance(payload, dict):
+            err = payload.get("error")
+            if err in ("authorization_pending", "slow_down"):
+                if err == "slow_down":
+                    next_sleep = min(30, next_sleep + 2)
+                    with _gdrive_lock:
+                        if _gdrive_device_state:
+                            _gdrive_device_state["status"] = "slow_down"
+                            _gdrive_device_state["interval"] = next_sleep
+                continue
+            if err in ("access_denied", "expired_token"):
+                with _gdrive_lock:
+                    if _gdrive_device_state:
+                        _gdrive_device_state["status"] = "error"
+                        _gdrive_device_state["error"] = str(err)
+                return
+
+        with _gdrive_lock:
+            if _gdrive_device_state:
+                _gdrive_device_state["status"] = "error"
+                _gdrive_device_state["error"] = f"http_{resp.status_code}"
+        return
 
 def _match_globs(rel_path: Path, globs: Optional[List[str]]) -> bool:
     if not globs:
@@ -2184,6 +2545,99 @@ async def diff_endpoint(body: dict):
     except Exception as e:
         raise HTTPException(422, detail={"message": str(e)})
     return {"ok": True, **diff}
+
+
+@app.get("/api/cloud/gdrive/status")
+def gdrive_status():
+    cid = _get_gdrive_client_id()
+    tokens = _load_gdrive_tokens()
+    with _gdrive_lock:
+        state = dict(_gdrive_device_state) if _gdrive_device_state else None
+    return {
+        "ok": True,
+        "configured": bool(cid),
+        "connected": _is_gdrive_connected(tokens),
+        "device_flow": state,
+    }
+
+
+@app.post("/api/cloud/gdrive/device/start")
+def gdrive_device_start():
+    cid = _get_gdrive_client_id()
+    if not cid:
+        raise HTTPException(503, "Manca gdrive_client_id nelle opzioni add-on")
+
+    with _gdrive_lock:
+        if _gdrive_device_state and _gdrive_device_state.get("status") in ("pending", "slow_down"):
+            return {"ok": True, **_gdrive_device_state}
+
+    payload = _oauth_post_form(
+        "https://oauth2.googleapis.com/device/code",
+        {"client_id": cid, "scope": "https://www.googleapis.com/auth/drive.file"},
+    )
+    device_code = payload.get("device_code")
+    user_code = payload.get("user_code")
+    verification_url = payload.get("verification_url") or payload.get("verification_uri")
+    expires_in = int(payload.get("expires_in") or 900)
+    interval = int(payload.get("interval") or 5)
+    if not device_code or not user_code or not verification_url:
+        raise HTTPException(502, "Google device flow response incomplete")
+
+    expires_at = int(time.time()) + expires_in
+    state = {
+        "status": "pending",
+        "user_code": user_code,
+        "verification_url": verification_url,
+        "expires_at": expires_at,
+        "interval": interval,
+    }
+
+    stop_event = threading.Event()
+    thread = threading.Thread(
+        target=_device_flow_poll_loop,
+        args=(cid, str(device_code), interval, expires_at, stop_event),
+        daemon=True,
+        name="gdrive-device-flow",
+    )
+    with _gdrive_lock:
+        global _gdrive_device_state, _gdrive_device_stop
+        _gdrive_device_state = state
+        _gdrive_device_stop = stop_event
+    thread.start()
+    return {"ok": True, **state}
+
+
+@app.post("/api/cloud/gdrive/device/cancel")
+def gdrive_device_cancel():
+    with _gdrive_lock:
+        if _gdrive_device_stop:
+            _gdrive_device_stop.set()
+        _stop_device_flow_locked()
+    return {"ok": True}
+
+
+@app.post("/api/cloud/gdrive/disconnect")
+def gdrive_disconnect():
+    with _gdrive_lock:
+        _stop_device_flow_locked()
+    _clear_gdrive_tokens()
+    try:
+        GDRIVE_CONFIG_FILE.unlink(missing_ok=True)
+    except Exception:
+        pass
+    return {"ok": True}
+
+
+@app.post("/api/cloud/gdrive/backup")
+def gdrive_backup_manual():
+    access = _get_access_token_or_503()
+    folder_id = _ensure_backup_folder(access)
+    zip_path, filename = _zip_config_dir()
+    try:
+        uploaded = _upload_zip_to_drive(access, folder_id, zip_path, filename)
+    finally:
+        zip_path.unlink(missing_ok=True)
+    return {"ok": True, "file": uploaded, "folder_id": folder_id}
 
 
 # ---- Frontend (Ingress friendly): serve static + SPA fallback

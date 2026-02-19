@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-19T08:51:30Z"
+  updated_at: "2026-02-19T08:58:24Z"
 
 commands:
   frontend_build:
@@ -37,7 +37,13 @@ entities:
     type: "service"
     name: "FastAPI backend"
     path: "file_editor_plus/backend/app.py"
-    notes: "Serve API FS + proxy HA; runtime uvicorn su 0.0.0.0:8099 via s6."
+    notes: "Serve API FS + proxy HA + cloud (Google Drive); runtime uvicorn su 0.0.0.0:8099 via s6."
+
+  - id: "backend:gdrive"
+    type: "module"
+    name: "Google Drive Cloud Backup"
+    path: "file_editor_plus/backend/app.py"
+    notes: "Device Flow + upload ZIP di /config su Drive; storage `/data/gdrive/*`; endpoints `/api/cloud/gdrive/*`."
 
   - id: "backend:s6-run"
     type: "runtime"
@@ -92,11 +98,26 @@ relations:
     type: "serves"
     to: "docs:user"
 
+  - from: "backend:api"
+    type: "implements"
+    to: "backend:gdrive"
+
   - from: "frontend:app"
     type: "uses"
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "SAVEAS_CLOUD-STEP-005"
+    summary: "Backend Google Drive: Device Authorization Flow + backup manuale ZIP di /config con upload in cartella fissa."
+    files:
+      - "file_editor_plus/backend/app.py"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/backend && (python -m pytest -q || true)"
+      - "cd file_editor_plus/frontend && npm ci && npm run -s build"
+    notes: "Nuovi endpoint: GET status, POST device/start|cancel|disconnect, POST backup. Token persistiti in `/data/gdrive/tokens.json`."
+
   - step_id: "SAVEAS_CLOUD-STEP-004"
     summary: "Decisione credenziali Google Drive: usare add-on options (`gdrive_client_id`) invece di Application Credentials."
     files:
