@@ -321,7 +321,7 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 ## STEP 009 - Smoke checklist post-fix
 
-- Status: TODO
+- Status: DONE
 - Goal: Verificare i flussi minimi dell’addon dopo la fix.
 - Scope:
   - `SMOKE.md` (se presente) o `AI/CHECKLISTS/SMOKE.md`
@@ -338,6 +338,22 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 - Commit message:
   - `chore(qa): complete smoke checks for rollup musl fix`
+
+- What changed:
+  - Eseguito build frontend (`npm ci && npm run build`) e test backend (`unittest` via Docker).
+  - Eseguito rebuild + restart dell'add-on `local_file_editor_plus` e verificato boot in log (uvicorn up).
+  - Compilata la checklist in `AI/CHECKLISTS/SMOKE.md` con N/A motivati per test manuali UI.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/CHECKLISTS/SMOKE.md`
+
+- Commands run:
+  - `cd file_editor_plus/frontend && npm ci && npm run build`
+  - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
+  - `docker exec hassio_cli ha apps rebuild local_file_editor_plus`
+  - `docker exec hassio_cli ha apps restart local_file_editor_plus`
+  - `docker logs --tail 80 addon_local_file_editor_plus`
 
 ---
 

@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T12:15:03Z"
+  updated_at: "2026-02-21T12:18:55Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,20 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ROLLUP_MUSL-STEP-009"
+    summary: "Smoke post-fix completato: FE build OK, BE unit tests OK, add-on rebuild+restart OK."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/CHECKLISTS/SMOKE.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm ci && npm run build"
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+      - "docker exec hassio_cli ha apps rebuild local_file_editor_plus"
+      - "docker exec hassio_cli ha apps restart local_file_editor_plus"
+      - "docker logs --tail 80 addon_local_file_editor_plus"
+    notes: "UI manuale in Ingress non eseguita in questo step (N/A)."
+
   - step_id: "ROLLUP_MUSL-STEP-008"
     summary: "Decision log: registrato ADR per fallback build FE arm64 (musl -> glibc) e workaround lockfile/npm install."
     files:
