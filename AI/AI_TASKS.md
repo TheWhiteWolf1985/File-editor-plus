@@ -114,7 +114,7 @@ Applicare 3 miglioramenti alla decisione ADR 007:
 
 ### STEP 003 - Verifica rapida e aggiornamento audit
 
-- Status: TODO
+- Status: DONE
 - Goal: Confermare che i cambiamenti non rompono la build e aggiornare evidenze.
 - Scope:
   - Build arm64 (add-on builder/CI) + eventuale amd64
@@ -136,3 +136,16 @@ Applicare 3 miglioramenti alla decisione ADR 007:
 
 - Commit message:
   - `chore(ci): verify ADR007 mitigations on arm64 build`
+
+- What changed:
+  - Eseguita build arm64 del solo stage FE con `--no-cache --pull` per validare le mitigazioni ADR007.
+  - Verificato in log che vengono stampate le versioni `node -v` e `npm -v` durante la build FE.
+  - Aggiornato `AI/CONTEXT/issue_17_rollup_musl.md` con comando e snippet log di verifica.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/CONTEXT/issue_17_rollup_musl.md`
+
+- Commands run:
+  - `docker pull --platform linux/arm64 node:20-bookworm-slim`
+  - `docker build --no-cache --pull --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus`

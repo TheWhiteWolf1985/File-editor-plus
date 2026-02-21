@@ -90,6 +90,26 @@ docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile f
 # esito: SUCCESS (vite build completa)
 ```
 
+## Verifica mitigazioni ADR007 (2026-02-21)
+Comando eseguito:
+```sh
+docker pull --platform linux/arm64 node:20-bookworm-slim
+docker build --no-cache --pull --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus
+```
+
+Estratto log rilevante:
+```text
+Step 5/9 : RUN node -v && npm -v
+v20.20.0
+10.8.2
+...
+Step 9/9 : RUN npm run build
+vite v6.4.1 building for production...
+...
+✓ built in 39.41s
+Successfully built 20930d3d8685
+```
+
 ## Backlog (separato): warning Dockerfile `BUILD_FROM`
 Durante i rebuild in Supervisor puo' comparire un warning tipo:\n
 - `InvalidDefaultArgInFrom: Default value for ARG ${BUILD_FROM} results in empty or invalid base image name`\n

@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T18:15:15Z"
+  updated_at: "2026-02-21T18:19:24Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,17 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ADR007-IMPROVEMENTS-STEP-003"
+    summary: "Verifica arm64 completata dopo mitigazioni ADR007: build FE OK con evidenza log versioni Node/npm."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/CONTEXT/issue_17_rollup_musl.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker pull --platform linux/arm64 node:20-bookworm-slim"
+      - "docker build --no-cache --pull --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus"
+    notes: "Prima prova con builder legacy aveva platform mismatch cache; verifica valida eseguita con pull esplicito + no-cache."
+
   - step_id: "ADR007-IMPROVEMENTS-STEP-002"
     summary: "Stage FE hardening: aggiunti `--no-audit --no-fund` e logging versioni Node/npm; contesto aggiornato con versioni di riferimento."
     files:
