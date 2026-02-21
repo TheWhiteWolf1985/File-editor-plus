@@ -67,7 +67,7 @@ Applicare 3 miglioramenti alla decisione ADR 007:
 
 ### STEP 002 - Dockerfile stage FE: aggiungere flag npm e tracciare versione Node/npm
 
-- Status: TODO
+- Status: DONE
 - Goal: Ridurre non-determinismo “pratico” e rumore (audit/fund) e aumentare riproducibilità (versioni).
 - Scope:
   - `file_editor_plus/Dockerfile`
@@ -95,6 +95,20 @@ Applicare 3 miglioramenti alla decisione ADR 007:
 
 - Commit message:
   - `chore(build): add npm install flags and log node/npm versions in FE stage`
+
+- What changed:
+  - Aggiornato stage FE in `file_editor_plus/Dockerfile` con log diagnostico versioni (`RUN node -v && npm -v`).
+  - Aggiornato comando install FE in `file_editor_plus/Dockerfile` con flag `--no-audit --no-fund` mantenendo `--include=optional`.
+  - Aggiornato `AI/CONTEXT/issue_17_rollup_musl.md` con versioni Node/npm della build di riferimento.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/Dockerfile`
+  - `AI/CONTEXT/issue_17_rollup_musl.md`
+
+- Commands run:
+  - `git diff`
+  - `docker run --rm node:20-bookworm-slim sh -lc 'node -v && npm -v'`
 
 ---
 

@@ -78,6 +78,12 @@ docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile f
 ## Workaround efficace (trovato)
 Il workaround che rende la build arm64 verde e' evitare `npm ci` con il lockfile (che triggera il bug sulle optional deps) e usare invece `npm install` **dopo** aver rimosso `package-lock.json` nello stage FE.
 
+Versioni di riferimento stage FE (Debian slim):
+```text
+node: v20.20.0
+npm: 10.8.2
+```
+
 Evidenza (build stage FE arm64 OK):
 ```sh
 docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus

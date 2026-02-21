@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T18:14:25Z"
+  updated_at: "2026-02-21T18:15:15Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,18 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ADR007-IMPROVEMENTS-STEP-002"
+    summary: "Stage FE hardening: aggiunti `--no-audit --no-fund` e logging versioni Node/npm; contesto aggiornato con versioni di riferimento."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/CONTEXT/issue_17_rollup_musl.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/Dockerfile"
+    commands:
+      - "git diff"
+      - "docker run --rm node:20-bookworm-slim sh -lc 'node -v && npm -v'"
+    notes: "Modifiche limitate allo stage FE di build; runtime invariato."
+
   - step_id: "ADR007-IMPROVEMENTS-STEP-001"
     summary: "ADR 007 chiarita con lockfile policy esplicita e exit criteria per rimuovere il workaround."
     files:
