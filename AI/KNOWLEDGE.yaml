@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T11:51:39Z"
+  updated_at: "2026-02-21T11:56:02Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,16 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ROLLUP_MUSL-STEP-003"
+    summary: "Verifica Patch 1 su arm64/musl: fallisce ancora con missing `@rollup/rollup-linux-arm64-musl`."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/CONTEXT/issue_17_rollup_musl.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus"
+    notes: "Anche con `npm ci --include=optional` nello stage FE, `vite build` crasha in `rollup/dist/native.js`."
+
   - step_id: "ROLLUP_MUSL-STEP-002"
     summary: "Dockerfile FE stage: forzato `npm ci --include=optional` per evitare missing Rollup optional deps su arm64/musl."
     files:

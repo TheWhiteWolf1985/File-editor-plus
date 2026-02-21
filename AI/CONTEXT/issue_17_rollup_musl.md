@@ -48,3 +48,21 @@ code: 'MODULE_NOT_FOUND'
 ## Fix plan (vedi AI_TASKS)
 - Patch minima: aggiornare stage FE del Dockerfile per usare `npm ci --include=optional`.
 - Hardening: `file_editor_plus/frontend/.npmrc` con `include=optional`.
+
+## Verifica Patch 1 (stato attuale)
+Dopo aver applicato `npm ci --include=optional` nello stage FE del Dockerfile, la build `arm64/musl` risulta **ancora** fallire con lo stesso errore.
+
+Comando usato (build solo stage FE):
+```sh
+docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus
+```
+
+Estratto log:
+```text
+> build
+> vite build
+
+Error: Cannot find module @rollup/rollup-linux-arm64-musl.
+...
+The command '/bin/sh -c npm run build' returned a non-zero code: 1
+```

@@ -107,7 +107,7 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 ## STEP 003 - Verifica Patch 1 su arm64/musl
 
-- Status: TODO
+- Status: DONE
 - Goal: Confermare che la build arm64 non fallisce più sull’errore Rollup.
 - Scope:
   - Build add-on / CI / docker build arm64
@@ -125,6 +125,18 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 - Commit message:
   - `chore(ci): verify fix on arm64 musl`
+
+- What changed:
+  - Eseguita build arm64 (musl) dopo Patch 1: **la build fallisce ancora** con `Cannot find module @rollup/rollup-linux-arm64-musl`.
+  - Aggiornato `AI/CONTEXT/issue_17_rollup_musl.md` con evidenza di fallimento post-patch.
+  - Next: applicare hardening `.npmrc` (STEP 004) e rivalidare; se persiste, usare fallback base image (STEP 007).
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/CONTEXT/issue_17_rollup_musl.md`
+
+- Commands run:
+  - `docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus`
 
 ---
 
