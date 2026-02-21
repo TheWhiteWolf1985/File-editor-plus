@@ -142,7 +142,7 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 ## STEP 004 - Patch 2 (hardening): `.npmrc` nel frontend per includere optional deps
 
-- Status: TODO
+- Status: DONE
 - Goal: Evitare regressioni future se qualcuno rimuove il flag `--include=optional`.
 - Scope:
   - `file_editor_plus/frontend/.npmrc`
@@ -161,6 +161,16 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 - Commit message:
   - `chore(frontend): harden npm optional deps install via npmrc`
+
+- What changed:
+  - Creato `file_editor_plus/frontend/.npmrc` con `include=optional` per rendere esplicita l'installazione delle optional deps in ambienti musl/arm64.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/frontend/.npmrc`
+
+- Commands run:
+  - `git diff`
 
 ---
 

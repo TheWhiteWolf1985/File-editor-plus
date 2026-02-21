@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T11:56:02Z"
+  updated_at: "2026-02-21T11:57:09Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,16 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ROLLUP_MUSL-STEP-004"
+    summary: "Hardening FE: aggiunto `frontend/.npmrc` con `include=optional`."
+    files:
+      - "file_editor_plus/frontend/.npmrc"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "git diff"
+    notes: "Obiettivo: evitare regressioni se il flag `--include=optional` viene rimosso in futuro."
+
   - step_id: "ROLLUP_MUSL-STEP-003"
     summary: "Verifica Patch 1 su arm64/musl: fallisce ancora con missing `@rollup/rollup-linux-arm64-musl`."
     files:
