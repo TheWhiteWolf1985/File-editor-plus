@@ -35,13 +35,14 @@ jobs:
       # Build-only (no push). This validates the FE build across architectures.
       - name: Build FE stage for amd64/arm64/armv7
         run: |
-          docker buildx build \
-            --platform linux/amd64,linux/arm64,linux/arm/v7 \
-            --build-arg BUILD_FROM=alpine:3.20 \
-            --target fe \
-            -f file_editor_plus/Dockerfile \
-            --progress plain \
-            .
+            docker buildx build \
+              --platform linux/amd64,linux/arm64,linux/arm/v7 \
+              --build-arg BUILD_FROM=alpine:3.20 \
+              --target fe \
+              -f file_editor_plus/Dockerfile \
+              --progress plain \
+              file_editor_plus
+
 
   publish_prerelease_branch:
     name: Publish release tree to PreRelease
