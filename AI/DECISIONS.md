@@ -74,3 +74,21 @@ Source of truth:
 - Consequences:
   - Setup piu' manuale per l'utente (inserimento client id nelle opzioni add-on).
   - Nessuna dipendenza da componenti HA esterni; implementazione confinata all'add-on.
+
+## ADR 007 — Build frontend arm64: fallback musl -> glibc per Rollup native deps
+- Date: 2026-02-21
+- Context:
+  - La build del frontend su `linux/arm64` con base `node:*-alpine` (musl) fallisce con Rollup:
+    - `Cannot find module @rollup/rollup-linux-arm64-musl`
+  - Patch 1/2 (forzare optional deps via `npm ci --include=optional` e `.npmrc include=optional`) non risolvono quando e' presente `package-lock.json`.
+- Decision:
+  - Usare `node:20-bookworm-slim` (glibc) nello stage FE del Dockerfile e installare deps con:
+    - rimozione `package-lock.json`
+    - `npm install --include=optional`
+  - Evidenze e comandi in `AI/CONTEXT/issue_17_rollup_musl.md`.
+- Alternatives:
+  - Restare su Alpine/musl e risolvere il bug npm/lockfile su optional deps (non deterministico in questo contesto).
+  - Introdurre pnpm/yarn o cambiare toolchain FE (fuori scope).
+- Consequences:
+  - Build arm64 stabile nello stage FE (vite build OK).
+  - Trade-off: stage FE leggermente piu' pesante e install meno deterministico rispetto a `npm ci` (workaround limitato allo stage di build).

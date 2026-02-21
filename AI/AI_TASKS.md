@@ -284,7 +284,7 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 ## STEP 008 - Decision log (solo se si usa il fallback)
 
-- Status: TODO
+- Status: DONE
 - Goal: Rendere auditabile la scelta del fallback.
 - Scope:
   - (Se presente) `AI/DECISIONS.md` altrimenti `docs/DECISIONS.md`
@@ -305,6 +305,17 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 - Commit message:
   - `docs(decisions): record rationale for FE base image fallback`
+
+- What changed:
+  - Aggiunta ADR 007 in `AI/DECISIONS.md` per tracciare la scelta: fallback musl -> glibc nello stage FE e workaround `rm package-lock.json && npm install --include=optional`.
+  - Collegata l'evidenza a `AI/CONTEXT/issue_17_rollup_musl.md`.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/DECISIONS.md`
+
+- Commands run:
+  - N/A
 
 ---
 

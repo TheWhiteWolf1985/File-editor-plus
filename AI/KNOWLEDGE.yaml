@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T12:14:28Z"
+  updated_at: "2026-02-21T12:15:03Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,16 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ROLLUP_MUSL-STEP-008"
+    summary: "Decision log: registrato ADR per fallback build FE arm64 (musl -> glibc) e workaround lockfile/npm install."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/DECISIONS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "N/A"
+    notes: "ADR 007: Patch 1/2 non risolvono con lockfile; scelta Debian slim + `rm package-lock.json` + `npm install --include=optional` confinata allo stage FE."
+
   - step_id: "ROLLUP_MUSL-STEP-007"
     summary: "Applicato fallback per build FE su arm64: stage FE su Debian slim + workaround lockfile per installare optional deps Rollup."
     files:
