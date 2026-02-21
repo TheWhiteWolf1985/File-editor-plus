@@ -244,7 +244,7 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 ## STEP 007 - Fallback (solo se necessario): cambiare base image dello stage FE a Debian slim
 
-- Status: TODO
+- Status: DONE
 - Goal: Bypass musl nello stage FE se Patch 1/2 non risolvono.
 - Scope:
   - `file_editor_plus/Dockerfile`
@@ -265,6 +265,20 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 - Commit message:
   - `fix(docker): use debian slim for FE build stage to avoid musl rollup issues`
+
+- What changed:
+  - Applicato fallback nello stage FE: base image `node:20-bookworm-slim` (glibc) invece di `node:20-alpine` (musl).
+  - Workaround aggiuntivo necessario: rimozione `package-lock.json` e uso di `npm install --include=optional` (con lockfile presente `npm ci`/`npm install` continuavano a saltare i pacchetti nativi di Rollup su arm64).
+  - Verificato che `docker build --platform linux/arm64 --target fe ...` completa `vite build` con esito OK.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/Dockerfile`
+  - `AI/CONTEXT/issue_17_rollup_musl.md`
+
+- Commands run:
+  - `git diff`
+  - `docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus`
 
 ---
 

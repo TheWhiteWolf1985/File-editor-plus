@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T11:58:59Z"
+  updated_at: "2026-02-21T12:14:28Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,18 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ROLLUP_MUSL-STEP-007"
+    summary: "Applicato fallback per build FE su arm64: stage FE su Debian slim + workaround lockfile per installare optional deps Rollup."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/CONTEXT/issue_17_rollup_musl.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/Dockerfile"
+    commands:
+      - "git diff"
+      - "docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus"
+    notes: "Patch 1/2 non risolvono: l'install arm64 con lockfile continua a mancare `@rollup/rollup-linux-arm64-*`; rimozione `package-lock.json` + `npm install --include=optional` risulta efficace."
+
   - step_id: "ROLLUP_MUSL-STEP-006"
     summary: "Tracciato backlog warning Dockerfile `BUILD_FROM` (InvalidDefaultArgInFrom) senza fix applicato."
     files:

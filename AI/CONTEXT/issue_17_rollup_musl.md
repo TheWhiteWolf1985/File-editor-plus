@@ -75,6 +75,15 @@ Comando usato:
 docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus
 ```
 
+## Workaround efficace (trovato)
+Il workaround che rende la build arm64 verde e' evitare `npm ci` con il lockfile (che triggera il bug sulle optional deps) e usare invece `npm install` **dopo** aver rimosso `package-lock.json` nello stage FE.
+
+Evidenza (build stage FE arm64 OK):
+```sh
+docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus
+# esito: SUCCESS (vite build completa)
+```
+
 ## Backlog (separato): warning Dockerfile `BUILD_FROM`
 Durante i rebuild in Supervisor puo' comparire un warning tipo:\n
 - `InvalidDefaultArgInFrom: Default value for ARG ${BUILD_FROM} results in empty or invalid base image name`\n
