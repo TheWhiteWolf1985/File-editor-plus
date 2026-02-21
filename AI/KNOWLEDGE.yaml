@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T11:49:54Z"
+  updated_at: "2026-02-21T11:51:39Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,16 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ROLLUP_MUSL-STEP-002"
+    summary: "Dockerfile FE stage: forzato `npm ci --include=optional` per evitare missing Rollup optional deps su arm64/musl."
+    files:
+      - "file_editor_plus/Dockerfile"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "git diff"
+    notes: "Fix minimale (1 riga) nello stage `FROM node:20-alpine AS fe`."
+
   - step_id: "ROLLUP_MUSL-STEP-001"
     summary: "Catturato contesto riproducibile per errore Rollup su arm64/musl (`@rollup/rollup-linux-arm64-musl` mancante)."
     files:

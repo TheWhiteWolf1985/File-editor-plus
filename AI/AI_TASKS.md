@@ -72,7 +72,7 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 ## STEP 002 - Patch 1 (fix minimo): includere optional deps nello stage FE
 
-- Status: TODO
+- Status: DONE
 - Goal: Forzare installazione delle optional deps necessarie a Rollup su `linux-arm64-musl`.
 - Scope:
   - `file_editor_plus/Dockerfile`
@@ -92,6 +92,16 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 - Commit message:
   - `fix(docker): include optional deps in FE build (rollup musl arm64)`
+
+- What changed:
+  - Aggiornato lo stage frontend (fe) del Dockerfile: `npm ci --include=optional` per forzare install di optional deps (incluse quelle platform-specific di Rollup su musl/arm64).
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/Dockerfile`
+
+- Commands run:
+  - `git diff`
 
 ---
 

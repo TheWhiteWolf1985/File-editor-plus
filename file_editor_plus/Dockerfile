@@ -4,7 +4,7 @@ ARG BUILD_FROM
 FROM node:20-alpine AS fe
 WORKDIR /fe
 COPY frontend/package*.json ./
-RUN npm ci
+RUN npm ci --include=optional
 COPY frontend/ ./
 COPY config.yaml /fe/config.yaml
 RUN npm run build
