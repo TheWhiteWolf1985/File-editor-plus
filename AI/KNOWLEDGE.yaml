@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-19T10:04:04Z"
+  updated_at: "2026-02-21T11:49:54Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,22 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ROLLUP_MUSL-STEP-001"
+    summary: "Catturato contesto riproducibile per errore Rollup su arm64/musl (`@rollup/rollup-linux-arm64-musl` mancante)."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/CONTEXT/issue_17_rollup_musl.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "git fetch --all"
+      - "git checkout develop"
+      - "git pull"
+      - "git status"
+      - "docker run --privileged --rm tonistiigi/binfmt --install arm64"
+      - "docker run --rm --platform linux/arm64 alpine:3.20 uname -m"
+      - "docker run --rm --platform linux/arm64 -v \"$PWD/file_editor_plus/frontend:/fe\" -w /fe node:20-alpine sh -lc \"npm ci && npm run -s build\""
+    notes: "Riproduzione locale via qemu/binfmt; errore emesso da `rollup/dist/native.js` e citato come bug npm su optional deps."
+
   - step_id: "AI_TASKS-STEP-009"
     summary: "Allineato audit UI nav e chiuso epic Save As + Cloud Backup (scheduler avanzato + UI)."
     files:
