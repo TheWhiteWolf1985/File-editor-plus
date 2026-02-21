@@ -74,3 +74,13 @@ Comando usato:
 ```sh
 docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus
 ```
+
+## Backlog (separato): warning Dockerfile `BUILD_FROM`
+Durante i rebuild in Supervisor puo' comparire un warning tipo:\n
+- `InvalidDefaultArgInFrom: Default value for ARG ${BUILD_FROM} results in empty or invalid base image name`\n
+
+Cause: il Dockerfile usa `ARG BUILD_FROM` + `FROM ${BUILD_FROM}` senza un default. In Home Assistant Builder `BUILD_FROM` viene iniettato, ma i linter vedono un arg vuoto.\n
+
+Proposta (da valutare in task separato): impostare un default non vuoto, es:\n
+- `ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest` (solo default, poi override in build HA)\n
+oppure costruire un default in base ad arch via `build.yaml` (se la pipeline lo supporta).\n

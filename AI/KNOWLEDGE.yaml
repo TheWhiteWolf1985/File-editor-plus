@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T11:58:14Z"
+  updated_at: "2026-02-21T11:58:59Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,16 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ROLLUP_MUSL-STEP-006"
+    summary: "Tracciato backlog warning Dockerfile `BUILD_FROM` (InvalidDefaultArgInFrom) senza fix applicato."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/CONTEXT/issue_17_rollup_musl.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "N/A"
+    notes: "Warning non bloccante osservato in Supervisor; proposta fix: default per `ARG BUILD_FROM` (task separato)."
+
   - step_id: "ROLLUP_MUSL-STEP-005"
     summary: "Verifica hardening `.npmrc` su arm64/musl: build ancora rotta (stesso missing Rollup native package)."
     files:

@@ -211,7 +211,7 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 ## STEP 006 - (Backlog separato) Warning Dockerfile su `BUILD_FROM`
 
-- Status: TODO
+- Status: DONE
 - Goal: Tracciare e (se deciso) sistemare warning non bloccante: `InvalidDefaultArgInFrom`.
 - Scope:
   - `file_editor_plus/Dockerfile`
@@ -228,6 +228,17 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 - Commit message:
   - `docs: track BUILD_FROM warning backlog`
+
+- What changed:
+  - Tracciato il warning `InvalidDefaultArgInFrom` (ARG `BUILD_FROM` senza default) nel contesto `AI/CONTEXT/issue_17_rollup_musl.md` con proposta di fix separata.
+  - Nessuna modifica applicata al Dockerfile in questo step (backlog separato, non bloccante).
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/CONTEXT/issue_17_rollup_musl.md`
+
+- Commands run:
+  - `<<OPTIONAL>>` (N/A)
 
 ---
 
