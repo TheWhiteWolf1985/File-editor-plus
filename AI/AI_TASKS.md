@@ -23,7 +23,7 @@ Applicare 3 miglioramenti alla decisione ADR 007:
 
 ### STEP 001 - Aggiornare ADR 007: lockfile solo in build stage + exit criteria
 
-- Status: TODO
+- Status: DONE
 - Goal: Rendere la decisione auditabile e limitare ambiguità sul lockfile e sul workaround.
 - Scope:
   - `AI/DECISIONS.md`
@@ -50,6 +50,18 @@ Applicare 3 miglioramenti alla decisione ADR 007:
 
 - Commit message:
   - `docs(decisions): clarify lockfile handling and add exit criteria for ADR 007`
+
+- What changed:
+  - Aggiornato ADR 007 in `AI/DECISIONS.md` con lockfile policy esplicita: `package-lock.json` viene rimosso solo nello stage FE del container e non dal repository.
+  - Aggiunta nota di confinamento del workaround al solo build stage FE (nessun impatto runtime add-on).
+  - Aggiunta sezione `Exit criteria ADR 007` con 2 condizioni verificabili per rientro a `npm ci` deterministico.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/DECISIONS.md`
+
+- Commands run:
+  - `git diff -- AI/DECISIONS.md`
 
 ---
 

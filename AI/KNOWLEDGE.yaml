@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T12:24:33Z"
+  updated_at: "2026-02-21T18:14:25Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,16 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ADR007-IMPROVEMENTS-STEP-001"
+    summary: "ADR 007 chiarita con lockfile policy esplicita e exit criteria per rimuovere il workaround."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/DECISIONS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "git diff -- AI/DECISIONS.md"
+    notes: "Nessuna modifica tecnica oltre ai documenti AI nello step 001."
+
   - step_id: "ROLLUP_MUSL-STEP-010"
     summary: "Release 1.0.0 preparata: changelog aggiornato + checklist release compilata + build/test FE/BE confermati."
     files:

@@ -86,9 +86,15 @@ Source of truth:
     - rimozione `package-lock.json`
     - `npm install --include=optional`
   - Evidenze e comandi in `AI/CONTEXT/issue_17_rollup_musl.md`.
+  - Lockfile policy: la rimozione di `package-lock.json` avviene solo nello stage FE del container (`RUN rm -f package-lock.json`) e non nel repository; il lockfile nel repo non va rimosso o committato come parte del workaround.
+  - Il workaround resta confinato allo stage FE di build e non impatta il runtime dell'add-on.
 - Alternatives:
   - Restare su Alpine/musl e risolvere il bug npm/lockfile su optional deps (non deterministico in questo contesto).
   - Introdurre pnpm/yarn o cambiare toolchain FE (fuori scope).
 - Consequences:
   - Build arm64 stabile nello stage FE (vite build OK).
   - Trade-off: stage FE leggermente piu' pesante e install meno deterministico rispetto a `npm ci` (workaround limitato allo stage di build).
+
+### Exit criteria ADR 007
+- Tornare a `npm ci` deterministico quando una build `linux/arm64` con base musl passa con `npm ci --include=optional` usando lockfile aggiornato/rigenerato in modo controllato e verificato.
+- Tornare a `npm ci` deterministico quando una versione specifica di Node/npm documentata elimina il problema optional-deps+lockfile su arm64/musl con evidenza riproducibile in CI/build add-on.
