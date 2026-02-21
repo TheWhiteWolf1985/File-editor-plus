@@ -3,6 +3,7 @@
 ## 1.0.0 - First official release
 
 - First official release.
+- Fix build aarch64: workaround Rollup native optional deps nello stage frontend (evita failure `@rollup/rollup-linux-arm64-musl`).
 
 ## 0.2.82
 

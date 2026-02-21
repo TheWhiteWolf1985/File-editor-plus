@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T12:18:55Z"
+  updated_at: "2026-02-21T12:24:33Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,22 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ROLLUP_MUSL-STEP-010"
+    summary: "Release 1.0.0 preparata: changelog aggiornato + checklist release compilata + build/test FE/BE confermati."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/CHECKLISTS/RELEASE.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/CHANGELOG.md"
+    commands:
+      - "cd file_editor_plus/frontend && npm ci && npm run -s typecheck && npm run build"
+      - "docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus"
+      - "docker pull --platform linux/amd64 node:20-bookworm-slim"
+      - "docker build --no-cache --pull --platform linux/amd64 --target fe -f file_editor_plus/Dockerfile file_editor_plus"
+      - "git tag -a v1.0.0 -m \"v1.0.0\""
+    notes: "Tag creato dopo il commit di release."
+
   - step_id: "ROLLUP_MUSL-STEP-009"
     summary: "Smoke post-fix completato: FE build OK, BE unit tests OK, add-on rebuild+restart OK."
     files:

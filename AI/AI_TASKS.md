@@ -359,7 +359,7 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 ## STEP 010 - Release v1.0.0
 
-- Status: TODO
+- Status: DONE
 - Goal: Preparare e rilasciare 1.0.0 includendo la fix.
 - Scope:
   - `RELEASE.md` (se presente) o `AI/CHECKLISTS/RELEASE.md`
@@ -380,3 +380,20 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 - Commit message:
   - `chore(release): prepare 1.0.0 with arm64 musl build fix`
+
+- What changed:
+  - Confermata versione add-on `1.0.0` in `file_editor_plus/config.yaml` e aggiornata la release note in `file_editor_plus/CHANGELOG.md` includendo la fix arm64 Rollup.
+  - Completata la checklist `AI/CHECKLISTS/RELEASE.md` con evidenze di build/test.
+  - Verificata build FE su amd64 e arm64 (docker stage FE) e typecheck FE.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/CHECKLISTS/RELEASE.md`
+  - `file_editor_plus/CHANGELOG.md`
+
+- Commands run:
+  - `cd file_editor_plus/frontend && npm ci && npm run -s typecheck && npm run build`
+  - `docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus`
+  - `docker pull --platform linux/amd64 node:20-bookworm-slim`
+  - `docker build --no-cache --pull --platform linux/amd64 --target fe -f file_editor_plus/Dockerfile file_editor_plus`
+  - `git tag -a v1.0.0 -m \"v1.0.0\"`
