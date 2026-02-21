@@ -66,3 +66,11 @@ Error: Cannot find module @rollup/rollup-linux-arm64-musl.
 ...
 The command '/bin/sh -c npm run build' returned a non-zero code: 1
 ```
+
+## Verifica hardening `.npmrc` (stato attuale)
+Anche dopo l'aggiunta di `file_editor_plus/frontend/.npmrc` con `include=optional`, la build arm64/musl continua a fallire con lo stesso errore.
+
+Comando usato:
+```sh
+docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus
+```

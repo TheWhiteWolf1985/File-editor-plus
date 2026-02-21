@@ -176,7 +176,7 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 ## STEP 005 - Verifica hardening su arm64/musl
 
-- Status: TODO
+- Status: DONE
 - Goal: Assicurarsi che l’hardening non introduca regressioni e la build resti verde.
 - Scope:
   - Build add-on / CI / docker build arm64
@@ -194,6 +194,18 @@ Far passare la build su aarch64/Alpine (musl) eliminando l’errore Rollup, con 
 
 - Commit message:
   - `chore(ci): verify npmrc hardening on arm64 musl`
+
+- What changed:
+  - Eseguita build arm64/musl dopo l'hardening `.npmrc`: **la build fallisce ancora** con missing `@rollup/rollup-linux-arm64-musl`.
+  - Evidenza aggiunta al contesto `AI/CONTEXT/issue_17_rollup_musl.md`.
+  - Next: applicare fallback stage FE su Debian slim (STEP 007) e registrare decisione (STEP 008).
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/CONTEXT/issue_17_rollup_musl.md`
+
+- Commands run:
+  - `docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus`
 
 ---
 

@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T11:57:09Z"
+  updated_at: "2026-02-21T11:58:14Z"
 
 commands:
   frontend_build:
@@ -107,6 +107,16 @@ relations:
     to: "frontend:i18n"
 
 changes_log:
+  - step_id: "ROLLUP_MUSL-STEP-005"
+    summary: "Verifica hardening `.npmrc` su arm64/musl: build ancora rotta (stesso missing Rollup native package)."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/CONTEXT/issue_17_rollup_musl.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker build --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus"
+    notes: "Con legacy builder + emulazione arm64, `vite build` continua a fallire in `rollup/dist/native.js`."
+
   - step_id: "ROLLUP_MUSL-STEP-004"
     summary: "Hardening FE: aggiunto `frontend/.npmrc` con `include=optional`."
     files:
