@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T14:20:00Z"
+  updated_at: "2026-02-22T14:28:00Z"
 
 commands:
   frontend_build:
@@ -127,6 +127,18 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "GDRIVE-INGRESS-STEP-008"
+    summary: "Aggiunti test smoke/coverage per redirect modes OAuth e checklist matrix aggiornata."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "AI/SMOKE.md"
+      - "file_editor_plus/backend/test_gdrive_oauth.py"
+    commands:
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm run build"
+    notes: "Le verifiche callback reali Google restano manuali (ambiente headless)."
+
   - step_id: "GDRIVE-INGRESS-STEP-007"
     summary: "Bind hard su redirect_uri nello state OAuth; callback usa solo valore persistito in start."
     files:

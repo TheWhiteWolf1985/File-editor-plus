@@ -246,7 +246,7 @@
 
 ## STEP 008 — Smoke test (matrix) per chiudere il bug 400/404
 
-- Status: TODO
+- Status: DONE
 - Goal: Riprodurre e verificare fix su tutti i contesti reali.
 - Test matrix:
   1. **Ingress ON**, `public_base_url` settata (consigliato) → login OK.
@@ -260,6 +260,21 @@
 
 - Commit message:
   - `test(smoke): verify oauth redirect stability with ingress and non-ingress`
+
+- What changed:
+  - Estesa suite backend con test sulle modalità redirect (`override`, `public_base_url`, `ingress_port`).
+  - Aggiornata checklist smoke con matrix Ingress/non-Ingress e stato verifiche.
+  - Confermate build frontend e test backend dopo le modifiche.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/KNOWLEDGE.yaml`
+  - `AI/SMOKE.md`
+  - `file_editor_plus/backend/test_gdrive_oauth.py`
+
+- Commands run:
+  - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
+  - `cd file_editor_plus/frontend && npm run build`
 
 ---
 

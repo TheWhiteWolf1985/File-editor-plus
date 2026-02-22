@@ -22,3 +22,18 @@ Data: 2026-02-22
 
 Note:
 - Checklist manuale non eseguibile in ambiente headless CI; da validare su istanza HA con Ingress attivo.
+
+## Matrix redirect stability (Ingress vs non-Ingress)
+
+- Scenario 1: Ingress ON + `public_base_url` configurata
+  - Verifica automatica: PASS (unit test redirect mode `public_base_url`)
+  - Verifica manuale callback reale: PENDING
+- Scenario 2: Ingress ON + `public_base_url` assente + `addon_callback_port` (default 8099)
+  - Verifica automatica: PASS (unit test redirect mode `ingress_port`)
+  - Verifica manuale callback reale: PENDING
+- Scenario 3: Ingress OFF / accesso diretto host
+  - Verifica automatica: PASS (fallback `direct` via resolver + build backend)
+  - Verifica manuale callback reale: PENDING
+- Scenario 4: Redirect non registrata su Google
+  - Verifica attesa: errore 400 `redirect_uri_mismatch` con URI suggerita dalla UI.
+  - Verifica manuale: PENDING
