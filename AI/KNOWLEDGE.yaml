@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T17:10:00Z"
+  updated_at: "2026-02-22T17:15:00Z"
 
 commands:
   frontend_build:
@@ -31,19 +31,19 @@ entities:
     type: "addon"
     name: "File Editor Plus"
     path: "file_editor_plus/config.yaml"
-    notes: "Ingress abilitato; mount /config:rw; permessi Supervisor/Core API (vedi manifest). Opzioni cloud: `gdrive_client_id`, `gdrive_client_secret`, `gdrive_redirect_uri`, `gdrive_redirect_override`, `public_base_url`, `addon_callback_port`."
+    notes: "Ingress abilitato; mount /config:rw; permessi Supervisor/Core API (vedi manifest). Opzioni add-on cloud backup rimosse dal manifest attivo."
 
   - id: "backend:api"
     type: "service"
     name: "FastAPI backend"
     path: "file_editor_plus/backend/app.py"
-    notes: "Serve API FS + proxy HA + cloud (Google Drive); runtime uvicorn su 0.0.0.0:8099 via s6."
+    notes: "Serve API FS + proxy HA e docs; runtime uvicorn su 0.0.0.0:8099 via s6."
 
   - id: "backend:gdrive"
     type: "module"
     name: "Google Drive Cloud Backup"
-    path: "file_editor_plus/backend/app.py"
-    notes: "Device Flow + upload ZIP di /config su Drive; storage `/data/gdrive/*`; endpoints `/api/cloud/gdrive/*`. Resolver OAuth config con fallback env (`GDRIVE_OAUTH_*` / `DEFAULT_GDRIVE_OAUTH_*`). OAuth start+callback con state/PKCE e persistenza token."
+    path: "future_features/cloud_backup_gdrive/"
+    notes: "Feature cloud backup archiviata in `future_features`; rimossa dal percorso attivo (UI/API/config/test)."
 
   - id: "backend:s6-run"
     type: "runtime"
@@ -110,10 +110,6 @@ relations:
     type: "serves"
     to: "docs:user"
 
-  - from: "backend:api"
-    type: "implements"
-    to: "backend:gdrive"
-
   - from: "frontend:app"
     type: "uses"
     to: "frontend:i18n"
@@ -127,6 +123,20 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "CLOUD-ARCHIVE-STEP-007"
+    summary: "Smoke finale completato: cloud backup assente dalla UI attiva, route API cloud non registrate, nota README aggiornata."
+    files:
+      - "file_editor_plus/README.md"
+      - "file_editor_plus/frontend/src/i18n/it.json"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "rg -n \"Backup su cloud\" file_editor_plus --glob '!**/dist/**'"
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python - <<'PY' ... TestClient ... PY\""
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm run build"
+    notes: "GET su `/api/cloud/gdrive/*` -> 404. POST su path cloud senza route esplicita risponde 405 per fallback routing."
+
   - step_id: "CLOUD-ARCHIVE-STEP-006"
     summary: "Audit dipendenze completato: nessuna dipendenza rimossa perché tutte ancora usate da feature attive."
     files:

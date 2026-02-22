@@ -37,7 +37,7 @@ Questa build e pensata per beta tester.
 
 ## Cloud Backup
 
-La funzionalità Cloud Backup (Google Drive) è stata archiviata in `future_features/cloud_backup_gdrive/` ed è fuori dal percorso attivo.
+Cloud backup (Google Drive) archiviato in `future_features/cloud_backup_gdrive`; non disponibile in release.
 
 ## Supporto
 

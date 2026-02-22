@@ -311,6 +311,22 @@
   - `git commit -m "docs: mark cloud backup feature as archived (future_features)"`
   - `git push origin develop`
 
+**Status:** DONE
+**What changed:**
+- Eseguito smoke statico UI: nel percorso attivo `file_editor_plus` non resta la stringa “Backup su cloud”.
+- Verificata assenza route cloud backup: `GET /api/cloud/gdrive/status` e `GET /api/cloud/gdrive/oauth/start` rispondono 404 via `TestClient`.
+- Aggiornata nota README: cloud backup archiviato in `future_features` e non disponibile in release.
+- Eseguiti test backend standard e build frontend con esito PASS.
+**Files touched:**
+- `file_editor_plus/README.md`
+- `file_editor_plus/frontend/src/i18n/it.json`
+- `AI/AI_TASKS.md`
+**Commands run:**
+- `rg -n "Backup su cloud" file_editor_plus --glob '!**/dist/**'`
+- `docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python - <<'PY' ... TestClient ... PY\"`
+- `docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\"`
+- `cd file_editor_plus/frontend && npm run build`
+
 ---
 
 ## Checklist di accettazione (deve essere vera alla fine)
