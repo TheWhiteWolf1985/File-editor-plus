@@ -74,7 +74,7 @@
 
 ## STEP 003 — Backend: riscrivere la logica di calcolo redirect_uri (Ingress-safe)
 
-- Status: TODO
+- Status: DONE
 - Goal: Eliminare la generazione di redirect “ingress-aware” con token.
 - Changes (algoritmo consigliato, in ordine di priorità):
   1. Se `gdrive_redirect_override` è settata → usa quella.
@@ -95,6 +95,20 @@
 
 - Notes:
   - Se usate PKCE, non cambia nulla qui: PKCE resta identico.
+
+- What changed:
+  - Implementato resolver stabile `override -> public_base_url -> ingress_port -> direct`.
+  - In modalità ingress, il callback usa `host` senza porta + `addon_callback_port` e non include mai `x-ingress-path`.
+  - `oauth/start` ora usa il resolver stabile per comporre la redirect URI.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/KNOWLEDGE.yaml`
+  - `file_editor_plus/backend/app.py`
+
+- Commands run:
+  - `python3 -m compileall file_editor_plus/backend/app.py`
+  - `cd file_editor_plus/frontend && npm run build`
 
 ---
 

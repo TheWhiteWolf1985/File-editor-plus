@@ -358,6 +358,37 @@ def _is_valid_redirect_uri(uri: str) -> bool:
     return bool(p.netloc)
 
 
+def _build_callback_from_base(base_url: str) -> str:
+    base = (base_url or "").strip().rstrip("/")
+    return f"{base}/api/cloud/gdrive/oauth/callback"
+
+
+def _resolve_stable_redirect_uri(request: Request, oauth_cfg: dict) -> tuple[str, str]:
+    override = str(oauth_cfg.get("redirect_override") or "").strip()
+    if override:
+        return override, "override"
+
+    public_base = str(oauth_cfg.get("public_base_url") or "").strip().rstrip("/")
+    if public_base:
+        return _build_callback_from_base(public_base), "public_base_url"
+
+    headers = request.headers
+    ingress_hdr = (headers.get("x-ingress-path") or headers.get("x-forwarded-prefix") or "").strip()
+    if ingress_hdr:
+        raw_host = (headers.get("x-forwarded-host") or headers.get("host") or request.url.netloc or "").split(",")[0].strip()
+        host_no_port = raw_host.split(":", 1)[0]
+        callback_port = int(oauth_cfg.get("addon_callback_port") or DEFAULT_ADDON_CALLBACK_PORT)
+        proto = (headers.get("x-forwarded-proto") or "https").split(",")[0].strip() or "https"
+        if host_no_port:
+            return f"{proto}://{host_no_port}:{callback_port}/api/cloud/gdrive/oauth/callback", "ingress_port"
+
+    direct_proto = (headers.get("x-forwarded-proto") or request.url.scheme or "http").split(",")[0].strip() or "http"
+    direct_host = (headers.get("x-forwarded-host") or headers.get("host") or request.url.netloc or "").split(",")[0].strip()
+    if direct_host:
+        return f"{direct_proto}://{direct_host}/api/cloud/gdrive/oauth/callback", "direct"
+    return f"{str(request.base_url).rstrip('/')}/api/cloud/gdrive/oauth/callback", "direct"
+
+
 def _load_gdrive_tokens() -> Optional[dict]:
     if not GDRIVE_TOKENS_FILE.exists():
         return None
@@ -2949,7 +2980,7 @@ def gdrive_oauth_start(request: Request):
     if not client_id:
         raise HTTPException(503, "Manca gdrive_client_id (opzioni add-on o fallback env)")
 
-    redirect_uri = oauth_cfg.get("redirect_uri") or f"{str(request.base_url).rstrip('/')}/api/cloud/gdrive/oauth/callback"
+    redirect_uri, _mode = _resolve_stable_redirect_uri(request, oauth_cfg)
     if not _is_valid_redirect_uri(str(redirect_uri)):
         raise HTTPException(400, "OAuth redirect_uri non valida")
     state = secrets.token_urlsafe(32)

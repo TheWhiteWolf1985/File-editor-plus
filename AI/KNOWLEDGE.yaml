@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T13:45:00Z"
+  updated_at: "2026-02-22T13:52:00Z"
 
 commands:
   frontend_build:
@@ -127,6 +127,17 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "GDRIVE-INGRESS-STEP-003"
+    summary: "Riscritta selezione redirect URI OAuth con priorità stabile e ramo ingress senza token."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/backend/app.py"
+    commands:
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+      - "cd file_editor_plus/frontend && npm run build"
+    notes: "Ordine applicato: override -> public_base_url -> ingress_port -> direct."
+
   - step_id: "GDRIVE-INGRESS-STEP-001"
     summary: "Definita regola d’oro: redirect URI OAuth stabile, mai token Ingress."
     files:
