@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T11:34:00Z"
+  updated_at: "2026-02-22T11:39:00Z"
 
 commands:
   frontend_build:
@@ -117,6 +117,16 @@ relations:
     to: "context:gdrive_oauth_map"
 
 changes_log:
+  - step_id: "GDRIVE-OAUTH-STEP-005"
+    summary: "Allineata la semantica di stato connessione: `connected=true` se refresh token presente oppure access token valido."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/backend/app.py"
+    commands:
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+    notes: "Mantiene compatibilità con polling frontend esistente su `/api/cloud/gdrive/status`."
+
   - step_id: "GDRIVE-OAUTH-STEP-004"
     summary: "Implementato callback OAuth (`/api/cloud/gdrive/oauth/callback`) con validazione state, token exchange e persistenza token."
     files:

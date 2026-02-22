@@ -500,7 +500,12 @@ def _compute_next_run_iso_for_cfg(cfg: dict, last_run_epoch: Optional[int] = Non
 def _is_gdrive_connected(tokens: Optional[dict]) -> bool:
     if not tokens or not isinstance(tokens, dict):
         return False
-    return bool(tokens.get("refresh_token"))
+    if tokens.get("refresh_token"):
+        return True
+    access = tokens.get("access_token")
+    expires_at = int(tokens.get("expires_at") or 0)
+    now = int(time.time())
+    return bool(access) and expires_at > now + 30
 
 
 def _oauth_post_form(url: str, data: dict, timeout: float = 20.0) -> dict:

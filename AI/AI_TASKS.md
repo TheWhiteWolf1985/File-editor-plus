@@ -211,7 +211,7 @@
 
 ## STEP 005 — Aggiornare endpoint /status (o logica stato) per supportare OAuth
 
-- Status: TODO
+- Status: DONE
 - Goal: Ri-usare il polling esistente e farlo riflettere lo stato reale dei token OAuth.
 - Scope:
   - Backend status endpoint: `<<REQUIRED: path>>`
@@ -234,6 +234,18 @@
 
 - Blockers/Notes:
   - Nessuna regressione sul flow precedente.
+
+- What changed:
+  - Aggiornata la logica `connected` lato backend per coprire sia refresh token sia access token valido non scaduto.
+  - Mantenuto invariato l’endpoint `/api/cloud/gdrive/status` e il contratto usato dal polling frontend.
+  - Eliminato il falso negativo sullo stato connesso nei casi OAuth senza refresh token immediato.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/backend/app.py`
+
+- Commands run:
+  - `python3 -m compileall file_editor_plus/backend/app.py`
 
 ---
 
