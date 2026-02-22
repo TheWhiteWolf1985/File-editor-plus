@@ -1150,9 +1150,11 @@ export const appStyles = css`
       background: var(--overlay-backdrop);
       display: grid;
       place-items: center;
-      z-index: 200;
+      z-index: 1400;
     }
     .modal {
+      position: relative;
+      z-index: 1;
       background: var(--panel-strong);
       border: 1px solid var(--border-color);
       border-radius: 12px;
