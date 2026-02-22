@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T12:42:00Z"
+  updated_at: "2026-02-22T13:45:00Z"
 
 commands:
   frontend_build:
@@ -31,7 +31,7 @@ entities:
     type: "addon"
     name: "File Editor Plus"
     path: "file_editor_plus/config.yaml"
-    notes: "Ingress abilitato; mount /config:rw; permessi Supervisor/Core API (vedi manifest). Opzioni cloud: `gdrive_client_id`, `gdrive_client_secret`, `gdrive_redirect_uri`."
+    notes: "Ingress abilitato; mount /config:rw; permessi Supervisor/Core API (vedi manifest). Opzioni cloud: `gdrive_client_id`, `gdrive_client_secret`, `gdrive_redirect_uri`, `gdrive_redirect_override`, `public_base_url`, `addon_callback_port`."
 
   - id: "backend:api"
     type: "service"
@@ -127,6 +127,29 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "GDRIVE-INGRESS-STEP-001"
+    summary: "Definita regola d’oro: redirect URI OAuth stabile, mai token Ingress."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/DECISIONS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm run build"
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+    notes: "ADR 009 aggiunta per fissare la policy redirect e prevenire regressioni 400/404."
+
+  - step_id: "GDRIVE-INGRESS-STEP-002"
+    summary: "Aggiunti parametri espliciti per redirect OAuth stabile (`public_base_url`, `addon_callback_port`, `gdrive_redirect_override`) in options add-on e resolver backend."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/backend/app.py"
+      - "file_editor_plus/config.yaml"
+    commands:
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+      - "cd file_editor_plus/frontend && npm run build"
+    notes: "Step configurativo: logica di selezione redirect verrà applicata nello step successivo."
+
   - step_id: "GDRIVE-OAUTH-STEP-010"
     summary: "Aggiornata documentazione utente OAuth (config + fallback + troubleshooting) e chiusa la task sequence."
     files:

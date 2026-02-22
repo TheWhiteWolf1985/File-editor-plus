@@ -113,3 +113,17 @@ Source of truth:
 - Consequences:
   - Migliore UX in ambiente standard.
   - Compatibilità preservata in ambienti restrittivi senza introdurre dipendenze esterne.
+
+## ADR 009 — Redirect URI OAuth stabile con Home Assistant Ingress
+- Date: 2026-02-22
+- Context:
+  - Il prefisso Ingress (`/api/hassio_ingress/<token>/`) è dinamico e non registrabile in Google Cloud.
+  - Con redirect non stabile si alternano `400 redirect_uri_mismatch` e `404 callback`.
+- Decision:
+  - La redirect URI OAuth non deve includere token Ingress.
+  - La URI consigliata deve essere stabile e registrabile (base pubblica o host+porta add-on).
+- Alternatives:
+  - Usare redirect “ingress-aware” tokenizzata.
+- Consequences:
+  - Configurazione OAuth più prevedibile.
+  - Necessità di documentare chiaramente quale URI registrare in Google Cloud.
