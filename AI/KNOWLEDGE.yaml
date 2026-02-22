@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T11:18:00Z"
+  updated_at: "2026-02-22T11:26:00Z"
 
 commands:
   frontend_build:
@@ -43,7 +43,7 @@ entities:
     type: "module"
     name: "Google Drive Cloud Backup"
     path: "file_editor_plus/backend/app.py"
-    notes: "Device Flow + upload ZIP di /config su Drive; storage `/data/gdrive/*`; endpoints `/api/cloud/gdrive/*`. Resolver OAuth config con fallback env (`GDRIVE_OAUTH_*` / `DEFAULT_GDRIVE_OAUTH_*`)."
+    notes: "Device Flow + upload ZIP di /config su Drive; storage `/data/gdrive/*`; endpoints `/api/cloud/gdrive/*`. Resolver OAuth config con fallback env (`GDRIVE_OAUTH_*` / `DEFAULT_GDRIVE_OAUTH_*`). OAuth start endpoint con state + PKCE."
 
   - id: "backend:s6-run"
     type: "runtime"
@@ -117,6 +117,16 @@ relations:
     to: "context:gdrive_oauth_map"
 
 changes_log:
+  - step_id: "GDRIVE-OAUTH-STEP-003"
+    summary: "Aggiunto endpoint OAuth start (`/api/cloud/gdrive/oauth/start`) con state+PKCE e store in-memory con TTL."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/backend/app.py"
+    commands:
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+    notes: "Step 003 backend-only; callback OAuth implementato nello step successivo."
+
   - step_id: "GDRIVE-OAUTH-STEP-002"
     summary: "Aggiunto resolver configurazione OAuth con fallback user -> env e ampliato schema opzioni add-on per secret/redirect URI."
     files:

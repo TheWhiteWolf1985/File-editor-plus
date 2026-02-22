@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+import base64
 import fnmatch
 import io
 import os
@@ -14,6 +15,8 @@ import platform
 import hashlib
 import mimetypes
 import threading
+import secrets
+from urllib.parse import urlencode
 from logging.handlers import RotatingFileHandler
 import tempfile
 import zipfile
@@ -261,6 +264,8 @@ _gdrive_device_stop: Optional[threading.Event] = None
 _gdrive_schedule_stop = threading.Event()
 _gdrive_schedule_wake = threading.Event()
 _gdrive_last_auto_run: Optional[int] = None
+_gdrive_oauth_state_store: dict[str, dict] = {}
+GDRIVE_OAUTH_STATE_TTL_SECONDS = 600
 
 
 def _load_addon_options() -> dict:
@@ -298,6 +303,21 @@ def _resolve_gdrive_oauth_config() -> dict:
         "client_id_source": "user" if _get_gdrive_option_str("gdrive_client_id") else ("env_default" if DEFAULT_GDRIVE_OAUTH_CLIENT_ID else "none"),
         "client_secret_source": "user" if _get_gdrive_option_str("gdrive_client_secret") else ("env_default" if DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET else "none"),
     }
+
+
+def _cleanup_gdrive_oauth_states(now_ts: Optional[int] = None) -> None:
+    now = int(now_ts or time.time())
+    with _gdrive_lock:
+        expired = [k for k, v in _gdrive_oauth_state_store.items() if int(v.get("expires_at") or 0) <= now]
+        for k in expired:
+            _gdrive_oauth_state_store.pop(k, None)
+
+
+def _build_gdrive_pkce_pair() -> tuple[str, str]:
+    verifier = secrets.token_urlsafe(64)
+    digest = hashlib.sha256(verifier.encode("utf-8")).digest()
+    challenge = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+    return verifier, challenge
 
 
 def _load_gdrive_tokens() -> Optional[dict]:
@@ -2877,6 +2897,42 @@ def gdrive_status():
         "connected": _is_gdrive_connected(tokens),
         "device_flow": state,
     }
+
+
+@app.get("/api/cloud/gdrive/oauth/start")
+def gdrive_oauth_start(request: Request):
+    oauth_cfg = _resolve_gdrive_oauth_config()
+    client_id = oauth_cfg.get("client_id")
+    if not client_id:
+        raise HTTPException(503, "Manca gdrive_client_id (opzioni add-on o fallback env)")
+
+    redirect_uri = oauth_cfg.get("redirect_uri") or f"{str(request.base_url).rstrip('/')}/api/cloud/gdrive/oauth/callback"
+    state = secrets.token_urlsafe(32)
+    verifier, challenge = _build_gdrive_pkce_pair()
+    expires_at = int(time.time()) + GDRIVE_OAUTH_STATE_TTL_SECONDS
+
+    _cleanup_gdrive_oauth_states()
+    with _gdrive_lock:
+        _gdrive_oauth_state_store[state] = {
+            "code_verifier": verifier,
+            "redirect_uri": redirect_uri,
+            "expires_at": expires_at,
+            "used": False,
+        }
+
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "https://www.googleapis.com/auth/drive.file",
+        "access_type": "offline",
+        "prompt": "consent",
+        "state": state,
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+    }
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    return {"ok": True, "auth_url": auth_url, "expires_at": expires_at}
 
 
 @app.post("/api/cloud/gdrive/device/start")

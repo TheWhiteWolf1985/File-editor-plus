@@ -103,7 +103,7 @@
 
 ## STEP 003 — Implementare endpoint OAuth start (generate auth_url + state + PKCE)
 
-- Status: TODO
+- Status: DONE
 - Goal: Creare `GET /api/cloud/gdrive/oauth/start` che ritorna l’URL di autorizzazione Google e prepara state/PKCE server-side.
 - Scope:
   - Backend route/controller: `<<REQUIRED: path>>`
@@ -138,6 +138,19 @@
 
 - Blockers/Notes:
   - Non loggare auth_url completa se contiene param sensibili (state ok, ma evita noise).
+
+- What changed:
+  - Aggiunto endpoint `GET /api/cloud/gdrive/oauth/start` con validazione `effective client_id`.
+  - Implementata generazione `state` robusto + PKCE (`code_verifier`/`code_challenge`).
+  - Aggiunto store in-memory con TTL per `state` e cleanup scadenze.
+  - `redirect_uri` risolto da opzioni add-on o fallback derivato da `request.base_url`.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/backend/app.py`
+
+- Commands run:
+  - `python3 -m compileall file_editor_plus/backend/app.py`
 
 ---
 
