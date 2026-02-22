@@ -53,7 +53,7 @@
 
 ## STEP 002 — Definire configurazione OAuth e fallback client_id
 
-- Status: TODO
+- Status: DONE
 - Goal: Implementare la logica “user client_id se presente, altrimenti fallback app client_id”.
 - Scope:
   - Config: `<<REQUIRED: config model/schema file>>`
@@ -82,6 +82,22 @@
 
 - Blockers/Notes:
   - Non committare segreti reali. Solo chiavi/placeholder e lettura da env/secrets.
+
+- What changed:
+  - Esteso backend con resolver OAuth (`_resolve_gdrive_oauth_config`) che usa prima opzioni utente e poi fallback env.
+  - Aggiunte variabili env fallback per `client_id` e `client_secret` (`GDRIVE_OAUTH_*`/`DEFAULT_GDRIVE_OAUTH_*`).
+  - Aggiornato `status`/`device_start`/token refresh path per usare il `client_id` effettivo risolto.
+  - Esteso schema add-on con `gdrive_client_secret` e `gdrive_redirect_uri` (opzionali).
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/backend/app.py`
+  - `file_editor_plus/config.yaml`
+
+- Commands run:
+  - `rg "gdrive_client_id" -n file_editor_plus`
+  - `rg "secrets|GDRIVE_OAUTH_CLIENT" -n file_editor_plus/backend/app.py file_editor_plus/config.yaml`
+  - `python3 -m compileall file_editor_plus/backend/app.py`
 
 ---
 

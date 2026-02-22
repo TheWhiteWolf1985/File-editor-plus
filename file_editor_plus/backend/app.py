@@ -43,6 +43,16 @@ LEGACY_USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
 MDI_META_FILE = (Path(__file__).parent / "mdi_meta.json").resolve()
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 ADDON_VERSION = os.environ.get("ADDON_VERSION") or os.environ.get("VERSION") or "unknown"
+DEFAULT_GDRIVE_OAUTH_CLIENT_ID = (
+    os.environ.get("GDRIVE_OAUTH_CLIENT_ID_DEFAULT")
+    or os.environ.get("DEFAULT_GDRIVE_OAUTH_CLIENT_ID")
+    or ""
+).strip()
+DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET = (
+    os.environ.get("GDRIVE_OAUTH_CLIENT_SECRET_DEFAULT")
+    or os.environ.get("DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET")
+    or ""
+).strip()
 logger = logging.getLogger("file_editor_plus")
 MAX_FORMAT_SIZE = 2 * 1024 * 1024  # 2MB
 MAX_SEARCH_FILE_SIZE = 2 * 1024 * 1024  # 2MB per file
@@ -270,6 +280,26 @@ def _get_gdrive_client_id() -> Optional[str]:
     return cid or None
 
 
+def _get_gdrive_option_str(key: str) -> str:
+    opts = _load_addon_options()
+    if not isinstance(opts, dict):
+        return ""
+    return str(opts.get(key) or "").strip()
+
+
+def _resolve_gdrive_oauth_config() -> dict:
+    client_id = _get_gdrive_option_str("gdrive_client_id") or DEFAULT_GDRIVE_OAUTH_CLIENT_ID
+    client_secret = _get_gdrive_option_str("gdrive_client_secret") or DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET
+    redirect_uri = _get_gdrive_option_str("gdrive_redirect_uri")
+    return {
+        "client_id": client_id or None,
+        "client_secret": client_secret or None,
+        "redirect_uri": redirect_uri or None,
+        "client_id_source": "user" if _get_gdrive_option_str("gdrive_client_id") else ("env_default" if DEFAULT_GDRIVE_OAUTH_CLIENT_ID else "none"),
+        "client_secret_source": "user" if _get_gdrive_option_str("gdrive_client_secret") else ("env_default" if DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET else "none"),
+    }
+
+
 def _load_gdrive_tokens() -> Optional[dict]:
     if not GDRIVE_TOKENS_FILE.exists():
         return None
@@ -492,7 +522,8 @@ def _refresh_access_token(client_id: str, refresh_token: str) -> dict:
 
 
 def _get_access_token_or_503() -> str:
-    cid = _get_gdrive_client_id()
+    cfg = _resolve_gdrive_oauth_config()
+    cid = cfg.get("client_id")
     if not cid:
         raise HTTPException(503, "Google Drive non configurato: manca gdrive_client_id nelle opzioni add-on")
     tokens = _load_gdrive_tokens()
@@ -2835,13 +2866,14 @@ async def diff_endpoint(body: dict):
 
 @app.get("/api/cloud/gdrive/status")
 def gdrive_status():
-    cid = _get_gdrive_client_id()
+    oauth_cfg = _resolve_gdrive_oauth_config()
     tokens = _load_gdrive_tokens()
     with _gdrive_lock:
         state = dict(_gdrive_device_state) if _gdrive_device_state else None
     return {
         "ok": True,
-        "configured": bool(cid),
+        "configured": bool(oauth_cfg.get("client_id")),
+        "oauth_client_source": oauth_cfg.get("client_id_source"),
         "connected": _is_gdrive_connected(tokens),
         "device_flow": state,
     }
@@ -2850,7 +2882,8 @@ def gdrive_status():
 @app.post("/api/cloud/gdrive/device/start")
 def gdrive_device_start():
     global _gdrive_device_state, _gdrive_device_stop
-    cid = _get_gdrive_client_id()
+    oauth_cfg = _resolve_gdrive_oauth_config()
+    cid = oauth_cfg.get("client_id")
     if not cid:
         raise HTTPException(503, "Manca gdrive_client_id nelle opzioni add-on")
 

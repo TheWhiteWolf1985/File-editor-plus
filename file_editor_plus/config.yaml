@@ -27,6 +27,10 @@ map:
 
 options:
   gdrive_client_id: ""
+  gdrive_client_secret: ""
+  gdrive_redirect_uri: ""
 
 schema:
   gdrive_client_id: str
+  gdrive_client_secret: str
+  gdrive_redirect_uri: str

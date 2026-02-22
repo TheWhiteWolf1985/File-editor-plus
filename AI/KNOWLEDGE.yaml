@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T11:10:00Z"
+  updated_at: "2026-02-22T11:18:00Z"
 
 commands:
   frontend_build:
@@ -31,7 +31,7 @@ entities:
     type: "addon"
     name: "File Editor Plus"
     path: "file_editor_plus/config.yaml"
-    notes: "Ingress abilitato; mount /config:rw; permessi Supervisor/Core API (vedi manifest)."
+    notes: "Ingress abilitato; mount /config:rw; permessi Supervisor/Core API (vedi manifest). Opzioni cloud: `gdrive_client_id`, `gdrive_client_secret`, `gdrive_redirect_uri`."
 
   - id: "backend:api"
     type: "service"
@@ -43,7 +43,7 @@ entities:
     type: "module"
     name: "Google Drive Cloud Backup"
     path: "file_editor_plus/backend/app.py"
-    notes: "Device Flow + upload ZIP di /config su Drive; storage `/data/gdrive/*`; endpoints `/api/cloud/gdrive/*`."
+    notes: "Device Flow + upload ZIP di /config su Drive; storage `/data/gdrive/*`; endpoints `/api/cloud/gdrive/*`. Resolver OAuth config con fallback env (`GDRIVE_OAUTH_*` / `DEFAULT_GDRIVE_OAUTH_*`)."
 
   - id: "backend:s6-run"
     type: "runtime"
@@ -117,6 +117,19 @@ relations:
     to: "context:gdrive_oauth_map"
 
 changes_log:
+  - step_id: "GDRIVE-OAUTH-STEP-002"
+    summary: "Aggiunto resolver configurazione OAuth con fallback user -> env e ampliato schema opzioni add-on per secret/redirect URI."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/backend/app.py"
+      - "file_editor_plus/config.yaml"
+    commands:
+      - "rg \"gdrive_client_id\" -n file_editor_plus"
+      - "rg \"secrets|GDRIVE_OAUTH_CLIENT\" -n file_editor_plus/backend/app.py file_editor_plus/config.yaml"
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+    notes: "Nessun secret committato; fallback solo da env runtime."
+
   - step_id: "GDRIVE-OAUTH-STEP-001"
     summary: "Mappato il flow Device Flow attuale (UI -> API -> polling -> token store) con file e endpoint coinvolti."
     files:
