@@ -280,7 +280,7 @@
 
 ## STEP 009 — Documentazione finale (per evitare future issue)
 
-- Status: TODO
+- Status: DONE
 - Goal: Mettere nero su bianco il requisito “callback raggiungibile e registrata”.
 - Changes:
   - Documentare:
@@ -294,6 +294,20 @@
 
 - Commit message:
   - `docs(gdrive): explain ingress-safe oauth redirect configuration`
+
+- What changed:
+  - Aggiornata documentazione utente con procedura completa di configurazione redirect OAuth.
+  - Aggiunte istruzioni su dove leggere la URI effettiva in UI e tabella troubleshooting 400 vs 404.
+  - Allineate note operative finali al comportamento ingress-safe implementato.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/KNOWLEDGE.yaml`
+  - `file_editor_plus/README.md`
+
+- Commands run:
+  - `cd file_editor_plus/frontend && npm run build`
+  - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
 
 ---
 

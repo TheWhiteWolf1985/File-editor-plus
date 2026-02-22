@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T14:28:00Z"
+  updated_at: "2026-02-22T14:34:00Z"
 
 commands:
   frontend_build:
@@ -127,6 +127,17 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "GDRIVE-INGRESS-STEP-009"
+    summary: "Documentazione finale OAuth ingress-safe completata con guida redirect URI e troubleshooting 400/404."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/README.md"
+    commands:
+      - "cd file_editor_plus/frontend && npm run build"
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+    notes: "Guida utenti allineata alla diagnostica UI (`redirect_uri`, `mode`) introdotta nei passi precedenti."
+
   - step_id: "GDRIVE-INGRESS-STEP-008"
     summary: "Aggiunti test smoke/coverage per redirect modes OAuth e checklist matrix aggiornata."
     files:
