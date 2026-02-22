@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T11:59:00Z"
+  updated_at: "2026-02-22T12:35:00Z"
 
 commands:
   frontend_build:
@@ -87,6 +87,12 @@ entities:
     path: "AI/CONTEXT/gdrive_oauth_flow_map.md"
     notes: "Mappa flow attuale Device Flow e punti di aggancio frontend/backend/config."
 
+  - id: "qa:gdrive_smoke"
+    type: "qa"
+    name: "Google Drive OAuth smoke checklist"
+    path: "AI/SMOKE.md"
+    notes: "Checklist smoke per connect OAuth e fallback Device Flow; include esiti automated."
+
 relations:
   - from: "addon:file_editor_plus"
     type: "runs"
@@ -116,7 +122,23 @@ relations:
     type: "documented_by"
     to: "context:gdrive_oauth_map"
 
+  - from: "backend:gdrive"
+    type: "validated_by"
+    to: "qa:gdrive_smoke"
+
 changes_log:
+  - step_id: "GDRIVE-OAUTH-STEP-009"
+    summary: "Aggiunta copertura test backend OAuth + checklist smoke; verifiche automated PASS."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "AI/SMOKE.md"
+      - "file_editor_plus/backend/test_gdrive_oauth.py"
+    commands:
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm run build"
+    notes: "Smoke UI OAuth manuale documentato ma non eseguibile in ambiente headless."
+
   - step_id: "GDRIVE-OAUTH-STEP-008"
     summary: "Hardening OAuth: validazione strict di `redirect_uri` su start/callback + conferma state single-use TTL."
     files:

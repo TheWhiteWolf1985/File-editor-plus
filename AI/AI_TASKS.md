@@ -384,7 +384,7 @@
 
 ## STEP 009 — Test + Smoke (minimi ma reali)
 
-- Status: TODO
+- Status: DONE
 - Goal: Aggiungere verifiche ripetibili.
 - Scope:
   - Test backend: `<<REQUIRED: test folder>>`
@@ -412,6 +412,21 @@
 
 - Blockers/Notes:
   - Evitare test che richiedono Google reale (mock token endpoint).
+
+- What changed:
+  - Aggiunti test backend dedicati al nuovo flow OAuth (`/oauth/start`, callback con state invalido, stato connected con token valido).
+  - Creata checklist smoke in `AI/SMOKE.md` con esiti automated e punti manuali da validare su HA Ingress.
+  - Eseguiti backend unit tests completi e build frontend con esito PASS.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/SMOKE.md`
+  - `AI/KNOWLEDGE.yaml`
+  - `file_editor_plus/backend/test_gdrive_oauth.py`
+
+- Commands run:
+  - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
+  - `cd file_editor_plus/frontend && npm run build`
 
 ---
 
