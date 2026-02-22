@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T14:34:00Z"
+  updated_at: "2026-02-22T16:40:00Z"
 
 commands:
   frontend_build:
@@ -127,6 +127,21 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "CLOUD-ARCHIVE-STEP-001"
+    summary: "Creata quarantine `future_features/cloud_backup_gdrive` con inventory completo dei riferimenti cloud backup/gdrive."
+    files:
+      - "future_features/cloud_backup_gdrive/README.md"
+      - "future_features/cloud_backup_gdrive/INVENTORY.md"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "rg -n \"Backup su cloud|cloud backup|gdrive|google drive|oauth/start|oauth/callback|device/start|hassio_ingress|GDRIVE_OAUTH|GOOGLE_OAUTH\""
+      - "rg -n \"/api/cloud/gdrive\""
+      - "rg -n \"gdrive_\""
+      - "cd file_editor_plus/frontend && npm run build"
+      - "cd file_editor_plus/backend && timeout 8s python3 -m uvicorn app:app --host 127.0.0.1 --port 18099"
+    notes: "Backend start locale non disponibile nell'host corrente (`No module named uvicorn`). Nessun comportamento runtime modificato in step 1."
+
   - step_id: "GDRIVE-INGRESS-STEP-009"
     summary: "Documentazione finale OAuth ingress-safe completata con guida redirect URI e troubleshooting 400/404."
     files:
