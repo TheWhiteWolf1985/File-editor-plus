@@ -849,7 +849,7 @@ export const appStyles = css`
     .token-function {
       color: var(--token-function-color);
     }
-    textarea {
+    .codeWrap > textarea {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -874,13 +874,13 @@ export const appStyles = css`
       scrollbar-gutter: stable;
       z-index: 2;
     }
-    textarea::selection {
+    .codeWrap > textarea::selection {
       background: var(--editor-selection-bg);
     }
-    textarea::-moz-selection {
+    .codeWrap > textarea::-moz-selection {
       background: var(--editor-selection-bg);
     }
-    textarea:focus {
+    .codeWrap > textarea:focus {
       border-color: var(--border-color);
     }
     .basePre {
