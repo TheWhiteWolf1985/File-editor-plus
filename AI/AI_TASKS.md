@@ -269,6 +269,21 @@
   - `git commit -m "chore(deps): remove unused deps from archived cloud-backup feature"`
   - `git push origin develop`
 
+**Status:** DONE
+**What changed:**
+- Audit dipendenze completato su backend/frontend.
+- Nessuna dipendenza rimossa: `httpx`, `websockets`, `ruamel.yaml`, `fastapi`, `uvicorn` risultano usate da feature attive non cloud.
+- Nessuna dipendenza frontend correlata esclusivamente a cloud backup.
+- Verifiche build/compile eseguite con esito positivo.
+**Files touched:**
+- `AI/AI_TASKS.md`
+**Commands run:**
+- `cat file_editor_plus/backend/requirements.txt`
+- `cat file_editor_plus/frontend/package.json`
+- `rg -n "\\b(httpx|websockets|yaml|uvicorn|fastapi)\\b" file_editor_plus/backend/app.py file_editor_plus/backend/*.py`
+- `python3 -m compileall file_editor_plus/backend/app.py`
+- `cd file_editor_plus/frontend && npm run build`
+
 ---
 
 ## STEP 7 — Smoke finale + nota di deprecazione

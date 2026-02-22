@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T17:06:00Z"
+  updated_at: "2026-02-22T17:10:00Z"
 
 commands:
   frontend_build:
@@ -127,6 +127,19 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "CLOUD-ARCHIVE-STEP-006"
+    summary: "Audit dipendenze completato: nessuna dipendenza rimossa perché tutte ancora usate da feature attive."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cat file_editor_plus/backend/requirements.txt"
+      - "cat file_editor_plus/frontend/package.json"
+      - "rg -n \"\\b(httpx|websockets|yaml|uvicorn|fastapi)\\b\" file_editor_plus/backend/app.py file_editor_plus/backend/*.py"
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+      - "cd file_editor_plus/frontend && npm run build"
+    notes: "Nessuna modifica runtime in questo step."
+
   - step_id: "CLOUD-ARCHIVE-STEP-005"
     summary: "Archiviate le unit test gdrive fuori dal percorso attivo; suite backend standard confermata verde."
     files:
