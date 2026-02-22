@@ -1039,12 +1039,19 @@ export class AppRoot extends LitElement {
       const payload = await res.json().catch(() => null);
       if (!res.ok || payload?.ok !== true || !payload?.auth_url) {
         const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
+        const lowered = String(msg).toLowerCase();
+        if (lowered.includes("client_id")) {
+          this.showToast("OAuth non disponibile: passo al Device Flow", "info");
+          await this.startGdriveDeviceFlow();
+          return;
+        }
         this.showToast(String(msg), "error");
         return;
       }
       const popup = window.open(String(payload.auth_url), "gdrive_oauth", "width=520,height=720,noopener,noreferrer");
       if (!popup) {
-        this.showToast("Popup bloccato: abilita popup per completare l'accesso Google", "error");
+        this.showToast("Popup bloccato: avvio Device Flow", "info");
+        await this.startGdriveDeviceFlow();
         return;
       }
       popup.focus();
@@ -3744,7 +3751,7 @@ export class AppRoot extends LitElement {
                         <div style="display:flex; gap:8px; align-items:center;">
                           ${connected
                             ? html`<button class="btn" ?disabled=${this.gdriveLoading} @click=${() => this.disconnectGdrive()}>Disconnetti</button>`
-                            : html`<button class="btn primary" ?disabled=${this.gdriveLoading || !configured} @click=${() => this.startGdriveOAuthFlow()}>
+                            : html`<button class="btn primary" ?disabled=${this.gdriveLoading} @click=${() => this.startGdriveOAuthFlow()}>
                                 Connetti
                               </button>`}
                         </div>

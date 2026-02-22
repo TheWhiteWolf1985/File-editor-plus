@@ -98,3 +98,18 @@ Source of truth:
 ### Exit criteria ADR 007
 - Tornare a `npm ci` deterministico quando una build `linux/arm64` con base musl passa con `npm ci --include=optional` usando lockfile aggiornato/rigenerato in modo controllato e verificato.
 - Tornare a `npm ci` deterministico quando una versione specifica di Node/npm documentata elimina il problema optional-deps+lockfile su arm64/musl con evidenza riproducibile in CI/build add-on.
+
+## ADR 008 — Google Drive Connect: OAuth popup come default, Device Flow come fallback
+- Date: 2026-02-22
+- Context:
+  - UX richiesta: apertura pagina ufficiale Google "Scegli account" dal pulsante `Connetti`.
+  - In alcuni ambienti popup può essere bloccato o il `client_id` OAuth può non essere disponibile.
+- Decision:
+  - Default: usare OAuth Authorization Code (`/api/cloud/gdrive/oauth/start` + popup Google).
+  - Fallback: usare Device Flow esistente solo se popup bloccato o OAuth start non disponibile per client id.
+- Alternatives:
+  - Rimuovere completamente Device Flow.
+  - Tenere solo Device Flow (UX peggiore, non allineata al requisito).
+- Consequences:
+  - Migliore UX in ambiente standard.
+  - Compatibilità preservata in ambienti restrittivi senza introdurre dipendenze esterne.

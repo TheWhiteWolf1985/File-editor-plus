@@ -296,7 +296,7 @@
 
 ## STEP 007 — (Opzionale) Tenere Device Flow come fallback secondario
 
-- Status: TODO
+- Status: DONE
 - Goal: Mantenere compatibilità per ambienti dove popup/redirect sono problematici.
 - Scope:
   - Backend: device endpoints esistenti
@@ -319,6 +319,18 @@
 
 - Blockers/Notes:
   - Se non richiesto, si può anche rimuovere: decidere in `AI/DECISIONS.md`.
+
+- What changed:
+  - Mantenuto Device Flow come fallback secondario dietro al nuovo OAuth popup.
+  - Fallback automatico attivato su popup bloccato o su errore OAuth legato a `client_id`.
+  - UI `Connetti` resa sempre cliccabile (disabilitata solo durante loading) per consentire fallback runtime.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/frontend/src/app-root.ts`
+
+- Commands run:
+  - `cd file_editor_plus/frontend && npm run build`
 
 ---
 
