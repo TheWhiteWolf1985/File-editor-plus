@@ -3,10 +3,6 @@ name: PreRelease (build + publish to PreRelease)
 on:
   workflow_dispatch:
 
-  push:
-    branches:
-      - develop
-
 jobs:
   build_fe_multiarch:
     name: Build FE stage (multi-arch)
