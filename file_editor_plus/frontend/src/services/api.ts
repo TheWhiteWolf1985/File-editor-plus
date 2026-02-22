@@ -283,6 +283,11 @@ export const apiGdriveDeviceStart = (apiBase: string) => {
   return fetch(url, { method: "POST", headers: jsonHeaders });
 };
 
+export const apiGdriveOauthStart = (apiBase: string) => {
+  const url = `${apiBase}api/cloud/gdrive/oauth/start`;
+  return fetch(url);
+};
+
 export const apiGdriveDeviceCancel = (apiBase: string) => {
   const url = `${apiBase}api/cloud/gdrive/device/cancel`;
   return fetch(url, { method: "POST", headers: jsonHeaders });

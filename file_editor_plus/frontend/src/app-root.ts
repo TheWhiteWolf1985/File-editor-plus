@@ -89,6 +89,7 @@ import {
   apiGdriveDeviceStart,
   apiGdriveDisconnect,
   apiGdriveGetSchedule,
+  apiGdriveOauthStart,
   apiGdrivePutSchedule,
   apiGdriveStatus,
 } from "./services/api";
@@ -1006,6 +1007,54 @@ export class AppRoot extends LitElement {
     }
   }
 
+  private startGdriveStatusPolling() {
+    if (this.gdrivePollTimer !== null) return;
+    this.gdrivePollTimer = window.setInterval(async () => {
+      try {
+        const s = await apiGdriveStatus(this.apiBase);
+        const sp = await s.json().catch(() => null);
+        this.gdriveStatus = sp;
+        if (sp?.connected) {
+          window.clearInterval(this.gdrivePollTimer!);
+          this.gdrivePollTimer = null;
+          await this.loadGdriveState();
+          this.showToast("Google Drive connesso");
+          return;
+        }
+        const st = sp?.device_flow?.status;
+        if (st === "expired" || st === "error") {
+          window.clearInterval(this.gdrivePollTimer!);
+          this.gdrivePollTimer = null;
+        }
+      } catch {
+        // ignore transient polling failures
+      }
+    }, 2000);
+  }
+
+  private async startGdriveOAuthFlow() {
+    this.gdriveLoading = true;
+    try {
+      const res = await apiGdriveOauthStart(this.apiBase);
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || payload?.ok !== true || !payload?.auth_url) {
+        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
+        this.showToast(String(msg), "error");
+        return;
+      }
+      const popup = window.open(String(payload.auth_url), "gdrive_oauth", "width=520,height=720,noopener,noreferrer");
+      if (!popup) {
+        this.showToast("Popup bloccato: abilita popup per completare l'accesso Google", "error");
+        return;
+      }
+      popup.focus();
+      this.showToast("Completa l'accesso Google nella finestra aperta", "info");
+      this.startGdriveStatusPolling();
+    } finally {
+      this.gdriveLoading = false;
+    }
+  }
+
   private async startGdriveDeviceFlow() {
     this.gdriveLoading = true;
     try {
@@ -1018,28 +1067,7 @@ export class AppRoot extends LitElement {
       }
       this.gdriveStatus = { ...(this.gdriveStatus || {}), device_flow: payload };
       this.showToast("Connetti Google Drive: inserisci il codice nel link mostrato", "info");
-      if (this.gdrivePollTimer === null) {
-        this.gdrivePollTimer = window.setInterval(async () => {
-          try {
-            const s = await apiGdriveStatus(this.apiBase);
-            const sp = await s.json().catch(() => null);
-            this.gdriveStatus = sp;
-            if (sp?.connected) {
-              window.clearInterval(this.gdrivePollTimer!);
-              this.gdrivePollTimer = null;
-              await this.loadGdriveState();
-              this.showToast("Google Drive connesso");
-            }
-            const st = sp?.device_flow?.status;
-            if (st === "expired" || st === "error") {
-              window.clearInterval(this.gdrivePollTimer!);
-              this.gdrivePollTimer = null;
-            }
-          } catch {
-            // ignore transient polling failures
-          }
-        }, 2000);
-      }
+      this.startGdriveStatusPolling();
     } finally {
       this.gdriveLoading = false;
     }
@@ -3716,7 +3744,7 @@ export class AppRoot extends LitElement {
                         <div style="display:flex; gap:8px; align-items:center;">
                           ${connected
                             ? html`<button class="btn" ?disabled=${this.gdriveLoading} @click=${() => this.disconnectGdrive()}>Disconnetti</button>`
-                            : html`<button class="btn primary" ?disabled=${this.gdriveLoading || !configured} @click=${() => this.startGdriveDeviceFlow()}>
+                            : html`<button class="btn primary" ?disabled=${this.gdriveLoading || !configured} @click=${() => this.startGdriveOAuthFlow()}>
                                 Connetti
                               </button>`}
                         </div>

@@ -251,7 +251,7 @@
 
 ## STEP 006 — Frontend: pulsante Connetti apre Google OAuth (popup)
 
-- Status: TODO
+- Status: DONE
 - Goal: Il click su “Connetti” deve aprire la pagina ufficiale Google “Scegli account”.
 - Scope:
   - Frontend connect action: `<<REQUIRED: path>>`
@@ -277,6 +277,20 @@
 
 - Blockers/Notes:
   - Il frontend non deve mai vedere secret o token.
+
+- What changed:
+  - Aggiunto client API `apiGdriveOauthStart()` e nuova action UI `startGdriveOAuthFlow()`.
+  - Il pulsante `Connetti` ora usa OAuth start (`/api/cloud/gdrive/oauth/start`) e apre popup Google ufficiale.
+  - Gestito caso popup bloccato con messaggio errore esplicito.
+  - Estratto polling status in helper riusabile, mantenendo invariato `/api/cloud/gdrive/status`.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/frontend/src/app-root.ts`
+  - `file_editor_plus/frontend/src/services/api.ts`
+
+- Commands run:
+  - `cd file_editor_plus/frontend && npm run build`
 
 ---
 
