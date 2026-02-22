@@ -215,7 +215,7 @@
 
 ## STEP 007 — Hardening: state/redirect binding e protezioni anti-mismatch
 
-- Status: TODO
+- Status: DONE
 - Goal: Evitare che un redirect diverso venga usato nel token exchange.
 - Changes:
   - Continuare a salvare `redirect_uri` nello state store al momento di `/oauth/start`.
@@ -227,6 +227,20 @@
 
 - Commit message:
   - `fix(gdrive): bind redirect_uri to state for consistent token exchange`
+
+- What changed:
+  - Il callback OAuth usa ora esclusivamente `redirect_uri` salvata nello state di `/oauth/start`.
+  - Rimossi fallback di ricalcolo redirect nel token exchange.
+  - Se `redirect_uri` manca nello state, il backend risponde con errore chiaro e azione suggerita.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/KNOWLEDGE.yaml`
+  - `file_editor_plus/backend/app.py`
+
+- Commands run:
+  - `python3 -m compileall file_editor_plus/backend/app.py`
+  - `cd file_editor_plus/frontend && npm run build`
 
 ---
 

@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T14:14:00Z"
+  updated_at: "2026-02-22T14:20:00Z"
 
 commands:
   frontend_build:
@@ -127,6 +127,17 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "GDRIVE-INGRESS-STEP-007"
+    summary: "Bind hard su redirect_uri nello state OAuth; callback usa solo valore persistito in start."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/backend/app.py"
+    commands:
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+      - "cd file_editor_plus/frontend && npm run build"
+    notes: "Eliminati fallback redirect nel callback per prevenire mismatch start/callback."
+
   - step_id: "GDRIVE-INGRESS-STEP-006"
     summary: "UI Google Drive aggiornata con redirect URI copiabile e warning Ingress per ridurre errori 400/404."
     files:

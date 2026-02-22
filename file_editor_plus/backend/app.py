@@ -3049,7 +3049,11 @@ def gdrive_oauth_callback(request: Request, code: Optional[str] = None, state: O
             _gdrive_oauth_state_store.pop(state, None)
         raise HTTPException(503, "OAuth non configurato: client_id mancante")
 
-    token_redirect_uri = state_data.get("redirect_uri") or oauth_cfg.get("redirect_uri") or f"{str(request.base_url).rstrip('/')}/api/cloud/gdrive/oauth/callback"
+    token_redirect_uri = str(state_data.get("redirect_uri") or "").strip()
+    if not token_redirect_uri:
+        with _gdrive_lock:
+            _gdrive_oauth_state_store.pop(state, None)
+        raise HTTPException(400, "OAuth state incompleto: redirect_uri mancante (riavvia il flow da Connetti)")
     if not _is_valid_redirect_uri(str(token_redirect_uri)):
         with _gdrive_lock:
             _gdrive_oauth_state_store.pop(state, None)
