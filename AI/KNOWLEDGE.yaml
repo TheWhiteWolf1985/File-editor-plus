@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T11:26:00Z"
+  updated_at: "2026-02-22T11:34:00Z"
 
 commands:
   frontend_build:
@@ -43,7 +43,7 @@ entities:
     type: "module"
     name: "Google Drive Cloud Backup"
     path: "file_editor_plus/backend/app.py"
-    notes: "Device Flow + upload ZIP di /config su Drive; storage `/data/gdrive/*`; endpoints `/api/cloud/gdrive/*`. Resolver OAuth config con fallback env (`GDRIVE_OAUTH_*` / `DEFAULT_GDRIVE_OAUTH_*`). OAuth start endpoint con state + PKCE."
+    notes: "Device Flow + upload ZIP di /config su Drive; storage `/data/gdrive/*`; endpoints `/api/cloud/gdrive/*`. Resolver OAuth config con fallback env (`GDRIVE_OAUTH_*` / `DEFAULT_GDRIVE_OAUTH_*`). OAuth start+callback con state/PKCE e persistenza token."
 
   - id: "backend:s6-run"
     type: "runtime"
@@ -117,6 +117,16 @@ relations:
     to: "context:gdrive_oauth_map"
 
 changes_log:
+  - step_id: "GDRIVE-OAUTH-STEP-004"
+    summary: "Implementato callback OAuth (`/api/cloud/gdrive/oauth/callback`) con validazione state, token exchange e persistenza token."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/backend/app.py"
+    commands:
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+    notes: "Response callback HTML popup-friendly; state cleanup eseguito sia su successo sia su errore."
+
   - step_id: "GDRIVE-OAUTH-STEP-003"
     summary: "Aggiunto endpoint OAuth start (`/api/cloud/gdrive/oauth/start`) con state+PKCE e store in-memory con TTL."
     files:

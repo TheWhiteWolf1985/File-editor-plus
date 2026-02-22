@@ -2935,6 +2935,91 @@ def gdrive_oauth_start(request: Request):
     return {"ok": True, "auth_url": auth_url, "expires_at": expires_at}
 
 
+@app.get("/api/cloud/gdrive/oauth/callback", response_class=HTMLResponse)
+def gdrive_oauth_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
+    global _gdrive_device_state
+    _cleanup_gdrive_oauth_states()
+
+    if error:
+        return HTMLResponse(
+            f"""<!doctype html><html><body style="font-family:sans-serif;padding:16px;">
+            <h3>Google Drive: autorizzazione negata</h3>
+            <p>Dettaglio: {error}</p>
+            <script>setTimeout(()=>window.close(),1200);</script>
+            </body></html>""",
+            status_code=400,
+        )
+
+    if not state or not code:
+        raise HTTPException(400, "OAuth callback incompleto")
+
+    with _gdrive_lock:
+        state_data = _gdrive_oauth_state_store.get(state)
+        if not state_data:
+            raise HTTPException(400, "OAuth state non valido o scaduto")
+        if bool(state_data.get("used")):
+            raise HTTPException(400, "OAuth state già utilizzato")
+        if int(state_data.get("expires_at") or 0) <= int(time.time()):
+            _gdrive_oauth_state_store.pop(state, None)
+            raise HTTPException(400, "OAuth state scaduto")
+        state_data = dict(state_data)
+        _gdrive_oauth_state_store[state]["used"] = True
+
+    oauth_cfg = _resolve_gdrive_oauth_config()
+    client_id = oauth_cfg.get("client_id")
+    if not client_id:
+        with _gdrive_lock:
+            _gdrive_oauth_state_store.pop(state, None)
+        raise HTTPException(503, "OAuth non configurato: client_id mancante")
+
+    token_payload = {
+        "client_id": client_id,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": state_data.get("redirect_uri") or oauth_cfg.get("redirect_uri") or f"{str(request.base_url).rstrip('/')}/api/cloud/gdrive/oauth/callback",
+        "code_verifier": state_data.get("code_verifier") or "",
+    }
+    client_secret = oauth_cfg.get("client_secret")
+    if client_secret:
+        token_payload["client_secret"] = client_secret
+
+    try:
+        payload = _oauth_post_form("https://oauth2.googleapis.com/token", token_payload)
+        access_token = payload.get("access_token")
+        if not access_token:
+            raise HTTPException(502, "Token response incompleta: access_token mancante")
+        refresh_token = payload.get("refresh_token")
+        existing = _load_gdrive_tokens() or {}
+        now = int(time.time())
+        expires_in = int(payload.get("expires_in") or 3600)
+        merged = dict(existing)
+        merged.update(
+            {
+                "access_token": access_token,
+                "expires_at": now + expires_in,
+                "token_type": payload.get("token_type") or "Bearer",
+                "scope": payload.get("scope") or merged.get("scope") or "drive.file",
+            }
+        )
+        if refresh_token:
+            merged["refresh_token"] = refresh_token
+        _save_gdrive_tokens(merged)
+    finally:
+        with _gdrive_lock:
+            _gdrive_oauth_state_store.pop(state, None)
+
+    with _gdrive_lock:
+        _gdrive_device_state = {"status": "connected", "source": "oauth_callback", "at": int(time.time())}
+
+    return HTMLResponse(
+        """<!doctype html><html><body style="font-family:sans-serif;padding:16px;">
+        <h3>Google Drive connesso</h3>
+        <p>Puoi chiudere questa finestra e tornare all'add-on.</p>
+        <script>setTimeout(()=>window.close(),1200);</script>
+        </body></html>"""
+    )
+
+
 @app.post("/api/cloud/gdrive/device/start")
 def gdrive_device_start():
     global _gdrive_device_state, _gdrive_device_stop

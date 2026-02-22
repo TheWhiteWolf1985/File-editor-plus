@@ -156,7 +156,7 @@
 
 ## STEP 004 — Implementare callback OAuth (code -> tokens) + state validation
 
-- Status: TODO
+- Status: DONE
 - Goal: Creare `GET /api/cloud/gdrive/oauth/callback` che valida `state`, scambia `code` per token e salva token.
 - Scope:
   - Backend route/controller: `<<REQUIRED: path>>`
@@ -193,6 +193,19 @@
 - Blockers/Notes:
   - Mai loggare token/refresh_token/secret.
   - Pulire state/PKCE storage dopo successo o errore.
+
+- What changed:
+  - Implementato endpoint `GET /api/cloud/gdrive/oauth/callback` con validazione `state` (single-use + TTL).
+  - Aggiunto token exchange verso Google con `authorization_code` + `code_verifier` (PKCE).
+  - Persistenza token aggiornata con merge sicuro su storage esistente (`/data/gdrive/tokens.json`).
+  - Callback ora risponde con HTML di successo/errore pensato per popup OAuth (`window.close()` best-effort).
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/backend/app.py`
+
+- Commands run:
+  - `python3 -m compileall file_editor_plus/backend/app.py`
 
 ---
 
