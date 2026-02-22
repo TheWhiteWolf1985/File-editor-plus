@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T16:48:00Z"
+  updated_at: "2026-02-22T16:55:00Z"
 
 commands:
   frontend_build:
@@ -127,6 +127,19 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "CLOUD-ARCHIVE-STEP-003"
+    summary: "Rimosse dal backend attivo le route `/api/cloud/gdrive/*`; snapshot route originale archiviato in future_features."
+    files:
+      - "file_editor_plus/backend/app.py"
+      - "future_features/cloud_backup_gdrive/backend/app_routes_snapshot.py"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "cd file_editor_plus/frontend && npm run build"
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+      - "rg -n \"@app\\.(get|post|put)\\(\\\"/api/cloud/gdrive\" file_editor_plus/backend/app.py"
+    notes: "Rimangono helper/funzioni gdrive non route nel backend core, da trattare nei passi successivi di archiviazione config/test."
+
   - step_id: "CLOUD-ARCHIVE-STEP-002"
     summary: "Rimosso pannello/modale Backup Cloud dalla UI attiva; snapshot del blocco archiviato in future_features."
     files:

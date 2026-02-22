@@ -144,6 +144,21 @@
   - `git commit -m "chore(api): remove gdrive cloud-backup endpoints (moved to future_features)"`
   - `git push origin develop`
 
+**Status:** DONE
+**What changed:**
+- Rimosse dal backend attivo tutte le route `/api/cloud/gdrive/*`.
+- Archiviato snapshot del blocco route originale in `future_features/cloud_backup_gdrive/backend/app_routes_snapshot.py`.
+- Verificato che nel file attivo non restino decorator `@app.*(\"/api/cloud/gdrive...\")`.
+- Build frontend e compile backend completati.
+**Files touched:**
+- `file_editor_plus/backend/app.py`
+- `future_features/cloud_backup_gdrive/backend/app_routes_snapshot.py`
+- `AI/AI_TASKS.md`
+**Commands run:**
+- `cd file_editor_plus/frontend && npm run build`
+- `python3 -m compileall file_editor_plus/backend/app.py`
+- `rg -n \"@app\\.(get|post|put)\\(\\\"/api/cloud/gdrive\" file_editor_plus/backend/app.py`
+
 ---
 
 ## STEP 4 — Config/add-on: rimuovere opzioni, env template, docs di gdrive dal percorso attivo
