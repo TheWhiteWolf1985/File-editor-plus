@@ -63,6 +63,20 @@ Se `gdrive_client_id` non e' impostato nelle opzioni, il backend prova fallback 
 - Errore redirect URI mismatch: imposta `gdrive_redirect_uri` coerente con URL Ingress dell'add-on.
 - Stato non passa a `Connesso`: controlla log backend/supervisor e opzioni OAuth.
 
+### Redirect OAuth e Ingress (callback raggiungibile)
+
+Per Home Assistant Ingress, non usare callback con token ingress dinamico.
+Usa una redirect URI stabile e raggiungibile:
+
+- Opzione 1 (consigliata): imposta `public_base_url` nelle opzioni add-on e registra su Google:
+  - `<public_base_url>/api/cloud/gdrive/oauth/callback`
+- Opzione 2: usa `gdrive_redirect_override` con URI completa.
+- Opzione 3: fallback host+porta add-on:
+  - `https://<host>:<addon_callback_port>/api/cloud/gdrive/oauth/callback` (default porta `8099`)
+
+Nota:
+- Se la callback non è raggiungibile dall'esterno, Google completerà il login ma il callback può finire in `404`.
+
 ## Supporto
 
 Apri un issue sul repo con:

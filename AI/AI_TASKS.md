@@ -114,7 +114,7 @@
 
 ## STEP 004 — Backend: rendere il callback raggiungibile (porta 8099 / routing)
 
-- Status: TODO
+- Status: DONE
 - Goal: Far sì che Google possa chiamare davvero la callback stabile.
 - Changes:
   - Verificare `config.yaml` addon:
@@ -129,6 +129,20 @@
 
 - Commit message:
   - `docs(addon): clarify port/public url requirements for oauth callback`
+
+- What changed:
+  - Documentati requisiti di raggiungibilità callback OAuth in presenza di Ingress.
+  - Esplicitate le opzioni `public_base_url`, `gdrive_redirect_override` e fallback `addon_callback_port`.
+  - Chiarita la causa tipica del `404` callback quando la URI non è esternamente raggiungibile.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/KNOWLEDGE.yaml`
+  - `file_editor_plus/README.md`
+
+- Commands run:
+  - `cd file_editor_plus/frontend && npm run build`
+  - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
 
 ---
 
