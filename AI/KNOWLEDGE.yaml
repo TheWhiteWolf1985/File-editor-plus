@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-21T18:19:24Z"
+  updated_at: "2026-02-22T11:10:00Z"
 
 commands:
   frontend_build:
@@ -81,6 +81,12 @@ entities:
     path: "file_editor_plus/frontend/src/i18n/index.ts"
     notes: "Locale persistito in localStorage key `locale`."
 
+  - id: "context:gdrive_oauth_map"
+    type: "context"
+    name: "Google Drive OAuth migration map"
+    path: "AI/CONTEXT/gdrive_oauth_flow_map.md"
+    notes: "Mappa flow attuale Device Flow e punti di aggancio frontend/backend/config."
+
 relations:
   - from: "addon:file_editor_plus"
     type: "runs"
@@ -106,7 +112,24 @@ relations:
     type: "uses"
     to: "frontend:i18n"
 
+  - from: "backend:gdrive"
+    type: "documented_by"
+    to: "context:gdrive_oauth_map"
+
 changes_log:
+  - step_id: "GDRIVE-OAUTH-STEP-001"
+    summary: "Mappato il flow Device Flow attuale (UI -> API -> polling -> token store) con file e endpoint coinvolti."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/CONTEXT/gdrive_oauth_flow_map.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "rg \"gdrive\" -n file_editor_plus"
+      - "rg \"/api/cloud/gdrive\" -n file_editor_plus"
+      - "rg \"device/start\" -n file_editor_plus"
+      - "rg \"status\" -n file_editor_plus/backend/app.py"
+    notes: "Nessuna modifica runtime nello step 001; solo analisi e tracciabilità."
+
   - step_id: "ADR007-IMPROVEMENTS-STEP-003"
     summary: "Verifica arm64 completata dopo mitigazioni ADR007: build FE OK con evidenza log versioni Node/npm."
     files:

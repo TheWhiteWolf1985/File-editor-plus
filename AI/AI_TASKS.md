@@ -1,151 +1,358 @@
-# AI_TASKS - ADR007 Improvements (lockfile clarity, exit criteria, npm flags)
+# AI_TASKS — Google Drive OAuth (Authorization Code) Flow (1.0.0)
 
-## Goal
-
-Applicare 3 miglioramenti alla decisione ADR 007:
-
-1. chiarire esplicitamente che la rimozione di `package-lock.json` avviene **solo nello stage di build** e non nel repo;
-2. aggiungere **exit criteria** per rimuovere il workaround e tornare a una build deterministica;
-3. aggiungere mitigazioni minime nello stage FE: flag `npm install` per ridurre rumore e annotare versione Node/npm per riproducibilità.
-
-## Scope
-
-- `AI/DECISIONS.md` (ADR 007)
-- `file_editor_plus/Dockerfile` (solo stage FE)
-- (Se presente) `AI/CONTEXT/issue_17_rollup_musl.md` (integrazione minima: versione Node/npm)
-
-## Non-goals
-
-- Tornare a musl/Alpine o cambiare toolchain FE.
-- Rigenerare `package-lock.json` in questa patch.
+> Feature: sostituire il **Device Flow** (codice manuale) con il flow **Google OAuth2 Authorization Code** (pagina “Scegli account”),
+> mantenendo il Device Flow come fallback opzionale.
 
 ---
 
-### STEP 001 - Aggiornare ADR 007: lockfile solo in build stage + exit criteria
+## STEP 001 — Allineamento contesto e mappa del codice
 
 - Status: DONE
-- Goal: Rendere la decisione auditabile e limitare ambiguità sul lockfile e sul workaround.
+- Goal: Trovare esattamente dove oggi vive il Device Flow e come viene salvato lo stato “connesso”.
 - Scope:
-  - `AI/DECISIONS.md`
+  - Backend: `<<REQUIRED: path server api routes/services for gdrive>>`
+  - Frontend: `<<REQUIRED: path UI page/button connect>>`
+  - Config: `<<REQUIRED: path config schema / env / secrets>>`
 
 - Changes:
-  - In ADR 007 aggiungere una sezione (o 2 bullet) che specifichi chiaramente:
-    - **Lockfile policy:** la rimozione di `package-lock.json` avviene **solo nello stage FE del container** (es. `RUN rm -f package-lock.json`), **non** viene rimossa dal repository e non va committata.
-
-  - Aggiungere una sezione **Exit criteria** con criteri verificabili per rimuovere il workaround e tornare a `npm ci` deterministico, ad esempio:
-    - Quando `npm ci --include=optional` su arm64/musl passa con lockfile aggiornato/rigenerato in modo controllato; oppure
-    - Quando una versione specifica di Node/npm (documentata) non presenta più il problema optional-deps+lockfile su arm64/musl.
-
-  - (Opzionale ma consigliato) Annotare che il workaround è confinato allo stage FE e non impatta runtime dell’addon.
+  - Individuare endpoint attuali: `/api/cloud/gdrive/device/start`, callback/status attuali, storage token.
+  - Identificare dove vengono letti `gdrive_client_id` (e secret, se esiste).
+  - Annotare dove vive l’handler “Connetti” nel frontend e l’aggiornamento stato via `/status`.
 
 - Commands:
-  - `git diff`
+  - `rg "gdrive" -n`
+  - `rg "/api/cloud/gdrive" -n`
+  - `rg "device/start" -n`
+  - `rg "status" -n`
 
 - Acceptance criteria:
-  - ADR 007 contiene:
-    - frase esplicita “lockfile rimosso solo in build stage, non dal repo”
-    - sezione Exit criteria con 2 condizioni verificabili
-
-  - Nessuna modifica tecnica oltre `AI/DECISIONS.md` in questo step.
+  - Lista file/entrypoint coinvolti + diagramma mentale (anche in note) del flusso attuale.
 
 - Commit message:
-  - `docs(decisions): clarify lockfile handling and add exit criteria for ADR 007`
+  - `chore(gdrive): map current device flow implementation`
+
+- Blockers/Notes:
+  - Nessun refactor: solo mappatura.
 
 - What changed:
-  - Aggiornato ADR 007 in `AI/DECISIONS.md` con lockfile policy esplicita: `package-lock.json` viene rimosso solo nello stage FE del container e non dal repository.
-  - Aggiunta nota di confinamento del workaround al solo build stage FE (nessun impatto runtime add-on).
-  - Aggiunta sezione `Exit criteria ADR 007` con 2 condizioni verificabili per rientro a `npm ci` deterministico.
+  - Mappato il flow attuale Device Flow frontend/backend con file e funzioni coinvolte.
+  - Verificata la persistenza token e stato transiente (`/data/gdrive/*` + `_gdrive_device_state`).
+  - Tracciati endpoint API effettivamente wired nella UI.
 
 - Files touched:
   - `AI/AI_TASKS.md`
-  - `AI/DECISIONS.md`
+  - `AI/CONTEXT/gdrive_oauth_flow_map.md`
 
 - Commands run:
-  - `git diff -- AI/DECISIONS.md`
+  - `rg "gdrive" -n file_editor_plus`
+  - `rg "/api/cloud/gdrive" -n file_editor_plus`
+  - `rg "device/start" -n file_editor_plus`
+  - `rg "status" -n file_editor_plus/backend/app.py`
 
 ---
 
-### STEP 002 - Dockerfile stage FE: aggiungere flag npm e tracciare versione Node/npm
+## STEP 002 — Definire configurazione OAuth e fallback client_id
 
-- Status: DONE
-- Goal: Ridurre non-determinismo “pratico” e rumore (audit/fund) e aumentare riproducibilità (versioni).
+- Status: TODO
+- Goal: Implementare la logica “user client_id se presente, altrimenti fallback app client_id”.
 - Scope:
-  - `file_editor_plus/Dockerfile`
-  - `AI/CONTEXT/issue_17_rollup_musl.md` (se esiste)
+  - Config: `<<REQUIRED: config model/schema file>>`
+  - Runtime env/secrets: `<<REQUIRED: where secrets/env are read>>`
 
 - Changes:
-  - Nello stage FE (glibc) aggiornare il comando di installazione per includere flag stabilizzanti:
-    - da: `npm install --include=optional`
-    - a: `npm install --include=optional --no-audit --no-fund`
+  - Aggiungere/validare queste chiavi:
+    - `gdrive_client_id` (opzionale lato user)
+    - `gdrive_client_secret` (solo backend; opzionale se usate PKCE-only, ma in genere serve)
+    - `gdrive_redirect_uri` (calcolata o configurabile; deve puntare al callback)
+    - `gdrive_oauth_client_id_default` + `gdrive_oauth_client_secret_default` (fallback via env/secrets)
 
-  - (Se utile e minimale) aggiungere subito prima o dopo una riga che stampi versioni in log build:
-    - `RUN node -v && npm -v`
-    - **Nota:** questa riga è solo diagnostica, non modifica output runtime.
-
-  - Aggiornare il contesto `AI/CONTEXT/issue_17_rollup_musl.md` con:
-    - output `node -v` e `npm -v` usati nella build di riferimento.
+  - Implementare resolver:
+    - `effectiveClientId = user.gdrive_client_id ?? env.DEFAULT_GDRIVE_CLIENT_ID`
+    - `effectiveClientSecret = user.gdrive_client_secret ?? env.DEFAULT_GDRIVE_CLIENT_SECRET`
 
 - Commands:
-  - `git diff`
+  - `rg "gdrive_client_id" -n`
+  - `rg "secrets" -n`
 
 - Acceptance criteria:
-  - Dockerfile: nello stage FE l’install usa `--no-audit --no-fund`.
-  - Dockerfile: presente logging `node -v` e `npm -v` (se aggiunto) senza altre modifiche laterali.
-  - Contesto aggiornato con versioni Node/npm.
+  - Backend può sempre ottenere un `client_id` valido (user o fallback), senza esporre segreti al frontend.
 
 - Commit message:
-  - `chore(build): add npm install flags and log node/npm versions in FE stage`
+  - `feat(gdrive): add oauth config resolver with fallback client id`
 
-- What changed:
-  - Aggiornato stage FE in `file_editor_plus/Dockerfile` con log diagnostico versioni (`RUN node -v && npm -v`).
-  - Aggiornato comando install FE in `file_editor_plus/Dockerfile` con flag `--no-audit --no-fund` mantenendo `--include=optional`.
-  - Aggiornato `AI/CONTEXT/issue_17_rollup_musl.md` con versioni Node/npm della build di riferimento.
-
-- Files touched:
-  - `AI/AI_TASKS.md`
-  - `file_editor_plus/Dockerfile`
-  - `AI/CONTEXT/issue_17_rollup_musl.md`
-
-- Commands run:
-  - `git diff`
-  - `docker run --rm node:20-bookworm-slim sh -lc 'node -v && npm -v'`
+- Blockers/Notes:
+  - Non committare segreti reali. Solo chiavi/placeholder e lettura da env/secrets.
 
 ---
 
-### STEP 003 - Verifica rapida e aggiornamento audit
+## STEP 003 — Implementare endpoint OAuth start (generate auth_url + state + PKCE)
 
-- Status: DONE
-- Goal: Confermare che i cambiamenti non rompono la build e aggiornare evidenze.
+- Status: TODO
+- Goal: Creare `GET /api/cloud/gdrive/oauth/start` che ritorna l’URL di autorizzazione Google e prepara state/PKCE server-side.
 - Scope:
-  - Build arm64 (add-on builder/CI) + eventuale amd64
+  - Backend route/controller: `<<REQUIRED: path>>`
+  - Storage temporaneo state (session/in-memory/db): `<<REQUIRED: path>>`
 
 - Changes:
-  - Eseguire build arm64 come da runbook/procedura progetto.
-  - Verificare che:
-    - build FE passa
-    - i log includono `node -v` e `npm -v` (se aggiunti)
+  - Implementare:
+    - Generazione `state` random (>= 128-bit) e salvataggio (con TTL).
+    - (Consigliato) PKCE:
+      - `code_verifier` random
+      - `code_challenge = BASE64URL(SHA256(code_verifier))`
+      - Salva `code_verifier` associato a `state` (TTL).
 
-  - Aggiornare audit/contesto con esito.
+    - Costruzione auth URL con:
+      - `client_id`, `redirect_uri`, `response_type=code`
+      - `scope` (minimo: `https://www.googleapis.com/auth/drive.file` o quello richiesto dal PRD)
+      - `access_type=offline` + `prompt=consent` (se serve refresh token)
+      - `state`
+      - `code_challenge` + `code_challenge_method=S256` (se PKCE)
+
+  - Response JSON:
+    - `{ "auth_url": "..." }`
 
 - Commands:
-  - `<<REQUIRED_RUNBOOK_ADDON_OR_CI_BUILD_FOR_ARM64>>`
+  - `<<OPTIONAL: run unit tests or server start>>`
 
 - Acceptance criteria:
-  - Build arm64 OK.
-  - Evidenze aggiornate nel contesto (o audit equivalente).
+  - Chiamando `/oauth/start` ottieni un `auth_url` valido e un `state` memorizzato (non in log).
 
 - Commit message:
-  - `chore(ci): verify ADR007 mitigations on arm64 build`
+  - `feat(api): add gdrive oauth start endpoint`
 
-- What changed:
-  - Eseguita build arm64 del solo stage FE con `--no-cache --pull` per validare le mitigazioni ADR007.
-  - Verificato in log che vengono stampate le versioni `node -v` e `npm -v` durante la build FE.
-  - Aggiornato `AI/CONTEXT/issue_17_rollup_musl.md` con comando e snippet log di verifica.
+- Blockers/Notes:
+  - Non loggare auth_url completa se contiene param sensibili (state ok, ma evita noise).
 
-- Files touched:
-  - `AI/AI_TASKS.md`
-  - `AI/CONTEXT/issue_17_rollup_musl.md`
+---
 
-- Commands run:
-  - `docker pull --platform linux/arm64 node:20-bookworm-slim`
-  - `docker build --no-cache --pull --platform linux/arm64 --target fe -f file_editor_plus/Dockerfile file_editor_plus`
+## STEP 004 — Implementare callback OAuth (code -> tokens) + state validation
+
+- Status: TODO
+- Goal: Creare `GET /api/cloud/gdrive/oauth/callback` che valida `state`, scambia `code` per token e salva token.
+- Scope:
+  - Backend route/controller: `<<REQUIRED: path>>`
+  - Token storage: `<<REQUIRED: where tokens are persisted>>`
+
+- Changes:
+  - Validazione:
+    - `state` presente e match con state salvato (anti-CSRF).
+    - `code` presente.
+    - TTL non scaduto.
+
+  - Token exchange:
+    - POST a `https://oauth2.googleapis.com/token`
+    - Parametri: `client_id`, `client_secret` (server-only), `code`, `grant_type=authorization_code`, `redirect_uri`
+    - Se PKCE: include `code_verifier`
+
+  - Persistenza:
+    - Salva `access_token`, `refresh_token` (se presente), `expiry`, `scope`, `token_type`
+    - Associazione a user/instance come da modello esistente
+
+  - Response:
+    - Se via popup: HTML minimale che mostra “Connesso, puoi chiudere questa finestra” e tenta `window.close()`
+    - Oppure redirect a pagina interna di successo (se esiste)
+
+- Commands:
+  - `<<OPTIONAL>>`
+
+- Acceptance criteria:
+  - Dopo login Google, il callback salva token e lo stato `/status` diventa “connesso”.
+
+- Commit message:
+  - `feat(api): handle gdrive oauth callback and token storage`
+
+- Blockers/Notes:
+  - Mai loggare token/refresh_token/secret.
+  - Pulire state/PKCE storage dopo successo o errore.
+
+---
+
+## STEP 005 — Aggiornare endpoint /status (o logica stato) per supportare OAuth
+
+- Status: TODO
+- Goal: Ri-usare il polling esistente e farlo riflettere lo stato reale dei token OAuth.
+- Scope:
+  - Backend status endpoint: `<<REQUIRED: path>>`
+
+- Changes:
+  - Considerare “connesso” se:
+    - token esiste e non scaduto, oppure
+    - refresh token presente (con possibilità di refresh) e access token refreshabile
+
+  - (Se già esiste refresh logic) confermare che funzioni anche per OAuth tokens.
+
+- Commands:
+  - `<<OPTIONAL>>`
+
+- Acceptance criteria:
+  - UI passa a “Connesso” senza nuovi endpoint frontend oltre a `/oauth/start`.
+
+- Commit message:
+  - `fix(status): reflect oauth token connection state`
+
+- Blockers/Notes:
+  - Nessuna regressione sul flow precedente.
+
+---
+
+## STEP 006 — Frontend: pulsante Connetti apre Google OAuth (popup)
+
+- Status: TODO
+- Goal: Il click su “Connetti” deve aprire la pagina ufficiale Google “Scegli account”.
+- Scope:
+  - Frontend connect action: `<<REQUIRED: path>>`
+
+- Changes:
+  - Sostituire chiamata a `/device/start` con:
+    1. fetch `GET /api/cloud/gdrive/oauth/start`
+    2. `window.open(auth_url, "gdrive_oauth", "width=520,height=720,...")`
+
+  - Gestire popup bloccato:
+    - se `window.open` ritorna `null`, mostra messaggio “abilita popup” e (opzionale) fallback Device Flow
+
+  - Lasciare invariato polling `/status`.
+
+- Commands:
+  - `<<OPTIONAL: frontend dev build>>`
+
+- Acceptance criteria:
+  - Click -> popup Google -> selezione account -> callback -> UI “Connesso”.
+
+- Commit message:
+  - `feat(ui): switch gdrive connect to oauth authorization code flow`
+
+- Blockers/Notes:
+  - Il frontend non deve mai vedere secret o token.
+
+---
+
+## STEP 007 — (Opzionale) Tenere Device Flow come fallback secondario
+
+- Status: TODO
+- Goal: Mantenere compatibilità per ambienti dove popup/redirect sono problematici.
+- Scope:
+  - Backend: device endpoints esistenti
+  - UI: fallback path
+
+- Changes:
+  - Mantieni `/device/start` e relativo flusso.
+  - UI usa Device Flow solo se:
+    - popup bloccato, oppure
+    - server non ha `effectiveClientId` disponibile (fallback non configurato)
+
+- Commands:
+  - `<<OPTIONAL>>`
+
+- Acceptance criteria:
+  - OAuth è default; Device Flow ancora funzionante quando necessario.
+
+- Commit message:
+  - `feat(gdrive): keep device flow as fallback`
+
+- Blockers/Notes:
+  - Se non richiesto, si può anche rimuovere: decidere in `AI/DECISIONS.md`.
+
+---
+
+## STEP 008 — Hardening sicurezza (state, headers, logging, secrets)
+
+- Status: TODO
+- Goal: Chiudere le falle classiche OAuth prima che qualcuno ci faccia a pezzi su GitHub 😄
+- Scope:
+  - Backend middleware/utilities: `<<REQUIRED>>`
+
+- Changes:
+  - `state`:
+    - random strong + TTL + single-use
+
+  - Cookie/session (se usata):
+    - `HttpOnly`, `SameSite=Lax` (o Strict se compatibile), `Secure` se https
+
+  - Logging:
+    - redaction token/secret
+    - no querystring dumping del callback
+
+  - CORS/redirect:
+    - redirect_uri deve essere esattamente quello atteso (no open redirect)
+
+- Commands:
+  - `<<OPTIONAL>>`
+
+- Acceptance criteria:
+  - Nessun token/secret appare nei log; callback respinge state invalidi.
+
+- Commit message:
+  - `chore(security): harden gdrive oauth flow`
+
+- Blockers/Notes:
+  - Se usi PKCE, il rischio cala ancora.
+
+---
+
+## STEP 009 — Test + Smoke (minimi ma reali)
+
+- Status: TODO
+- Goal: Aggiungere verifiche ripetibili.
+- Scope:
+  - Test backend: `<<REQUIRED: test folder>>`
+  - Smoke: `AI/SMOKE.md` (aggiornare)
+
+- Changes:
+  - Unit/integration:
+    - `/oauth/start` ritorna auth_url e salva state
+    - `/oauth/callback` rifiuta state invalido
+    - `/status` riflette token presence
+
+  - Smoke manuale:
+    - “Connetti” apre Google
+    - login ok
+    - UI diventa “Connesso”
+
+- Commands:
+  - `<<REQUIRED: commands to run tests>>`
+
+- Acceptance criteria:
+  - Test passano + smoke checklist eseguita e annotata.
+
+- Commit message:
+  - `test(gdrive): add oauth start/callback coverage`
+
+- Blockers/Notes:
+  - Evitare test che richiedono Google reale (mock token endpoint).
+
+---
+
+## STEP 010 — Documentazione e audit finale
+
+- Status: TODO
+- Goal: Chiudere feature con documenti coerenti e pronto per release 1.0.0.
+- Scope:
+  - `README` / docs addon: `<<REQUIRED>>`
+  - `AI/KNOWLEDGE.yaml`, `AI/DECISIONS.md`, `AI/RELEASE.md`, `AI/AI_TASKS.md`
+
+- Changes:
+  - Documentare:
+    - come configurare client_id/secret user
+    - come configurare fallback via env/secrets
+    - troubleshooting (popup bloccato, redirect mismatch)
+
+  - Aggiornare `AI/KNOWLEDGE.yaml` con:
+    - endpoints nuovi
+    - config keys
+    - decisione su PKCE e fallback device flow
+
+  - Aggiornare status di tutti gli step a DONE.
+
+- Commands:
+  - `<<OPTIONAL>>`
+
+- Acceptance criteria:
+  - Docs aggiornate, audit chiuso, nessun secret nel repo.
+
+- Commit message:
+  - `docs(gdrive): document oauth connect flow and configuration`
+
+- Blockers/Notes:
+  - Release notes in `AI/RELEASE.md` se previste.
+
+---
