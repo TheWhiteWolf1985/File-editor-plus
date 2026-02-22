@@ -95,6 +95,21 @@
   - `git commit -m "chore(ui): remove cloud backup panel from UI (moved to future_features)"`
   - `git push origin develop`
 
+**Status:** DONE
+**What changed:**
+- Rimosso dal frontend il bottone card `Backup su cloud` dalla sezione Backup.
+- Rimossi da `app-root.ts` blocco modal Google Drive e tutti gli handler/state UI collegati.
+- Salvato snapshot del blocco UI rimosso in `future_features/cloud_backup_gdrive/snippets/ui_backup_modal.md`.
+- Build frontend eseguita con esito positivo.
+- Backend start locale non eseguibile nell'host corrente (`uvicorn` non installato).
+**Files touched:**
+- `file_editor_plus/frontend/src/app-root.ts`
+- `future_features/cloud_backup_gdrive/snippets/ui_backup_modal.md`
+- `AI/AI_TASKS.md`
+**Commands run:**
+- `cd file_editor_plus/frontend && npm run build`
+- `cd file_editor_plus/backend && timeout 8s python3 -m uvicorn app:app --host 127.0.0.1 --port 18099` (failed: module `uvicorn` missing)
+
 ---
 
 ## STEP 3 — Backend: scollegare e rimuovere endpoint /api/cloud/gdrive/\*

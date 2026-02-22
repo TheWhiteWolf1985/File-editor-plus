@@ -84,14 +84,6 @@ import {
   apiPutSessionBuffer,
   apiGetSessionBuffer,
   apiResetSession,
-  apiGdriveBackup,
-  apiGdriveDeviceCancel,
-  apiGdriveDeviceStart,
-  apiGdriveDisconnect,
-  apiGdriveGetSchedule,
-  apiGdriveOauthStart,
-  apiGdrivePutSchedule,
-  apiGdriveStatus,
 } from "./services/api";
 import { SUPPORTED_LOCALES, getPersistedLocale, loadLocale, setLocale, t, type SupportedLocaleCode } from "./i18n";
 import { FONT_BASE_MAX, FONT_BASE_MIN, FONT_BASE_STEP, FONT_DEFAULTS } from "./constants";
@@ -108,7 +100,6 @@ export class AppRoot extends LitElement {
   })();
 
   private saveAsConflictResolver: ((choice: "overwrite" | "suffix" | "cancel") => void) | null = null;
-  private gdrivePollTimer: number | null = null;
 
   static properties = {
     expanded: { state: true },
@@ -202,12 +193,6 @@ export class AppRoot extends LitElement {
     saveAsInProgress: { state: true },
     saveAsConflictOpen: { state: true },
     saveAsConflictPath: { state: true },
-    showGdriveModal: { state: true },
-    gdriveStatus: { state: true },
-    gdriveSchedule: { state: true },
-    gdriveOauthInfo: { state: true },
-    gdriveLoading: { state: true },
-    gdriveSavingSchedule: { state: true },
     uploadTargetDir: { state: true },
     uploadInProgress: { state: true },
     uploadFiles: { state: true },
@@ -250,12 +235,6 @@ export class AppRoot extends LitElement {
   declare saveAsInProgress: boolean;
   declare saveAsConflictOpen: boolean;
   declare saveAsConflictPath: string | null;
-  declare showGdriveModal: boolean;
-  declare gdriveStatus: any;
-  declare gdriveSchedule: any;
-  declare gdriveOauthInfo: { redirect_uri?: string; mode?: string } | null;
-  declare gdriveLoading: boolean;
-  declare gdriveSavingSchedule: boolean;
   declare uploadTargetDir: string;
   declare uploadFile: File | null;
   declare uploadFiles: File[];
@@ -595,12 +574,6 @@ export class AppRoot extends LitElement {
     this.saveAsInProgress = false;
     this.saveAsConflictOpen = false;
     this.saveAsConflictPath = null;
-    this.showGdriveModal = false;
-    this.gdriveStatus = null;
-    this.gdriveSchedule = null;
-    this.gdriveOauthInfo = null;
-    this.gdriveLoading = false;
-    this.gdriveSavingSchedule = false;
     this.uploadTargetDir = "/";
     this.uploadFile = null;
     this.uploadFiles = [];
@@ -717,10 +690,6 @@ export class AppRoot extends LitElement {
     if (this.haClient) {
       this.haClient.disconnect();
       this.haClient = null;
-    }
-    if (this.gdrivePollTimer !== null) {
-      window.clearInterval(this.gdrivePollTimer);
-      this.gdrivePollTimer = null;
     }
     super.disconnectedCallback();
   }
@@ -975,204 +944,6 @@ export class AppRoot extends LitElement {
       this.showToast("Errore Save As", "error");
     } finally {
       this.saveAsInProgress = false;
-    }
-  }
-
-  private async loadGdriveState() {
-    const [statusRes, scheduleRes] = await Promise.all([
-      apiGdriveStatus(this.apiBase),
-      apiGdriveGetSchedule(this.apiBase),
-    ]);
-    const statusPayload = await statusRes.json().catch(() => null);
-    const schedulePayload = await scheduleRes.json().catch(() => null);
-    this.gdriveStatus = statusPayload;
-    this.gdriveSchedule = schedulePayload;
-  }
-
-  private async openGdriveModal() {
-    this.showGdriveModal = true;
-    this.gdriveLoading = true;
-    try {
-      await this.loadGdriveState();
-    } catch (e) {
-      if (import.meta.env.DEV) console.warn("gdrive load failed", e);
-      this.showToast("Errore caricamento Google Drive", "error");
-    } finally {
-      this.gdriveLoading = false;
-    }
-  }
-
-  private closeGdriveModal() {
-    this.showGdriveModal = false;
-    this.gdriveOauthInfo = null;
-    if (this.gdrivePollTimer !== null) {
-      window.clearInterval(this.gdrivePollTimer);
-      this.gdrivePollTimer = null;
-    }
-  }
-
-  private startGdriveStatusPolling() {
-    if (this.gdrivePollTimer !== null) return;
-    this.gdrivePollTimer = window.setInterval(async () => {
-      try {
-        const s = await apiGdriveStatus(this.apiBase);
-        const sp = await s.json().catch(() => null);
-        this.gdriveStatus = sp;
-        if (sp?.connected) {
-          window.clearInterval(this.gdrivePollTimer!);
-          this.gdrivePollTimer = null;
-          await this.loadGdriveState();
-          this.showToast("Google Drive connesso");
-          return;
-        }
-        const st = sp?.device_flow?.status;
-        if (st === "expired" || st === "error") {
-          window.clearInterval(this.gdrivePollTimer!);
-          this.gdrivePollTimer = null;
-        }
-      } catch {
-        // ignore transient polling failures
-      }
-    }, 2000);
-  }
-
-  private async startGdriveOAuthFlow() {
-    this.gdriveLoading = true;
-    try {
-      const res = await apiGdriveOauthStart(this.apiBase);
-      const payload = await res.json().catch(() => null);
-      if (!res.ok || payload?.ok !== true || !payload?.auth_url) {
-        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
-        const lowered = String(msg).toLowerCase();
-        if (lowered.includes("client_id")) {
-          this.showToast("OAuth non disponibile: passo al Device Flow", "info");
-          await this.startGdriveDeviceFlow();
-          return;
-        }
-        this.showToast(String(msg), "error");
-        return;
-      }
-      this.gdriveOauthInfo = {
-        redirect_uri: typeof payload?.redirect_uri === "string" ? payload.redirect_uri : undefined,
-        mode: typeof payload?.mode === "string" ? payload.mode : undefined,
-      };
-      const popup = window.open(String(payload.auth_url), "gdrive_oauth", "width=520,height=720");
-      if (!popup) {
-        this.showToast("Popup bloccato: avvio Device Flow", "info");
-        await this.startGdriveDeviceFlow();
-        return;
-      }
-      popup.focus();
-      this.showToast("Completa l'accesso Google nella finestra aperta", "info");
-      this.startGdriveStatusPolling();
-    } finally {
-      this.gdriveLoading = false;
-    }
-  }
-
-  private async startGdriveDeviceFlow() {
-    this.gdriveLoading = true;
-    try {
-      const res = await apiGdriveDeviceStart(this.apiBase);
-      const payload = await res.json().catch(() => null);
-      if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
-        this.showToast(String(msg), "error");
-        return;
-      }
-      this.gdriveStatus = { ...(this.gdriveStatus || {}), device_flow: payload };
-      this.showToast("Connetti Google Drive: inserisci il codice nel link mostrato", "info");
-      this.startGdriveStatusPolling();
-    } finally {
-      this.gdriveLoading = false;
-    }
-  }
-
-  private async cancelGdriveDeviceFlow() {
-    try {
-      await apiGdriveDeviceCancel(this.apiBase);
-      await this.loadGdriveState();
-    } catch {
-      // ignore
-    }
-  }
-
-  private async disconnectGdrive() {
-    this.gdriveLoading = true;
-    try {
-      const res = await apiGdriveDisconnect(this.apiBase);
-      const payload = await res.json().catch(() => null);
-      if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
-        this.showToast(String(msg), "error");
-        return;
-      }
-      await this.loadGdriveState();
-      this.showToast("Google Drive disconnesso");
-    } finally {
-      this.gdriveLoading = false;
-    }
-  }
-
-  private async runGdriveBackupNow() {
-    this.gdriveLoading = true;
-    try {
-      const res = await apiGdriveBackup(this.apiBase);
-      const payload = await res.json().catch(() => null);
-      if (!res.ok || payload?.ok !== true) {
-        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
-        this.showToast(String(msg), "error");
-        return;
-      }
-      this.showToast("Backup cloud avviato/completato");
-    } finally {
-      this.gdriveLoading = false;
-    }
-  }
-
-  private async saveGdriveSchedule() {
-    const cfg = this.gdriveSchedule;
-    if (!cfg || typeof cfg !== "object") return;
-    const enabled = !!cfg.enabled;
-    const modeRaw = String(cfg.mode || "daily");
-    const mode = (modeRaw === "hourly" || modeRaw === "daily" || modeRaw === "weekly" || modeRaw === "monthly" ? modeRaw : "daily") as
-      | "hourly"
-      | "daily"
-      | "weekly"
-      | "monthly";
-
-    const reqPayload: any = { enabled, mode };
-
-    const retentionCount = Number(cfg.retention_count ?? cfg.retention ?? 0);
-    reqPayload.retention_count = Number.isFinite(retentionCount) ? Math.max(0, Math.min(200, retentionCount)) : 0;
-
-    if (mode === "hourly") {
-      const interval = Number(cfg.hour_interval ?? 1);
-      reqPayload.hour_interval = Number.isFinite(interval) ? Math.max(1, Math.min(24, interval)) : 1;
-    } else {
-      const atTime = String(cfg.at_time || cfg.time || "03:00");
-      reqPayload.at_time = atTime;
-      if (mode === "weekly") {
-        reqPayload.weekday = String(cfg.weekday || "mon");
-      }
-      if (mode === "monthly") {
-        const md = Number(cfg.monthday ?? 1);
-        reqPayload.monthday = Number.isFinite(md) ? Math.max(1, Math.min(28, md)) : 1;
-      }
-    }
-    this.gdriveSavingSchedule = true;
-    try {
-      const res = await apiGdrivePutSchedule(this.apiBase, reqPayload);
-      const respPayload = await res.json().catch(() => null);
-      if (!res.ok || respPayload?.ok !== true) {
-        const msg = respPayload?.detail || respPayload?.error || `HTTP ${res.status}`;
-        this.showToast(String(msg), "error");
-        return;
-      }
-      this.gdriveSchedule = respPayload;
-      this.showToast("Schedulazione aggiornata");
-    } finally {
-      this.gdriveSavingSchedule = false;
     }
   }
 
@@ -2912,13 +2683,6 @@ export class AppRoot extends LitElement {
             </div>
             <div class="systemCardDesc">${t("backup.network_desc")}</div>
           </button>
-          <button class="systemCard" type="button" ?disabled=${this.backupLoading} @click=${() => this.openGdriveModal()}>
-            <div class="systemCardTitle">
-              <app-icon name="cloud" size="16" aria-hidden="true"></app-icon>
-              <span>${t("backup.cloud")}</span>
-            </div>
-            <div class="systemCardDesc">${t("backup.cloud_coming_soon_desc")}</div>
-          </button>
         </div>
       </div>`;
     }
@@ -3719,258 +3483,6 @@ export class AppRoot extends LitElement {
                         : t("modal.upload.uploading")
                       : t("explorer.action.upload")}
                   </button>
-                </div>
-              </div>
-            </div>`
-          : nothing}
-
-        ${this.showGdriveModal
-          ? html`<div class="modalBackdrop" @click=${() => this.closeGdriveModal()}>
-              <div class="modal" @click=${(e: Event) => e.stopPropagation()} style="max-width:720px;">
-                <h3>Google Drive Backup</h3>
-                ${this.gdriveLoading
-                  ? html`<div style="margin-top:10px; color:var(--muted-color);">${t("status.loading")}</div>`
-                  : nothing}
-                ${(() => {
-                  const st = this.gdriveStatus || {};
-                  const configured = !!st.configured;
-                  const connected = !!st.connected;
-                  const flow = st.device_flow || null;
-                  const sched = this.gdriveSchedule || {};
-                  const mode = String(sched.mode || "daily");
-                  const oauthInfo = this.gdriveOauthInfo || {};
-                  const redirectUri = String(oauthInfo.redirect_uri || "");
-                  const redirectMode = String(oauthInfo.mode || "");
-                  const ingressDetected = window.location.pathname.includes("/api/hassio_ingress/");
-                  const atTime = String(sched.at_time || sched.time || "03:00");
-                  const hourInterval = Number(sched.hour_interval ?? 1);
-                  const weekday = String(sched.weekday || "mon");
-                  const monthday = Number(sched.monthday ?? 1);
-                  const retentionCount = Number(sched.retention_count ?? sched.retention ?? 0);
-                  return html`
-                    <div style="margin-top:10px; display:grid; gap:10px;">
-                      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-                        <div>
-                          <div style="font-weight:600;">Stato</div>
-                          <div style="color:var(--muted-color);">
-                            ${!configured
-                              ? "Non configurato (manca gdrive_client_id nelle opzioni add-on)"
-                              : connected
-                                ? "Connesso"
-                                : "Non connesso"}
-                          </div>
-                        </div>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                          ${connected
-                            ? html`<button class="btn" ?disabled=${this.gdriveLoading} @click=${() => this.disconnectGdrive()}>Disconnetti</button>`
-                            : html`<button class="btn primary" ?disabled=${this.gdriveLoading} @click=${() => this.startGdriveOAuthFlow()}>
-                                Connetti
-                              </button>`}
-                        </div>
-                      </div>
-
-                      ${redirectUri
-                        ? html`<div style="border:1px solid var(--border-color); border-radius:10px; padding:10px; background:var(--panel-bg); display:grid; gap:8px;">
-                            <div style="font-weight:600;">Redirect URI da registrare</div>
-                            <div style="font-family:monospace; word-break:break-all;">${redirectUri}</div>
-                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                              <button
-                                class="btn"
-                                @click=${async () => {
-                                  try {
-                                    await navigator.clipboard.writeText(redirectUri);
-                                    this.showToast("Redirect URI copiata");
-                                  } catch {
-                                    this.showToast("Copia non disponibile", "error");
-                                  }
-                                }}
-                              >
-                                Copia redirect URI
-                              </button>
-                              ${redirectMode ? html`<span style="color:var(--muted-color); font-size:var(--font-size-sm);">Mode: ${redirectMode}</span>` : nothing}
-                            </div>
-                            ${redirectMode === "ingress_port" || ingressDetected
-                              ? html`<div style="font-size:var(--font-size-sm); color:var(--warning-color, #f59e0b);">
-                                  Stai usando Ingress: registra una redirect URI esterna/stabile (public_base_url o host:porta callback).
-                                </div>`
-                              : nothing}
-                          </div>`
-                        : nothing}
-
-                      ${!connected && flow
-                        ? html`<div style="border:1px solid var(--border-color); border-radius:10px; padding:10px; background:var(--panel-bg); display:grid; gap:8px;">
-                            <div style="font-weight:600;">Device flow</div>
-                            <div style="color:var(--muted-color);">
-                              Apri <span style="font-family:monospace;">${flow.verification_url}</span> e inserisci il codice:
-                              <span style="font-family:monospace; font-weight:700;">${flow.user_code}</span>
-                            </div>
-                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                              <button
-                                class="btn"
-                                ?disabled=${this.gdriveLoading}
-                                @click=${async () => {
-                                  try {
-                                    await navigator.clipboard.writeText(String(flow.user_code || ""));
-                                    this.showToast("Codice copiato");
-                                  } catch {
-                                    this.showToast("Copia non disponibile", "error");
-                                  }
-                                }}
-                              >
-                                Copia codice
-                              </button>
-                              <button class="btn" ?disabled=${this.gdriveLoading} @click=${() => this.cancelGdriveDeviceFlow()}>Annulla</button>
-                            </div>
-                            <div style="font-size:var(--font-size-sm); color:var(--muted-color);">Stato: ${String(flow.status || "pending")}</div>
-                          </div>`
-                        : nothing}
-
-                      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px;">
-                        <div>
-                          <div style="font-weight:600;">Backup manuale</div>
-                          <div style="color:var(--muted-color);">Crea uno zip di /config e lo carica su Google Drive.</div>
-                        </div>
-                        <button class="btn primary" ?disabled=${this.gdriveLoading || !connected} @click=${() => this.runGdriveBackupNow()}>
-                          Backup ora
-                        </button>
-                      </div>
-
-                      <div style="border:1px solid var(--border-color); border-radius:10px; padding:10px; display:grid; gap:10px;">
-                        <div style="font-weight:600;">Schedulazione</div>
-                        <label style="display:flex; align-items:center; gap:8px;">
-                          <input
-                            type="checkbox"
-                            .checked=${!!sched.enabled}
-                            ?disabled=${this.gdriveSavingSchedule}
-                            @change=${(e: Event) => {
-                              const checked = (e.target as HTMLInputElement).checked;
-                              this.gdriveSchedule = { ...(sched || {}), enabled: checked };
-                            }}
-                          />
-                          Abilita backup automatico
-                        </label>
-                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                          <label style="display:grid; gap:6px;">
-                            <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Modalita'</span>
-                            <select
-                              .value=${mode}
-                              ?disabled=${this.gdriveSavingSchedule}
-                              @change=${(e: Event) => {
-                                const v = String((e.target as HTMLSelectElement).value || "daily");
-                                const next: any = { ...(sched || {}), mode: v };
-                                if (v === "hourly") {
-                                  if (next.hour_interval == null) next.hour_interval = 1;
-                                } else {
-                                  if (!next.at_time && next.time) next.at_time = next.time;
-                                  if (!next.at_time) next.at_time = atTime;
-                                  if (v === "weekly" && !next.weekday) next.weekday = "mon";
-                                  if (v === "monthly" && !next.monthday) next.monthday = 1;
-                                }
-                                this.gdriveSchedule = next;
-                              }}
-                            >
-                              <option value="hourly">Oraria</option>
-                              <option value="daily">Giornaliera</option>
-                              <option value="weekly">Settimanale</option>
-                              <option value="monthly">Mensile</option>
-                            </select>
-                          </label>
-
-                          ${mode === "hourly"
-                            ? html`<label style="display:grid; gap:6px;">
-                                <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Intervallo ore</span>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max="24"
-                                  .value=${String(Number.isFinite(hourInterval) ? hourInterval : 1)}
-                                  ?disabled=${this.gdriveSavingSchedule}
-                                  @input=${(e: Event) => {
-                                    const v = Number((e.target as HTMLInputElement).value || 1);
-                                    this.gdriveSchedule = { ...(sched || {}), mode: "hourly", hour_interval: v };
-                                  }}
-                                />
-                              </label>`
-                            : html`
-                                ${mode === "weekly"
-                                  ? html`<label style="display:grid; gap:6px;">
-                                      <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Giorno</span>
-                                      <select
-                                        .value=${weekday}
-                                        ?disabled=${this.gdriveSavingSchedule}
-                                        @change=${(e: Event) => {
-                                          const v = String((e.target as HTMLSelectElement).value || "mon");
-                                          this.gdriveSchedule = { ...(sched || {}), mode: "weekly", weekday: v };
-                                        }}
-                                      >
-                                        <option value="mon">Lun</option>
-                                        <option value="tue">Mar</option>
-                                        <option value="wed">Mer</option>
-                                        <option value="thu">Gio</option>
-                                        <option value="fri">Ven</option>
-                                        <option value="sat">Sab</option>
-                                        <option value="sun">Dom</option>
-                                      </select>
-                                    </label>`
-                                  : nothing}
-                                ${mode === "monthly"
-                                  ? html`<label style="display:grid; gap:6px;">
-                                      <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Giorno mese</span>
-                                      <input
-                                        type="number"
-                                        min="1"
-                                        max="28"
-                                        .value=${String(Number.isFinite(monthday) ? monthday : 1)}
-                                        ?disabled=${this.gdriveSavingSchedule}
-                                        @input=${(e: Event) => {
-                                          const v = Number((e.target as HTMLInputElement).value || 1);
-                                          this.gdriveSchedule = { ...(sched || {}), mode: "monthly", monthday: v };
-                                        }}
-                                      />
-                                    </label>`
-                                  : nothing}
-                                <label style="display:grid; gap:6px;">
-                                  <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Orario</span>
-                                  <input
-                                    type="time"
-                                    .value=${atTime}
-                                    ?disabled=${this.gdriveSavingSchedule}
-                                    @input=${(e: Event) => {
-                                      const v = (e.target as HTMLInputElement).value;
-                                      this.gdriveSchedule = { ...(sched || {}), at_time: v };
-                                    }}
-                                  />
-                                </label>
-                              `}
-                          <label style="display:grid; gap:6px;">
-                            <span style="font-size:var(--font-size-sm); color:var(--muted-color);">Retention (auto)</span>
-                            <input
-                              type="number"
-                              min="0"
-                              max="200"
-                              .value=${String(Number.isFinite(retentionCount) ? retentionCount : 0)}
-                              ?disabled=${this.gdriveSavingSchedule}
-                              @input=${(e: Event) => {
-                                const v = Number((e.target as HTMLInputElement).value || 0);
-                                this.gdriveSchedule = { ...(sched || {}), retention_count: v };
-                              }}
-                            />
-                          </label>
-                        </div>
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-                          <div style="font-size:var(--font-size-sm); color:var(--muted-color);">
-                            Next run: ${sched.next_run ? String(sched.next_run) : "N/A"}
-                          </div>
-                          <button class="btn" ?disabled=${this.gdriveSavingSchedule} @click=${() => this.saveGdriveSchedule()}>
-                            ${this.gdriveSavingSchedule ? "Salvataggio…" : "Salva"}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  `;
-                })()}
-                <div class="actions">
-                  <button class="btn" @click=${() => this.closeGdriveModal()}>Chiudi</button>
                 </div>
               </div>
             </div>`
