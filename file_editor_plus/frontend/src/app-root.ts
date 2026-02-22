@@ -89,6 +89,7 @@ import {
   apiGdriveDeviceStart,
   apiGdriveDisconnect,
   apiGdriveGetSchedule,
+  apiGdriveOauthStart,
   apiGdrivePutSchedule,
   apiGdriveStatus,
 } from "./services/api";
@@ -204,6 +205,7 @@ export class AppRoot extends LitElement {
     showGdriveModal: { state: true },
     gdriveStatus: { state: true },
     gdriveSchedule: { state: true },
+    gdriveOauthInfo: { state: true },
     gdriveLoading: { state: true },
     gdriveSavingSchedule: { state: true },
     uploadTargetDir: { state: true },
@@ -251,6 +253,7 @@ export class AppRoot extends LitElement {
   declare showGdriveModal: boolean;
   declare gdriveStatus: any;
   declare gdriveSchedule: any;
+  declare gdriveOauthInfo: { redirect_uri?: string; mode?: string } | null;
   declare gdriveLoading: boolean;
   declare gdriveSavingSchedule: boolean;
   declare uploadTargetDir: string;
@@ -595,6 +598,7 @@ export class AppRoot extends LitElement {
     this.showGdriveModal = false;
     this.gdriveStatus = null;
     this.gdriveSchedule = null;
+    this.gdriveOauthInfo = null;
     this.gdriveLoading = false;
     this.gdriveSavingSchedule = false;
     this.uploadTargetDir = "/";
@@ -1000,9 +1004,69 @@ export class AppRoot extends LitElement {
 
   private closeGdriveModal() {
     this.showGdriveModal = false;
+    this.gdriveOauthInfo = null;
     if (this.gdrivePollTimer !== null) {
       window.clearInterval(this.gdrivePollTimer);
       this.gdrivePollTimer = null;
+    }
+  }
+
+  private startGdriveStatusPolling() {
+    if (this.gdrivePollTimer !== null) return;
+    this.gdrivePollTimer = window.setInterval(async () => {
+      try {
+        const s = await apiGdriveStatus(this.apiBase);
+        const sp = await s.json().catch(() => null);
+        this.gdriveStatus = sp;
+        if (sp?.connected) {
+          window.clearInterval(this.gdrivePollTimer!);
+          this.gdrivePollTimer = null;
+          await this.loadGdriveState();
+          this.showToast("Google Drive connesso");
+          return;
+        }
+        const st = sp?.device_flow?.status;
+        if (st === "expired" || st === "error") {
+          window.clearInterval(this.gdrivePollTimer!);
+          this.gdrivePollTimer = null;
+        }
+      } catch {
+        // ignore transient polling failures
+      }
+    }, 2000);
+  }
+
+  private async startGdriveOAuthFlow() {
+    this.gdriveLoading = true;
+    try {
+      const res = await apiGdriveOauthStart(this.apiBase);
+      const payload = await res.json().catch(() => null);
+      if (!res.ok || payload?.ok !== true || !payload?.auth_url) {
+        const msg = payload?.detail || payload?.error || `HTTP ${res.status}`;
+        const lowered = String(msg).toLowerCase();
+        if (lowered.includes("client_id")) {
+          this.showToast("OAuth non disponibile: passo al Device Flow", "info");
+          await this.startGdriveDeviceFlow();
+          return;
+        }
+        this.showToast(String(msg), "error");
+        return;
+      }
+      this.gdriveOauthInfo = {
+        redirect_uri: typeof payload?.redirect_uri === "string" ? payload.redirect_uri : undefined,
+        mode: typeof payload?.mode === "string" ? payload.mode : undefined,
+      };
+      const popup = window.open(String(payload.auth_url), "gdrive_oauth", "width=520,height=720");
+      if (!popup) {
+        this.showToast("Popup bloccato: avvio Device Flow", "info");
+        await this.startGdriveDeviceFlow();
+        return;
+      }
+      popup.focus();
+      this.showToast("Completa l'accesso Google nella finestra aperta", "info");
+      this.startGdriveStatusPolling();
+    } finally {
+      this.gdriveLoading = false;
     }
   }
 
@@ -1018,28 +1082,7 @@ export class AppRoot extends LitElement {
       }
       this.gdriveStatus = { ...(this.gdriveStatus || {}), device_flow: payload };
       this.showToast("Connetti Google Drive: inserisci il codice nel link mostrato", "info");
-      if (this.gdrivePollTimer === null) {
-        this.gdrivePollTimer = window.setInterval(async () => {
-          try {
-            const s = await apiGdriveStatus(this.apiBase);
-            const sp = await s.json().catch(() => null);
-            this.gdriveStatus = sp;
-            if (sp?.connected) {
-              window.clearInterval(this.gdrivePollTimer!);
-              this.gdrivePollTimer = null;
-              await this.loadGdriveState();
-              this.showToast("Google Drive connesso");
-            }
-            const st = sp?.device_flow?.status;
-            if (st === "expired" || st === "error") {
-              window.clearInterval(this.gdrivePollTimer!);
-              this.gdrivePollTimer = null;
-            }
-          } catch {
-            // ignore transient polling failures
-          }
-        }, 2000);
-      }
+      this.startGdriveStatusPolling();
     } finally {
       this.gdriveLoading = false;
     }
@@ -3695,6 +3738,10 @@ export class AppRoot extends LitElement {
                   const flow = st.device_flow || null;
                   const sched = this.gdriveSchedule || {};
                   const mode = String(sched.mode || "daily");
+                  const oauthInfo = this.gdriveOauthInfo || {};
+                  const redirectUri = String(oauthInfo.redirect_uri || "");
+                  const redirectMode = String(oauthInfo.mode || "");
+                  const ingressDetected = window.location.pathname.includes("/api/hassio_ingress/");
                   const atTime = String(sched.at_time || sched.time || "03:00");
                   const hourInterval = Number(sched.hour_interval ?? 1);
                   const weekday = String(sched.weekday || "mon");
@@ -3716,11 +3763,39 @@ export class AppRoot extends LitElement {
                         <div style="display:flex; gap:8px; align-items:center;">
                           ${connected
                             ? html`<button class="btn" ?disabled=${this.gdriveLoading} @click=${() => this.disconnectGdrive()}>Disconnetti</button>`
-                            : html`<button class="btn primary" ?disabled=${this.gdriveLoading || !configured} @click=${() => this.startGdriveDeviceFlow()}>
+                            : html`<button class="btn primary" ?disabled=${this.gdriveLoading} @click=${() => this.startGdriveOAuthFlow()}>
                                 Connetti
                               </button>`}
                         </div>
                       </div>
+
+                      ${redirectUri
+                        ? html`<div style="border:1px solid var(--border-color); border-radius:10px; padding:10px; background:var(--panel-bg); display:grid; gap:8px;">
+                            <div style="font-weight:600;">Redirect URI da registrare</div>
+                            <div style="font-family:monospace; word-break:break-all;">${redirectUri}</div>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                              <button
+                                class="btn"
+                                @click=${async () => {
+                                  try {
+                                    await navigator.clipboard.writeText(redirectUri);
+                                    this.showToast("Redirect URI copiata");
+                                  } catch {
+                                    this.showToast("Copia non disponibile", "error");
+                                  }
+                                }}
+                              >
+                                Copia redirect URI
+                              </button>
+                              ${redirectMode ? html`<span style="color:var(--muted-color); font-size:var(--font-size-sm);">Mode: ${redirectMode}</span>` : nothing}
+                            </div>
+                            ${redirectMode === "ingress_port" || ingressDetected
+                              ? html`<div style="font-size:var(--font-size-sm); color:var(--warning-color, #f59e0b);">
+                                  Stai usando Ingress: registra una redirect URI esterna/stabile (public_base_url o host:porta callback).
+                                </div>`
+                              : nothing}
+                          </div>`
+                        : nothing}
 
                       ${!connected && flow
                         ? html`<div style="border:1px solid var(--border-color); border-radius:10px; padding:10px; background:var(--panel-bg); display:grid; gap:8px;">

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import difflib
+import base64
 import fnmatch
 import io
 import os
@@ -14,6 +15,8 @@ import platform
 import hashlib
 import mimetypes
 import threading
+import secrets
+from urllib.parse import urlencode, urlparse
 from logging.handlers import RotatingFileHandler
 import tempfile
 import zipfile
@@ -43,6 +46,33 @@ LEGACY_USER_CONFIG_FILE = (Path(__file__).parent / "user_config.json").resolve()
 MDI_META_FILE = (Path(__file__).parent / "mdi_meta.json").resolve()
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 ADDON_VERSION = os.environ.get("ADDON_VERSION") or os.environ.get("VERSION") or "unknown"
+DEFAULT_GDRIVE_OAUTH_CLIENT_ID = (
+    os.environ.get("GDRIVE_OAUTH_CLIENT_ID_DEFAULT")
+    or os.environ.get("DEFAULT_GDRIVE_OAUTH_CLIENT_ID")
+    or ""
+).strip()
+DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET = (
+    os.environ.get("GDRIVE_OAUTH_CLIENT_SECRET_DEFAULT")
+    or os.environ.get("DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET")
+    or ""
+).strip()
+DEFAULT_PUBLIC_BASE_URL = (
+    os.environ.get("PUBLIC_BASE_URL")
+    or os.environ.get("GDRIVE_PUBLIC_BASE_URL")
+    or ""
+).strip().rstrip("/")
+DEFAULT_GDRIVE_REDIRECT_OVERRIDE = (
+    os.environ.get("GDRIVE_REDIRECT_OVERRIDE")
+    or os.environ.get("GDRIVE_REDIRECT_URI_OVERRIDE")
+    or ""
+).strip()
+try:
+    DEFAULT_ADDON_CALLBACK_PORT = int(
+        (os.environ.get("ADDON_CALLBACK_PORT") or os.environ.get("GDRIVE_ADDON_CALLBACK_PORT") or "8099").strip()
+    )
+except Exception:
+    DEFAULT_ADDON_CALLBACK_PORT = 8099
+DEFAULT_ADDON_CALLBACK_PORT = max(1, min(65535, DEFAULT_ADDON_CALLBACK_PORT))
 logger = logging.getLogger("file_editor_plus")
 MAX_FORMAT_SIZE = 2 * 1024 * 1024  # 2MB
 MAX_SEARCH_FILE_SIZE = 2 * 1024 * 1024  # 2MB per file
@@ -251,6 +281,8 @@ _gdrive_device_stop: Optional[threading.Event] = None
 _gdrive_schedule_stop = threading.Event()
 _gdrive_schedule_wake = threading.Event()
 _gdrive_last_auto_run: Optional[int] = None
+_gdrive_oauth_state_store: dict[str, dict] = {}
+GDRIVE_OAUTH_STATE_TTL_SECONDS = 600
 
 
 def _load_addon_options() -> dict:
@@ -268,6 +300,93 @@ def _get_gdrive_client_id() -> Optional[str]:
     opts = _load_addon_options()
     cid = (opts.get("gdrive_client_id") or "").strip() if isinstance(opts, dict) else ""
     return cid or None
+
+
+def _get_gdrive_option_str(key: str) -> str:
+    opts = _load_addon_options()
+    if not isinstance(opts, dict):
+        return ""
+    return str(opts.get(key) or "").strip()
+
+
+def _resolve_gdrive_oauth_config() -> dict:
+    client_id = _get_gdrive_option_str("gdrive_client_id") or DEFAULT_GDRIVE_OAUTH_CLIENT_ID
+    client_secret = _get_gdrive_option_str("gdrive_client_secret") or DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET
+    redirect_override = _get_gdrive_option_str("gdrive_redirect_override") or _get_gdrive_option_str("gdrive_redirect_uri") or DEFAULT_GDRIVE_REDIRECT_OVERRIDE
+    public_base_url = _get_gdrive_option_str("public_base_url") or DEFAULT_PUBLIC_BASE_URL
+    try:
+        addon_callback_port = int(_get_gdrive_option_str("addon_callback_port") or str(DEFAULT_ADDON_CALLBACK_PORT))
+    except Exception:
+        addon_callback_port = DEFAULT_ADDON_CALLBACK_PORT
+    addon_callback_port = max(1, min(65535, addon_callback_port))
+    return {
+        "client_id": client_id or None,
+        "client_secret": client_secret or None,
+        "redirect_uri": redirect_override or None,
+        "redirect_override": redirect_override or None,
+        "public_base_url": public_base_url or None,
+        "addon_callback_port": addon_callback_port,
+        "client_id_source": "user" if _get_gdrive_option_str("gdrive_client_id") else ("env_default" if DEFAULT_GDRIVE_OAUTH_CLIENT_ID else "none"),
+        "client_secret_source": "user" if _get_gdrive_option_str("gdrive_client_secret") else ("env_default" if DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET else "none"),
+        "redirect_override_source": "user" if (_get_gdrive_option_str("gdrive_redirect_override") or _get_gdrive_option_str("gdrive_redirect_uri")) else ("env_default" if DEFAULT_GDRIVE_REDIRECT_OVERRIDE else "none"),
+        "public_base_url_source": "user" if _get_gdrive_option_str("public_base_url") else ("env_default" if DEFAULT_PUBLIC_BASE_URL else "none"),
+    }
+
+
+def _cleanup_gdrive_oauth_states(now_ts: Optional[int] = None) -> None:
+    now = int(now_ts or time.time())
+    with _gdrive_lock:
+        expired = [k for k, v in _gdrive_oauth_state_store.items() if int(v.get("expires_at") or 0) <= now]
+        for k in expired:
+            _gdrive_oauth_state_store.pop(k, None)
+
+
+def _build_gdrive_pkce_pair() -> tuple[str, str]:
+    verifier = secrets.token_urlsafe(64)
+    digest = hashlib.sha256(verifier.encode("utf-8")).digest()
+    challenge = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
+    return verifier, challenge
+
+
+def _is_valid_redirect_uri(uri: str) -> bool:
+    try:
+        p = urlparse(uri)
+    except Exception:
+        return False
+    if p.scheme not in ("http", "https"):
+        return False
+    return bool(p.netloc)
+
+
+def _build_callback_from_base(base_url: str) -> str:
+    base = (base_url or "").strip().rstrip("/")
+    return f"{base}/api/cloud/gdrive/oauth/callback"
+
+
+def _resolve_stable_redirect_uri(request: Request, oauth_cfg: dict) -> tuple[str, str]:
+    override = str(oauth_cfg.get("redirect_override") or "").strip()
+    if override:
+        return override, "override"
+
+    public_base = str(oauth_cfg.get("public_base_url") or "").strip().rstrip("/")
+    if public_base:
+        return _build_callback_from_base(public_base), "public_base_url"
+
+    headers = request.headers
+    ingress_hdr = (headers.get("x-ingress-path") or headers.get("x-forwarded-prefix") or "").strip()
+    if ingress_hdr:
+        raw_host = (headers.get("x-forwarded-host") or headers.get("host") or request.url.netloc or "").split(",")[0].strip()
+        host_no_port = raw_host.split(":", 1)[0]
+        callback_port = int(oauth_cfg.get("addon_callback_port") or DEFAULT_ADDON_CALLBACK_PORT)
+        proto = (headers.get("x-forwarded-proto") or "https").split(",")[0].strip() or "https"
+        if host_no_port:
+            return f"{proto}://{host_no_port}:{callback_port}/api/cloud/gdrive/oauth/callback", "ingress_port"
+
+    direct_proto = (headers.get("x-forwarded-proto") or request.url.scheme or "http").split(",")[0].strip() or "http"
+    direct_host = (headers.get("x-forwarded-host") or headers.get("host") or request.url.netloc or "").split(",")[0].strip()
+    if direct_host:
+        return f"{direct_proto}://{direct_host}/api/cloud/gdrive/oauth/callback", "direct"
+    return f"{str(request.base_url).rstrip('/')}/api/cloud/gdrive/oauth/callback", "direct"
 
 
 def _load_gdrive_tokens() -> Optional[dict]:
@@ -450,7 +569,12 @@ def _compute_next_run_iso_for_cfg(cfg: dict, last_run_epoch: Optional[int] = Non
 def _is_gdrive_connected(tokens: Optional[dict]) -> bool:
     if not tokens or not isinstance(tokens, dict):
         return False
-    return bool(tokens.get("refresh_token"))
+    if tokens.get("refresh_token"):
+        return True
+    access = tokens.get("access_token")
+    expires_at = int(tokens.get("expires_at") or 0)
+    now = int(time.time())
+    return bool(access) and expires_at > now + 30
 
 
 def _oauth_post_form(url: str, data: dict, timeout: float = 20.0) -> dict:
@@ -492,7 +616,8 @@ def _refresh_access_token(client_id: str, refresh_token: str) -> dict:
 
 
 def _get_access_token_or_503() -> str:
-    cid = _get_gdrive_client_id()
+    cfg = _resolve_gdrive_oauth_config()
+    cid = cfg.get("client_id")
     if not cid:
         raise HTTPException(503, "Google Drive non configurato: manca gdrive_client_id nelle opzioni add-on")
     tokens = _load_gdrive_tokens()
@@ -2835,22 +2960,158 @@ async def diff_endpoint(body: dict):
 
 @app.get("/api/cloud/gdrive/status")
 def gdrive_status():
-    cid = _get_gdrive_client_id()
+    oauth_cfg = _resolve_gdrive_oauth_config()
     tokens = _load_gdrive_tokens()
     with _gdrive_lock:
         state = dict(_gdrive_device_state) if _gdrive_device_state else None
     return {
         "ok": True,
-        "configured": bool(cid),
+        "configured": bool(oauth_cfg.get("client_id")),
+        "oauth_client_source": oauth_cfg.get("client_id_source"),
         "connected": _is_gdrive_connected(tokens),
         "device_flow": state,
     }
 
 
+@app.get("/api/cloud/gdrive/oauth/start")
+def gdrive_oauth_start(request: Request):
+    oauth_cfg = _resolve_gdrive_oauth_config()
+    client_id = oauth_cfg.get("client_id")
+    if not client_id:
+        raise HTTPException(503, "Manca gdrive_client_id (opzioni add-on o fallback env)")
+
+    redirect_uri, mode = _resolve_stable_redirect_uri(request, oauth_cfg)
+    if not _is_valid_redirect_uri(str(redirect_uri)):
+        raise HTTPException(400, "OAuth redirect_uri non valida")
+    state = secrets.token_urlsafe(32)
+    verifier, challenge = _build_gdrive_pkce_pair()
+    expires_at = int(time.time()) + GDRIVE_OAUTH_STATE_TTL_SECONDS
+
+    _cleanup_gdrive_oauth_states()
+    with _gdrive_lock:
+        _gdrive_oauth_state_store[state] = {
+            "code_verifier": verifier,
+            "redirect_uri": redirect_uri,
+            "expires_at": expires_at,
+            "used": False,
+        }
+
+    params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "https://www.googleapis.com/auth/drive.file",
+        "access_type": "offline",
+        "prompt": "consent",
+        "state": state,
+        "code_challenge": challenge,
+        "code_challenge_method": "S256",
+    }
+    auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+    logger.info("gdrive_oauth_start mode=%s redirect_uri=%s", mode, redirect_uri)
+    return {"ok": True, "auth_url": auth_url, "redirect_uri": redirect_uri, "mode": mode, "expires_at": expires_at}
+
+
+@app.get("/api/cloud/gdrive/oauth/callback", response_class=HTMLResponse)
+def gdrive_oauth_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
+    global _gdrive_device_state
+    _cleanup_gdrive_oauth_states()
+
+    if error:
+        return HTMLResponse(
+            f"""<!doctype html><html><body style="font-family:sans-serif;padding:16px;">
+            <h3>Google Drive: autorizzazione negata</h3>
+            <p>Dettaglio: {error}</p>
+            <script>setTimeout(()=>window.close(),1200);</script>
+            </body></html>""",
+            status_code=400,
+        )
+
+    if not state or not code:
+        raise HTTPException(400, "OAuth callback incompleto")
+
+    with _gdrive_lock:
+        state_data = _gdrive_oauth_state_store.get(state)
+        if not state_data:
+            raise HTTPException(400, "OAuth state non valido o scaduto")
+        if bool(state_data.get("used")):
+            raise HTTPException(400, "OAuth state già utilizzato")
+        if int(state_data.get("expires_at") or 0) <= int(time.time()):
+            _gdrive_oauth_state_store.pop(state, None)
+            raise HTTPException(400, "OAuth state scaduto")
+        state_data = dict(state_data)
+        _gdrive_oauth_state_store[state]["used"] = True
+
+    oauth_cfg = _resolve_gdrive_oauth_config()
+    client_id = oauth_cfg.get("client_id")
+    if not client_id:
+        with _gdrive_lock:
+            _gdrive_oauth_state_store.pop(state, None)
+        raise HTTPException(503, "OAuth non configurato: client_id mancante")
+
+    token_redirect_uri = str(state_data.get("redirect_uri") or "").strip()
+    if not token_redirect_uri:
+        with _gdrive_lock:
+            _gdrive_oauth_state_store.pop(state, None)
+        raise HTTPException(400, "OAuth state incompleto: redirect_uri mancante (riavvia il flow da Connetti)")
+    if not _is_valid_redirect_uri(str(token_redirect_uri)):
+        with _gdrive_lock:
+            _gdrive_oauth_state_store.pop(state, None)
+        raise HTTPException(400, "OAuth redirect_uri non valida")
+
+    token_payload = {
+        "client_id": client_id,
+        "code": code,
+        "grant_type": "authorization_code",
+        "redirect_uri": token_redirect_uri,
+        "code_verifier": state_data.get("code_verifier") or "",
+    }
+    client_secret = oauth_cfg.get("client_secret")
+    if client_secret:
+        token_payload["client_secret"] = client_secret
+
+    try:
+        payload = _oauth_post_form("https://oauth2.googleapis.com/token", token_payload)
+        access_token = payload.get("access_token")
+        if not access_token:
+            raise HTTPException(502, "Token response incompleta: access_token mancante")
+        refresh_token = payload.get("refresh_token")
+        existing = _load_gdrive_tokens() or {}
+        now = int(time.time())
+        expires_in = int(payload.get("expires_in") or 3600)
+        merged = dict(existing)
+        merged.update(
+            {
+                "access_token": access_token,
+                "expires_at": now + expires_in,
+                "token_type": payload.get("token_type") or "Bearer",
+                "scope": payload.get("scope") or merged.get("scope") or "drive.file",
+            }
+        )
+        if refresh_token:
+            merged["refresh_token"] = refresh_token
+        _save_gdrive_tokens(merged)
+    finally:
+        with _gdrive_lock:
+            _gdrive_oauth_state_store.pop(state, None)
+
+    with _gdrive_lock:
+        _gdrive_device_state = {"status": "connected", "source": "oauth_callback", "at": int(time.time())}
+
+    return HTMLResponse(
+        """<!doctype html><html><body style="font-family:sans-serif;padding:16px;">
+        <h3>Google Drive connesso</h3>
+        <p>Puoi chiudere questa finestra e tornare all'add-on.</p>
+        <script>setTimeout(()=>window.close(),1200);</script>
+        </body></html>"""
+    )
+
+
 @app.post("/api/cloud/gdrive/device/start")
 def gdrive_device_start():
     global _gdrive_device_state, _gdrive_device_stop
-    cid = _get_gdrive_client_id()
+    oauth_cfg = _resolve_gdrive_oauth_config()
+    cid = oauth_cfg.get("client_id")
     if not cid:
         raise HTTPException(503, "Manca gdrive_client_id nelle opzioni add-on")
 
