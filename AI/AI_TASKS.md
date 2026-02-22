@@ -183,7 +183,7 @@
 
 ## STEP 006 — Frontend: mostra “Redirect URI da registrare” + warning Ingress
 
-- Status: TODO
+- Status: DONE
 - Goal: Ridurre supporto/issue: l’utente deve copiare-incollare la redirect corretta.
 - Changes:
   - Quando clicchi Connetti e ricevi `/oauth/start`:
@@ -196,6 +196,20 @@
 
 - Commit message:
   - `feat(ui): display oauth redirect uri and ingress warning`
+
+- What changed:
+  - La modale Google Drive mostra la `redirect_uri` restituita da `/oauth/start` in forma copiabile.
+  - Aggiunto warning contestuale quando la strategia è `ingress_port` (o quando la UI gira sotto path ingress).
+  - Preservata UX esistente del pulsante `Connetti` con apertura popup OAuth.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/KNOWLEDGE.yaml`
+  - `file_editor_plus/frontend/src/app-root.ts`
+
+- Commands run:
+  - `cd file_editor_plus/frontend && npm run build`
+  - `docker run --rm -v "$PWD/file_editor_plus/backend:/app" -w /app python:3.12-alpine sh -lc "python -m pip install -r requirements.txt >/dev/null && python -m unittest -q"`
 
 ---
 
