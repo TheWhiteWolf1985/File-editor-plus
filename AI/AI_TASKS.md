@@ -230,6 +230,20 @@
   - `git commit -m "chore(test): archive gdrive oauth tests under future_features and keep CI green"`
   - `git push origin develop`
 
+**Status:** DONE
+**What changed:**
+- Spostato `file_editor_plus/backend/test_gdrive_oauth.py` in `future_features/cloud_backup_gdrive/tests/test_gdrive_oauth.py`.
+- Nessun aggiornamento pattern runner necessario: la suite standard backend continua a scoprire solo test nel path attivo.
+- Eseguita suite backend standard in container con esito PASS.
+- Build frontend eseguita con esito PASS.
+**Files touched:**
+- `file_editor_plus/backend/test_gdrive_oauth.py` (moved)
+- `future_features/cloud_backup_gdrive/tests/test_gdrive_oauth.py`
+- `AI/AI_TASKS.md`
+**Commands run:**
+- `docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\"`
+- `cd file_editor_plus/frontend && npm run build`
+
 ---
 
 ## STEP 6 — Ripulitura dipendenze (SOLO se 100% inutilizzate)

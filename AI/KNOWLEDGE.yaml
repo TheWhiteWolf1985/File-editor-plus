@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T17:01:00Z"
+  updated_at: "2026-02-22T17:06:00Z"
 
 commands:
   frontend_build:
@@ -127,6 +127,18 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "CLOUD-ARCHIVE-STEP-005"
+    summary: "Archiviate le unit test gdrive fuori dal percorso attivo; suite backend standard confermata verde."
+    files:
+      - "file_editor_plus/backend/test_gdrive_oauth.py"
+      - "future_features/cloud_backup_gdrive/tests/test_gdrive_oauth.py"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "docker run --rm -v \"$PWD/file_editor_plus/backend:/app\" -w /app python:3.12-alpine sh -lc \"python -m pip install -r requirements.txt >/dev/null && python -m unittest -q\""
+      - "cd file_editor_plus/frontend && npm run build"
+    notes: "I test OAuth gdrive restano recuperabili in future_features e non impattano più la CI attiva."
+
   - step_id: "CLOUD-ARCHIVE-STEP-004"
     summary: "Rimosse opzioni gdrive dalla config add-on e pulita documentazione attiva; snapshot config/docs archiviati in future_features."
     files:
