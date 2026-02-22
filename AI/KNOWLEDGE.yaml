@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T11:54:00Z"
+  updated_at: "2026-02-22T11:59:00Z"
 
 commands:
   frontend_build:
@@ -117,6 +117,16 @@ relations:
     to: "context:gdrive_oauth_map"
 
 changes_log:
+  - step_id: "GDRIVE-OAUTH-STEP-008"
+    summary: "Hardening OAuth: validazione strict di `redirect_uri` su start/callback + conferma state single-use TTL."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/backend/app.py"
+    commands:
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+    notes: "Nessuna session cookie introdotta; flow resta stateless con state store in-memory."
+
   - step_id: "GDRIVE-OAUTH-STEP-007"
     summary: "Mantenuto Device Flow come fallback secondario quando OAuth popup fallisce/bloccato."
     files:

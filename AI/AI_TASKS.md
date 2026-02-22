@@ -336,7 +336,7 @@
 
 ## STEP 008 — Hardening sicurezza (state, headers, logging, secrets)
 
-- Status: TODO
+- Status: DONE
 - Goal: Chiudere le falle classiche OAuth prima che qualcuno ci faccia a pezzi su GitHub 😄
 - Scope:
   - Backend middleware/utilities: `<<REQUIRED>>`
@@ -366,6 +366,19 @@
 
 - Blockers/Notes:
   - Se usi PKCE, il rischio cala ancora.
+
+- What changed:
+  - Rafforzata validazione `redirect_uri` OAuth (schema `http/https` + netloc obbligatorio).
+  - Confermata gestione `state` robusta già in place: random forte, TTL e single-use.
+  - Confermato che i token/secret non vengono loggati nel nuovo flow (nessun dump query/token).
+  - Nessun cookie/session introdotto: N/A per attributi cookie in questa implementazione stateless.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `file_editor_plus/backend/app.py`
+
+- Commands run:
+  - `python3 -m compileall file_editor_plus/backend/app.py`
 
 ---
 

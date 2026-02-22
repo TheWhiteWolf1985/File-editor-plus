@@ -16,7 +16,7 @@ import hashlib
 import mimetypes
 import threading
 import secrets
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from logging.handlers import RotatingFileHandler
 import tempfile
 import zipfile
@@ -318,6 +318,16 @@ def _build_gdrive_pkce_pair() -> tuple[str, str]:
     digest = hashlib.sha256(verifier.encode("utf-8")).digest()
     challenge = base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
     return verifier, challenge
+
+
+def _is_valid_redirect_uri(uri: str) -> bool:
+    try:
+        p = urlparse(uri)
+    except Exception:
+        return False
+    if p.scheme not in ("http", "https"):
+        return False
+    return bool(p.netloc)
 
 
 def _load_gdrive_tokens() -> Optional[dict]:
@@ -2912,6 +2922,8 @@ def gdrive_oauth_start(request: Request):
         raise HTTPException(503, "Manca gdrive_client_id (opzioni add-on o fallback env)")
 
     redirect_uri = oauth_cfg.get("redirect_uri") or f"{str(request.base_url).rstrip('/')}/api/cloud/gdrive/oauth/callback"
+    if not _is_valid_redirect_uri(str(redirect_uri)):
+        raise HTTPException(400, "OAuth redirect_uri non valida")
     state = secrets.token_urlsafe(32)
     verifier, challenge = _build_gdrive_pkce_pair()
     expires_at = int(time.time()) + GDRIVE_OAUTH_STATE_TTL_SECONDS
@@ -2977,11 +2989,17 @@ def gdrive_oauth_callback(request: Request, code: Optional[str] = None, state: O
             _gdrive_oauth_state_store.pop(state, None)
         raise HTTPException(503, "OAuth non configurato: client_id mancante")
 
+    token_redirect_uri = state_data.get("redirect_uri") or oauth_cfg.get("redirect_uri") or f"{str(request.base_url).rstrip('/')}/api/cloud/gdrive/oauth/callback"
+    if not _is_valid_redirect_uri(str(token_redirect_uri)):
+        with _gdrive_lock:
+            _gdrive_oauth_state_store.pop(state, None)
+        raise HTTPException(400, "OAuth redirect_uri non valida")
+
     token_payload = {
         "client_id": client_id,
         "code": code,
         "grant_type": "authorization_code",
-        "redirect_uri": state_data.get("redirect_uri") or oauth_cfg.get("redirect_uri") or f"{str(request.base_url).rstrip('/')}/api/cloud/gdrive/oauth/callback",
+        "redirect_uri": token_redirect_uri,
         "code_verifier": state_data.get("code_verifier") or "",
     }
     client_secret = oauth_cfg.get("client_secret")
