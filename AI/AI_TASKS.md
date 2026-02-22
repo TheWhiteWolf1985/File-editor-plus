@@ -148,7 +148,7 @@
 
 ## STEP 005 — Backend: debug ergonomico (senza leak)
 
-- Status: TODO
+- Status: DONE
 - Goal: Rendere immediato capire _quale_ redirect URI stiamo usando e _perché_, senza loggare segreti.
 - Changes:
   - In `/api/cloud/gdrive/oauth/start` includere (già presente o da aggiungere):
@@ -164,6 +164,20 @@
 
 - Commit message:
   - `chore(gdrive): add safe diagnostics for oauth redirect selection`
+
+- What changed:
+  - L’endpoint `/api/cloud/gdrive/oauth/start` ora restituisce sempre `redirect_uri` e `mode`.
+  - Aggiunto log backend safe con `mode` e `redirect_uri` (senza token/code/secret).
+  - Diagnostica pronta per capire subito quale URI registrare in Google Cloud.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/KNOWLEDGE.yaml`
+  - `file_editor_plus/backend/app.py`
+
+- Commands run:
+  - `python3 -m compileall file_editor_plus/backend/app.py`
+  - `cd file_editor_plus/frontend && npm run build`
 
 ---
 

@@ -2980,7 +2980,7 @@ def gdrive_oauth_start(request: Request):
     if not client_id:
         raise HTTPException(503, "Manca gdrive_client_id (opzioni add-on o fallback env)")
 
-    redirect_uri, _mode = _resolve_stable_redirect_uri(request, oauth_cfg)
+    redirect_uri, mode = _resolve_stable_redirect_uri(request, oauth_cfg)
     if not _is_valid_redirect_uri(str(redirect_uri)):
         raise HTTPException(400, "OAuth redirect_uri non valida")
     state = secrets.token_urlsafe(32)
@@ -3008,7 +3008,8 @@ def gdrive_oauth_start(request: Request):
         "code_challenge_method": "S256",
     }
     auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
-    return {"ok": True, "auth_url": auth_url, "expires_at": expires_at}
+    logger.info("gdrive_oauth_start mode=%s redirect_uri=%s", mode, redirect_uri)
+    return {"ok": True, "auth_url": auth_url, "redirect_uri": redirect_uri, "mode": mode, "expires_at": expires_at}
 
 
 @app.get("/api/cloud/gdrive/oauth/callback", response_class=HTMLResponse)

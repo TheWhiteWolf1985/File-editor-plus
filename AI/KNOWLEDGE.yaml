@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T14:00:00Z"
+  updated_at: "2026-02-22T14:06:00Z"
 
 commands:
   frontend_build:
@@ -127,6 +127,17 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "GDRIVE-INGRESS-STEP-005"
+    summary: "Aggiunta diagnostica sicura su `/oauth/start`: response con `redirect_uri`/`mode` e log backend senza segreti."
+    files:
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+      - "file_editor_plus/backend/app.py"
+    commands:
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+      - "cd file_editor_plus/frontend && npm run build"
+    notes: "Supporta troubleshooting rapido di 400/404 con URI effettiva e strategia selezionata."
+
   - step_id: "GDRIVE-INGRESS-STEP-004"
     summary: "Documentati requisiti callback OAuth raggiungibile (public_base_url/override/porta callback) per evitare 404."
     files:
