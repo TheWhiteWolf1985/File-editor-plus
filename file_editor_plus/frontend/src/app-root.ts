@@ -2882,7 +2882,13 @@ export class AppRoot extends LitElement {
     if (this.activeActivity === "snippet") {
       const term = this.snippetSearchText.toLowerCase();
       const field = this.snippetSearchField;
-      const filtered = this.snippets.filter((s) => {
+      const normalized = this.snippets.map((s) => ({
+        ...s,
+        name: String(s?.name ?? ""),
+        description: String(s?.description ?? ""),
+        content: String(s?.content ?? ""),
+      }));
+      const filtered = normalized.filter((s) => {
         const hay = field === "description" ? s.description : s.name;
         return hay.toLowerCase().includes(term);
       });
