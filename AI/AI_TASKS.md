@@ -432,7 +432,7 @@
 
 ## STEP 010 — Documentazione e audit finale
 
-- Status: TODO
+- Status: DONE
 - Goal: Chiudere feature con documenti coerenti e pronto per release 1.0.0.
 - Scope:
   - `README` / docs addon: `<<REQUIRED>>`
@@ -462,5 +462,18 @@
 
 - Blockers/Notes:
   - Release notes in `AI/RELEASE.md` se previste.
+
+- What changed:
+  - Aggiornata documentazione addon (`README`) con sezione OAuth Google Drive: opzioni utente, fallback env/secrets, flow e troubleshooting.
+  - Consolidata tracciabilita' finale in `AI/KNOWLEDGE.yaml` con chiusura step e comandi eseguiti.
+  - Tutti gli step della sequenza OAuth risultano ora marcati come `DONE`.
+
+- Files touched:
+  - `AI/AI_TASKS.md`
+  - `AI/KNOWLEDGE.yaml`
+  - `file_editor_plus/README.md`
+
+- Commands run:
+  - `cd file_editor_plus/frontend && npm run build`
 
 ---
