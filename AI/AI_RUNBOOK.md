@@ -11,7 +11,6 @@ Vincoli:
 - Requisiti runtime:
   - Add-on Home Assistant con Ingress abilitato.
   - Mount `/config:rw` e contesto Supervisor per API HA (token gestito dal Supervisor).
-  - (Cloud Backup) Google Drive richiede `gdrive_client_id` nelle opzioni dell'add-on (vedi `file_editor_plus/config.yaml` -> `options/schema`).
 
 ## Dev
 - Dev locale:

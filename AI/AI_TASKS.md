@@ -189,6 +189,25 @@
   - `git commit -m "chore(config): remove cloud-backup gdrive options/docs from active addon (archived)"`
   - `git push origin develop`
 
+**Status:** DONE
+**What changed:**
+- Rimosse le opzioni/schema `gdrive_*` da `file_editor_plus/config.yaml` (ora `options: {}` e `schema: {}`).
+- Archiviato schema precedente in `future_features/cloud_backup_gdrive/config/options_schema_snapshot.yaml`.
+- Rimossa la sezione cloud backup dalla documentazione attiva `file_editor_plus/README.md`.
+- Salvato estratto doc rimosso in `future_features/cloud_backup_gdrive/docs/README_cloud_section.md`.
+- Aggiornato `AI/AI_RUNBOOK.md` rimuovendo prerequisito operativo cloud backup.
+**Files touched:**
+- `file_editor_plus/config.yaml`
+- `file_editor_plus/README.md`
+- `AI/AI_RUNBOOK.md`
+- `future_features/cloud_backup_gdrive/config/options_schema_snapshot.yaml`
+- `future_features/cloud_backup_gdrive/docs/README_cloud_section.md`
+- `AI/AI_TASKS.md`
+**Commands run:**
+- `rg -n "gdrive_|GDRIVE_OAUTH|GOOGLE_OAUTH" file_editor_plus/config.yaml file_editor_plus/README.md AI/AI_RUNBOOK.md`
+- `cd file_editor_plus/frontend && npm run build`
+- `python3 -m compileall file_editor_plus/backend/app.py`
+
 ---
 
 ## STEP 5 — Test/CI: rimuovere test gdrive dal percorso attivo e archiviare

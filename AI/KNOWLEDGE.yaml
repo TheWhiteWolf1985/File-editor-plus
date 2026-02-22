@@ -1,7 +1,7 @@
 meta:
   project: "ha-file-editor-plus"
   source_of_truth: "AI/KNOWLEDGE.yaml"
-  updated_at: "2026-02-22T16:55:00Z"
+  updated_at: "2026-02-22T17:01:00Z"
 
 commands:
   frontend_build:
@@ -127,6 +127,22 @@ relations:
     to: "qa:gdrive_smoke"
 
 changes_log:
+  - step_id: "CLOUD-ARCHIVE-STEP-004"
+    summary: "Rimosse opzioni gdrive dalla config add-on e pulita documentazione attiva; snapshot config/docs archiviati in future_features."
+    files:
+      - "file_editor_plus/config.yaml"
+      - "file_editor_plus/README.md"
+      - "AI/AI_RUNBOOK.md"
+      - "future_features/cloud_backup_gdrive/config/options_schema_snapshot.yaml"
+      - "future_features/cloud_backup_gdrive/docs/README_cloud_section.md"
+      - "AI/AI_TASKS.md"
+      - "AI/KNOWLEDGE.yaml"
+    commands:
+      - "rg -n \"gdrive_|GDRIVE_OAUTH|GOOGLE_OAUTH\" file_editor_plus/config.yaml file_editor_plus/README.md AI/AI_RUNBOOK.md"
+      - "cd file_editor_plus/frontend && npm run build"
+      - "python3 -m compileall file_editor_plus/backend/app.py"
+    notes: "Le opzioni cloud backup non sono più esposte nel manifest add-on attivo."
+
   - step_id: "CLOUD-ARCHIVE-STEP-003"
     summary: "Rimosse dal backend attivo le route `/api/cloud/gdrive/*`; snapshot route originale archiviato in future_features."
     files:
