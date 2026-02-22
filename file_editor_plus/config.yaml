@@ -29,8 +29,14 @@ options:
   gdrive_client_id: ""
   gdrive_client_secret: ""
   gdrive_redirect_uri: ""
+  gdrive_redirect_override: ""
+  public_base_url: ""
+  addon_callback_port: 8099
 
 schema:
   gdrive_client_id: str
   gdrive_client_secret: str
   gdrive_redirect_uri: str
+  gdrive_redirect_override: str
+  public_base_url: str
+  addon_callback_port: int(1,65535)

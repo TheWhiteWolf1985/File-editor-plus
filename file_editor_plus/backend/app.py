@@ -56,6 +56,23 @@ DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET = (
     or os.environ.get("DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET")
     or ""
 ).strip()
+DEFAULT_PUBLIC_BASE_URL = (
+    os.environ.get("PUBLIC_BASE_URL")
+    or os.environ.get("GDRIVE_PUBLIC_BASE_URL")
+    or ""
+).strip().rstrip("/")
+DEFAULT_GDRIVE_REDIRECT_OVERRIDE = (
+    os.environ.get("GDRIVE_REDIRECT_OVERRIDE")
+    or os.environ.get("GDRIVE_REDIRECT_URI_OVERRIDE")
+    or ""
+).strip()
+try:
+    DEFAULT_ADDON_CALLBACK_PORT = int(
+        (os.environ.get("ADDON_CALLBACK_PORT") or os.environ.get("GDRIVE_ADDON_CALLBACK_PORT") or "8099").strip()
+    )
+except Exception:
+    DEFAULT_ADDON_CALLBACK_PORT = 8099
+DEFAULT_ADDON_CALLBACK_PORT = max(1, min(65535, DEFAULT_ADDON_CALLBACK_PORT))
 logger = logging.getLogger("file_editor_plus")
 MAX_FORMAT_SIZE = 2 * 1024 * 1024  # 2MB
 MAX_SEARCH_FILE_SIZE = 2 * 1024 * 1024  # 2MB per file
@@ -295,13 +312,24 @@ def _get_gdrive_option_str(key: str) -> str:
 def _resolve_gdrive_oauth_config() -> dict:
     client_id = _get_gdrive_option_str("gdrive_client_id") or DEFAULT_GDRIVE_OAUTH_CLIENT_ID
     client_secret = _get_gdrive_option_str("gdrive_client_secret") or DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET
-    redirect_uri = _get_gdrive_option_str("gdrive_redirect_uri")
+    redirect_override = _get_gdrive_option_str("gdrive_redirect_override") or _get_gdrive_option_str("gdrive_redirect_uri") or DEFAULT_GDRIVE_REDIRECT_OVERRIDE
+    public_base_url = _get_gdrive_option_str("public_base_url") or DEFAULT_PUBLIC_BASE_URL
+    try:
+        addon_callback_port = int(_get_gdrive_option_str("addon_callback_port") or str(DEFAULT_ADDON_CALLBACK_PORT))
+    except Exception:
+        addon_callback_port = DEFAULT_ADDON_CALLBACK_PORT
+    addon_callback_port = max(1, min(65535, addon_callback_port))
     return {
         "client_id": client_id or None,
         "client_secret": client_secret or None,
-        "redirect_uri": redirect_uri or None,
+        "redirect_uri": redirect_override or None,
+        "redirect_override": redirect_override or None,
+        "public_base_url": public_base_url or None,
+        "addon_callback_port": addon_callback_port,
         "client_id_source": "user" if _get_gdrive_option_str("gdrive_client_id") else ("env_default" if DEFAULT_GDRIVE_OAUTH_CLIENT_ID else "none"),
         "client_secret_source": "user" if _get_gdrive_option_str("gdrive_client_secret") else ("env_default" if DEFAULT_GDRIVE_OAUTH_CLIENT_SECRET else "none"),
+        "redirect_override_source": "user" if (_get_gdrive_option_str("gdrive_redirect_override") or _get_gdrive_option_str("gdrive_redirect_uri")) else ("env_default" if DEFAULT_GDRIVE_REDIRECT_OVERRIDE else "none"),
+        "public_base_url_source": "user" if _get_gdrive_option_str("public_base_url") else ("env_default" if DEFAULT_PUBLIC_BASE_URL else "none"),
     }
 
 
