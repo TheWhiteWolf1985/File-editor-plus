@@ -2,12 +2,6 @@ name: PreRelease (build + publish to PreRelease)
 
 on:
   workflow_dispatch:
-    inputs:
-      ref:
-        description: "Git ref da pubblicare (branch/tag/sha). Default: develop"
-        required: false
-        default: "develop"
-        type: string
 
   push:
     branches:

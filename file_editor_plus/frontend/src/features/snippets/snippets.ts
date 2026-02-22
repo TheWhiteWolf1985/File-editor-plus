@@ -7,7 +7,16 @@ export async function loadSnippets(this: any) {
     const res = await apiGetSnippets(this.apiBase);
     if (!res.ok) throw new Error(`snippets ${res.status}`);
     const data = await res.json();
-    const items = Array.isArray(data?.items) ? (data.items as Snippet[]) : [];
+    const rawItems = Array.isArray(data?.items) ? data.items : [];
+    const items: Snippet[] = rawItems
+      .filter((item: any) => item && typeof item === "object")
+      .map((item: any) => ({
+        id: String(item.id ?? `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+        name: String(item.name ?? ""),
+        description: String(item.description ?? ""),
+        content: String(item.content ?? ""),
+      }))
+      .filter((item: Snippet) => item.name.length > 0 || item.description.length > 0 || item.content.length > 0);
     this.snippets = items.length > 0 ? items : this.snippetMocks;
   } catch (e) {
     this.snippets = this.snippetMocks;
@@ -19,9 +28,9 @@ export function openSnippetModal(this: any, existing?: Snippet) {
   this.showSnippetModal = true;
   if (existing) {
     this.snippetEditingId = existing.id;
-    this.snippetName = existing.name;
-    this.snippetDescription = existing.description;
-    this.snippetContent = existing.content;
+    this.snippetName = String(existing.name ?? "");
+    this.snippetDescription = String(existing.description ?? "");
+    this.snippetContent = String(existing.content ?? "");
   } else {
     this.snippetEditingId = null;
     this.snippetName = "";
